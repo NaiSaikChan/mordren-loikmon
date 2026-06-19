@@ -8,7 +8,7 @@ import EmptyState from '@/components/shared/EmptyState.vue'
 
 const { t } = useI18n()
 const store = useArticlesStore()
-onMounted(() => store.fetchArticles({}, true))
+onMounted(() => store.fetchArticles())
 </script>
 
 <template>
@@ -19,7 +19,7 @@ onMounted(() => store.fetchArticles({}, true))
     <div v-else class="space-y-3">
       <ArticleCard v-for="article in store.list" :key="article.id" :article="article" />
     </div>
-    <div v-if="store.hasMore" class="mt-6 text-center">
+    <div class="mt-6 text-center">
       <button class="btn-secondary" :disabled="store.loading" @click="store.fetchArticles()">
         {{ store.loading ? t('common.loading') : t('common.more') }}
       </button>

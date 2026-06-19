@@ -10,7 +10,7 @@ const { t } = useI18n();
 const booksStore = useBooksStore();
 const authStore = useAuthStore();
 onMounted(() => {
-    booksStore.fetchBooks({}, true);
+    booksStore.fetchBooks();
 });
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
@@ -20,7 +20,7 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.d
     ...{ class: "page-wrapper" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-    ...{ class: "mb-8 rounded-2xl bg-linear-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg" },
+    ...{ class: "mb-8 rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg" },
 });
 __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
     ...{ class: "text-brand-200 text-sm font-medium mb-1" },
@@ -68,7 +68,7 @@ for (const [item] of __VLS_getVForSourceType(([
     { to: '/books', icon: '📚', label: __VLS_ctx.t('nav.books'), color: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' },
     { to: '/articles', icon: '📰', label: __VLS_ctx.t('nav.articles'), color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
     { to: '/music', icon: '🎵', label: __VLS_ctx.t('nav.music'), color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' },
-    { to: '/library', icon: '📁', label: __VLS_ctx.t('nav.library'), color: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' },
+    { to: '/library', icon: '🗂️', label: __VLS_ctx.t('nav.library'), color: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' },
 ]))) {
     const __VLS_8 = {}.RouterLink;
     /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
@@ -76,12 +76,12 @@ for (const [item] of __VLS_getVForSourceType(([
     const __VLS_9 = __VLS_asFunctionalComponent(__VLS_8, new __VLS_8({
         key: (item.to),
         to: (item.to),
-        ...{ class: (['flex flex-col items-center gap-2 p-4 rounded-2xl transition-transform hover:scale-105', item.color]) },
+        ...{ class: (['card flex flex-col items-center justify-center p-4 gap-2 no-underline', item.color]) },
     }));
     const __VLS_10 = __VLS_9({
         key: (item.to),
         to: (item.to),
-        ...{ class: (['flex flex-col items-center gap-2 p-4 rounded-2xl transition-transform hover:scale-105', item.color]) },
+        ...{ class: (['card flex flex-col items-center justify-center p-4 gap-2 no-underline', item.color]) },
     }, ...__VLS_functionalComponentArgsRest(__VLS_9));
     __VLS_11.slots.default;
     __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
@@ -94,20 +94,17 @@ for (const [item] of __VLS_getVForSourceType(([
     (item.label);
     var __VLS_11;
 }
-__VLS_asFunctionalElement(__VLS_intrinsicElements.section, __VLS_intrinsicElements.section)({
-    ...{ class: "mb-8" },
-});
 /** @type {[typeof SectionHeader, ]} */ ;
 // @ts-ignore
 const __VLS_12 = __VLS_asFunctionalComponent(SectionHeader, new SectionHeader({
     title: (__VLS_ctx.t('books.title')),
-    viewAllPath: "/books",
+    to: ('/books'),
 }));
 const __VLS_13 = __VLS_12({
     title: (__VLS_ctx.t('books.title')),
-    viewAllPath: "/books",
+    to: ('/books'),
 }, ...__VLS_functionalComponentArgsRest(__VLS_12));
-if (__VLS_ctx.booksStore.loading && __VLS_ctx.booksStore.list.length === 0) {
+if (__VLS_ctx.booksStore.loading) {
     /** @type {[typeof LoadingSpinner, ]} */ ;
     // @ts-ignore
     const __VLS_15 = __VLS_asFunctionalComponent(LoadingSpinner, new LoadingSpinner({}));
@@ -133,7 +130,7 @@ else {
 /** @type {__VLS_StyleScopedClasses['page-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['mb-8']} */ ;
 /** @type {__VLS_StyleScopedClasses['rounded-2xl']} */ ;
-/** @type {__VLS_StyleScopedClasses['bg-linear-to-br']} */ ;
+/** @type {__VLS_StyleScopedClasses['bg-gradient-to-br']} */ ;
 /** @type {__VLS_StyleScopedClasses['from-brand-600']} */ ;
 /** @type {__VLS_StyleScopedClasses['to-indigo-700']} */ ;
 /** @type {__VLS_StyleScopedClasses['p-6']} */ ;
@@ -181,7 +178,6 @@ else {
 /** @type {__VLS_StyleScopedClasses['text-2xl']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
 /** @type {__VLS_StyleScopedClasses['font-semibold']} */ ;
-/** @type {__VLS_StyleScopedClasses['mb-8']} */ ;
 /** @type {__VLS_StyleScopedClasses['content-grid']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({

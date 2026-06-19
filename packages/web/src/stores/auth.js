@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { auth as authApi, setClient } from '@loikmon/api';
-import axios from 'axios';
+import { auth as authApi } from '@loikmon/api';
 export const useAuthStore = defineStore('auth', () => {
     // ── State ────────────────────────────────────────
     const user = ref(null);
@@ -9,37 +8,33 @@ export const useAuthStore = defineStore('auth', () => {
     const loading = ref(false);
     const error = ref(null);
     // ── Getters ──────────────────────────────────────
-    const isLoggedIn = computed(() => !!token.value && !!user.value);
+    const isLoggedIn = computed(() => !!token.value);
     const displayName = computed(() => user.value?.name ?? '');
     const avatar = computed(() => user.value?.avatar ?? '');
     const coinBalance = computed(() => user.value?.coins ?? 0);
-    // ── Init axios with base URL ──────────────────────
-    function _initClient() {
-        const instance = axios.create({
-            baseURL: '/api',
-            timeout: 15000,
-            headers: { 'Content-Type': 'application/json' },
-        });
-        instance.interceptors.request.use((config) => {
-            if (token.value)
-                config.headers['Authorization'] = `Bearer ${token.value}`;
-            return config;
-        });
-        setClient(instance);
-    }
     // ── Actions ──────────────────────────────────────
     async function login(payload) {
         loading.value = true;
         error.value = null;
         try {
-            _initClient();
             const res = await authApi.login(payload);
-            const result = res.data.data;
-            token.value = result.token;
-            user.value = result.user;
-            localStorage.setItem('token', result.token);
+            const body = res.data;
+            // loikmon.org returns: { status: 'ok'|'error', token?, user?, message? }
+            if (body.status === 'error') {
+                error.value = body.message ?? 'Login failed';
+                throw error.value;
+            }
+            if (!body.token) {
+                error.value = 'No token received';
+                throw error.value;
+            }
+            token.value = body.token;
+            user.value = body.user ?? null;
+            localStorage.setItem('token', body.token);
         }
         catch (err) {
+            if (typeof err === 'string')
+                throw err;
             const e = err;
             error.value = e.response?.data?.message ?? e.message ?? 'Login failed';
             throw error.value;
@@ -52,14 +47,22 @@ export const useAuthStore = defineStore('auth', () => {
         loading.value = true;
         error.value = null;
         try {
-            _initClient();
             const res = await authApi.register(payload);
-            const result = res.data.data;
-            token.value = result.token;
-            user.value = result.user;
-            localStorage.setItem('token', result.token);
+            const body = res.data;
+            if (body.status === 'error') {
+                error.value = body.message ?? 'Registration failed';
+                throw error.value;
+            }
+            // Some accounts require email verification — token may not be present
+            if (body.token) {
+                token.value = body.token;
+                user.value = body.user ?? null;
+                localStorage.setItem('token', body.token);
+            }
         }
         catch (err) {
+            if (typeof err === 'string')
+                throw err;
             const e = err;
             error.value = e.response?.data?.message ?? e.message ?? 'Registration failed';
             throw error.value;
@@ -77,7 +80,10 @@ export const useAuthStore = defineStore('auth', () => {
         loading.value = true;
         try {
             const res = await authApi.updateProfile(data);
-            user.value = res.data.data;
+            const body = res.data;
+            if (body.status !== 'error' && body.user) {
+                user.value = body.user;
+            }
         }
         finally {
             loading.value = false;
@@ -86,11 +92,11 @@ export const useAuthStore = defineStore('auth', () => {
     // Restore session on app mount
     function restore() {
         const saved = localStorage.getItem('token');
-        if (saved) {
+        if (saved)
             token.value = saved;
-            _initClient();
-        }
     }
-    return { user, token, loading, error, isLoggedIn, displayName, avatar, coinBalance,
-        login, register, logout, updateProfile, restore };
+    return {
+        user, token, loading, error, isLoggedIn, displayName, avatar, coinBalance,
+        login, register, logout, updateProfile, restore,
+    };
 });

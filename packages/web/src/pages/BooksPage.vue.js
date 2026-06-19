@@ -8,8 +8,8 @@ import EmptyState from '@/components/shared/EmptyState.vue';
 const { t } = useI18n();
 const store = useBooksStore();
 const categoryFilter = ref('');
-onMounted(() => store.fetchBooks({}, true));
-function loadMore() {
+onMounted(() => store.fetchBooks());
+function applyFilter() {
     store.fetchBooks(categoryFilter.value ? { category_id: categoryFilter.value } : {});
 }
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -61,23 +61,21 @@ else {
             book: (book),
         }, ...__VLS_functionalComponentArgsRest(__VLS_6));
     }
-    if (__VLS_ctx.store.hasMore) {
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-            ...{ class: "mt-8 text-center" },
-        });
-        __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-            ...{ onClick: (__VLS_ctx.loadMore) },
-            ...{ class: "btn-secondary" },
-            disabled: (__VLS_ctx.store.loading),
-        });
-        if (__VLS_ctx.store.loading) {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-            (__VLS_ctx.t('common.loading'));
-        }
-        else {
-            __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
-            (__VLS_ctx.t('common.more'));
-        }
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "mt-8 text-center" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.applyFilter) },
+        ...{ class: "btn-secondary" },
+        disabled: (__VLS_ctx.store.loading),
+    });
+    if (__VLS_ctx.store.loading) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (__VLS_ctx.t('common.loading'));
+    }
+    else {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({});
+        (__VLS_ctx.t('common.more'));
     }
 }
 /** @type {__VLS_StyleScopedClasses['page-wrapper']} */ ;
@@ -102,7 +100,7 @@ const __VLS_self = (await import('vue')).defineComponent({
             EmptyState: EmptyState,
             t: t,
             store: store,
-            loadMore: loadMore,
+            applyFilter: applyFilter,
         };
     },
 });

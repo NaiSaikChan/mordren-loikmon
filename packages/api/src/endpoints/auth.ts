@@ -1,25 +1,34 @@
-import type { ApiResponse, LoginPayload, RegisterPayload, AuthResult, User } from '../types.js'
+import type { ApiResponse, LoginPayload, RegisterPayload, User } from '../types.js'
 import { getClient } from '../client.js'
+
+// Real API response shape from loikmon.org (flat, not wrapped in data:{})
+export interface RawAuthResponse {
+  status: 'ok' | 'error'
+  message?: string
+  token?: string
+  user?: User
+  isadminuser?: number | string
+}
 
 export const auth = {
   login: (payload: LoginPayload) =>
-    getClient().post<ApiResponse<AuthResult>>('/auth/loginapp', payload),
+    getClient().post<RawAuthResponse>('loginapp', payload),
 
   register: (payload: RegisterPayload) =>
-    getClient().post<ApiResponse<AuthResult>>('/auth/createaccount', payload),
+    getClient().post<RawAuthResponse>('createaccount', payload),
 
   resetPassword: (email: string) =>
-    getClient().post<ApiResponse<null>>('/auth/resetpassword', { email }),
+    getClient().post<RawAuthResponse>('resetpassword', { email }),
 
   resendVerifyLink: (email: string) =>
-    getClient().post<ApiResponse<null>>('/auth/resendVerificationMail', { email }),
+    getClient().post<RawAuthResponse>('resendVerificationMail', { email }),
 
   updateProfile: (data: Partial<User> & { password?: string }) =>
-    getClient().post<ApiResponse<User>>('/auth/updateUserProfile', data),
+    getClient().post<RawAuthResponse>('updateUserProfile', data),
 
-  deleteAccount: () =>
-    getClient().post<ApiResponse<null>>('/auth/deletemyaccount'),
+  deleteAccount: (email: string) =>
+    getClient().post<RawAuthResponse>('deletemyaccount', { email }),
 
   storeFcmToken: (token: string) =>
-    getClient().post<ApiResponse<null>>('/auth/storefcmtoken', { token }),
+    getClient().post<RawAuthResponse>('storefcmtoken', { token }),
 }

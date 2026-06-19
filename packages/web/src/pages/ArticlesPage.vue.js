@@ -7,7 +7,7 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner.vue';
 import EmptyState from '@/components/shared/EmptyState.vue';
 const { t } = useI18n();
 const store = useArticlesStore();
-onMounted(() => store.fetchArticles({}, true));
+onMounted(() => store.fetchArticles());
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
 const __VLS_ctx = {};
 let __VLS_components;
@@ -54,21 +54,17 @@ else {
         }, ...__VLS_functionalComponentArgsRest(__VLS_6));
     }
 }
-if (__VLS_ctx.store.hasMore) {
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
-        ...{ class: "mt-6 text-center" },
-    });
-    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
-        ...{ onClick: (...[$event]) => {
-                if (!(__VLS_ctx.store.hasMore))
-                    return;
-                __VLS_ctx.store.fetchArticles();
-            } },
-        ...{ class: "btn-secondary" },
-        disabled: (__VLS_ctx.store.loading),
-    });
-    (__VLS_ctx.store.loading ? __VLS_ctx.t('common.loading') : __VLS_ctx.t('common.more'));
-}
+__VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+    ...{ class: "mt-6 text-center" },
+});
+__VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+    ...{ onClick: (...[$event]) => {
+            __VLS_ctx.store.fetchArticles();
+        } },
+    ...{ class: "btn-secondary" },
+    disabled: (__VLS_ctx.store.loading),
+});
+(__VLS_ctx.store.loading ? __VLS_ctx.t('common.loading') : __VLS_ctx.t('common.more'));
 /** @type {__VLS_StyleScopedClasses['page-wrapper']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-2xl']} */ ;
 /** @type {__VLS_StyleScopedClasses['font-bold']} */ ;

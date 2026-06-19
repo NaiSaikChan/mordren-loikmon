@@ -12,14 +12,14 @@ const booksStore = useBooksStore()
 const authStore = useAuthStore()
 
 onMounted(() => {
-  booksStore.fetchBooks({}, true)
+  booksStore.fetchBooks()
 })
 </script>
 
 <template>
   <div class="page-wrapper">
     <!-- Welcome banner -->
-    <div class="mb-8 rounded-2xl bg-linear-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg">
+    <div class="mb-8 rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg">
       <p class="text-brand-200 text-sm font-medium mb-1">Welcome back 👋</p>
       <h1 class="text-2xl font-bold">{{ authStore.displayName || 'Reader' }}</h1>
       <p class="mt-2 text-brand-100 text-sm">Explore thousands of Mon books and articles</p>
@@ -39,21 +39,19 @@ onMounted(() => {
         { to: '/books', icon: '📚', label: t('nav.books'), color: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' },
         { to: '/articles', icon: '📰', label: t('nav.articles'), color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
         { to: '/music', icon: '🎵', label: t('nav.music'), color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' },
-        { to: '/library', icon: '📁', label: t('nav.library'), color: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' },
+        { to: '/library', icon: '🗂️', label: t('nav.library'), color: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' },
       ]" :key="item.to" :to="item.to"
-        :class="['flex flex-col items-center gap-2 p-4 rounded-2xl transition-transform hover:scale-105', item.color]">
+        :class="['card flex flex-col items-center justify-center p-4 gap-2 no-underline', item.color]">
         <span class="text-2xl">{{ item.icon }}</span>
         <span class="text-xs font-semibold">{{ item.label }}</span>
       </RouterLink>
     </div>
 
-    <!-- Latest Books -->
-    <section class="mb-8">
-      <SectionHeader :title="t('books.title')" view-all-path="/books" />
-      <LoadingSpinner v-if="booksStore.loading && booksStore.list.length === 0" />
-      <div v-else class="content-grid">
-        <BookCard v-for="book in booksStore.list.slice(0, 12)" :key="book.id" :book="book" />
-      </div>
-    </section>
+    <!-- Recent books -->
+    <SectionHeader :title="t('books.title')" :to="'/books'" />
+    <LoadingSpinner v-if="booksStore.loading" />
+    <div v-else class="content-grid">
+      <BookCard v-for="book in booksStore.list.slice(0, 12)" :key="book.id" :book="book" />
+    </div>
   </div>
 </template>

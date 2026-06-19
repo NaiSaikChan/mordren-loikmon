@@ -10,9 +10,9 @@ const { t } = useI18n()
 const store = useBooksStore()
 const categoryFilter = ref<string>('')
 
-onMounted(() => store.fetchBooks({}, true))
+onMounted(() => store.fetchBooks())
 
-function loadMore() {
+function applyFilter() {
   store.fetchBooks(categoryFilter.value ? { category_id: categoryFilter.value } : {})
 }
 </script>
@@ -31,8 +31,8 @@ function loadMore() {
         <BookCard v-for="book in store.list" :key="book.id" :book="book" />
       </div>
 
-      <div v-if="store.hasMore" class="mt-8 text-center">
-        <button class="btn-secondary" :disabled="store.loading" @click="loadMore">
+      <div class="mt-8 text-center">
+        <button class="btn-secondary" :disabled="store.loading" @click="applyFilter">
           <span v-if="store.loading">{{ t('common.loading') }}</span>
           <span v-else>{{ t('common.more') }}</span>
         </button>

@@ -1,26 +1,30 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { misc } from '@loikmon/api'
-import type { SearchResult } from '@loikmon/api'
+import { search as searchApi } from '@loikmon/api'
+import type { SearchResults } from '@loikmon/api'
 
 export const useSearchStore = defineStore('search', () => {
-  const query = ref('')
-  const results = ref<SearchResult | null>(null)
+  const results = ref<SearchResults | null>(null)
   const loading = ref(false)
+  const query = ref('')
 
   async function search(q: string) {
-    query.value = q
     if (!q.trim()) { results.value = null; return }
+    query.value = q
     loading.value = true
     try {
-      const res = await misc.search(q)
-      results.value = res.data.data ?? null
+      const res = await searchApi.search(q)
+      const body = res.data as any
+      results.value = body.data ?? body ?? {}
     } finally {
       loading.value = false
     }
   }
 
-  function clear() { query.value = ''; results.value = null }
+  function clear() {
+    results.value = null
+    query.value = ''
+  }
 
-  return { query, results, loading, search, clear }
+  return { results, loading, query, search, clear }
 })
