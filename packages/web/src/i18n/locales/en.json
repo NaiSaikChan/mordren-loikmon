@@ -1,0 +1,112 @@
+{
+  "app": {
+    "name": "Loikmon",
+    "tagline": "Mon Digital Library"
+  },
+  "nav": {
+    "home": "Home",
+    "books": "Books",
+    "articles": "Articles",
+    "authors": "Authors",
+    "music": "Music",
+    "search": "Search",
+    "library": "My Library",
+    "purchases": "Purchases",
+    "collections": "Collections",
+    "categories": "Categories",
+    "settings": "Settings",
+    "about": "About",
+    "faq": "FAQ"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout",
+    "email": "Email address",
+    "password": "Password",
+    "name": "Full name",
+    "confirmPassword": "Confirm password",
+    "forgotPassword": "Forgot password?",
+    "resetPassword": "Reset password",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "verifyEmail": "Please verify your email",
+    "resendLink": "Resend verification link"
+  },
+  "books": {
+    "title": "Books",
+    "free": "Free",
+    "purchase": "Purchase",
+    "read": "Read",
+    "download": "Download",
+    "chapters": "Chapters",
+    "related": "Related Books",
+    "reviews": "Reviews",
+    "rating": "Rating",
+    "pages": "{count} pages",
+    "viewAll": "View all"
+  },
+  "articles": {
+    "title": "Articles",
+    "read": "Read article",
+    "purchase": "Purchase article",
+    "related": "Related articles"
+  },
+  "authors": {
+    "title": "Authors",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "followers": "{count} followers",
+    "works": "Works"
+  },
+  "music": {
+    "title": "Music",
+    "albums": "Albums",
+    "trending": "Trending",
+    "play": "Play",
+    "pause": "Pause",
+    "like": "Like",
+    "unlike": "Unlike"
+  },
+  "search": {
+    "placeholder": "Search books, articles, authors…",
+    "results": "Search results",
+    "noResults": "No results found for "{query}""
+  },
+  "library": {
+    "title": "My Library",
+    "bookmarks": "Bookmarks",
+    "downloaded": "Downloaded",
+    "purchased": "Purchased"
+  },
+  "purchases": {
+    "title": "Purchases",
+    "coins": "Coins",
+    "buyCoins": "Buy Coins",
+    "balance": "Balance: {amount} coins",
+    "pending": "Pending",
+    "approved": "Approved",
+    "bankTransfer": "Bank Transfer",
+    "coupon": "Coupon",
+    "redeemCoupon": "Redeem coupon"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "retry": "Try again",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "more": "More",
+    "all": "All",
+    "by": "by",
+    "free": "Free",
+    "notFound": "Page not found",
+    "comingSoon": "Coming soon"
+  }
+}
