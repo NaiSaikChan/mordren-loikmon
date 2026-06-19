@@ -1,77 +1,90 @@
 {
-  "app": {
-    "name": "လိုက်မန်",
-    "tagline": "မန်ဘာသာ ဒစ်ဂျစ်တယ် စာကြည့်တိုက်"
-  },
   "nav": {
-    "home": "ဂၠံၚ်တြဴ",
-    "books": "လိက်",
+    "home": "ဍုၚ်ဒၟာ",
+    "books": "လိက်ပတ်",
     "articles": "ပရိုၚ်",
     "authors": "ညးကၠောန်လိက်",
-    "music": "ဂဥုဲ",
-    "search": "ဃောဒၟံၚ်",
-    "library": "ကမ်ဍိုပ်ညးကဵုကဵု",
-    "purchases": "ပသောၚ်",
-    "collections": "ဂကူ",
+    "music": "သဵုဇြဳ",
+    "library": "ကမ်ဍိုပ်",
+    "purchases": "ဓမ်ၚိုဟ်",
     "categories": "ကဏ္ဍ",
-    "settings": "ပ္ဍဲဒၟံၚ်",
-    "about": "ဂကောံ",
-    "faq": "မုဟိုတ်"
+    "collections": "ကေတ်ဂိုၚ်",
+    "inbox": "ပရောၚ်",
+    "settings": "ပၠောပ်ပလေဝ်",
+    "about": "ဗွဲမလၟေၚ်",
+    "faq": "မုဟ်ဟွံနွံ",
+    "search": "ဃောဒၟံၚ်",
+    "logout": "ဂၠာဲကဆံၚ်",
+    "login": "ကဵုနၚ်",
+    "register": "ဒၟာနၚ်"
+  },
+  "common": {
+    "loading": "ဒၟံၚ်…",
+    "more": "ဂပ်ဝ်ဒၟာ",
+    "notFound": "ဟွံဒၟံၚ်မဲ့",
+    "back": "ဂၠာဲတိုန်",
+    "by": "ကဵု",
+    "comingSoon": "ဒၟာနၚ်ဟွံမွဲ",
+    "cancel": "ကေတ်မဲ့",
+    "confirm": "ပတှေ်",
+    "save": "သိုၚ်",
+    "edit": "ပလေဝ်",
+    "delete": "ဖျေဟ်",
+    "close": "ဂၠာဲမဲ့",
+    "submit": "ကဵုနၚ်",
+    "error": "ညောန်ဟွံဒးတၠအဲ"
   },
   "auth": {
-    "login": "ဒက်ပ္တန်ဒၟံၚ်",
-    "register": "ဗ္တောန်",
-    "logout": "ကဆံၚ်ပၠောပ်",
-    "email": "အီမေဝ်",
-    "password": "ကျာသ္ကတ်",
-    "name": "နာမ",
-    "confirmPassword": "ဒုၚ်ကျာသ္ကတ်",
-    "forgotPassword": "မ္ဂးဂၠိုၚ်ကျာသ္ကတ်?",
-    "resetPassword": "ပ္ညဳကျာသ္ကတ်",
-    "noAccount": "ဟွံမဲ့ Account?",
-    "hasAccount": "ကၠောန်Account ပြေၚ်?",
-    "verifyEmail": "ကဒုၚ်ပ္ကောံ Email",
-    "resendLink": "ဗ္ဂေတ်ပ္ကောံLink"
+    "login": "ကဵုနၚ်",
+    "register": "ဒၟာနၚ်",
+    "email": "အဳမဲဝ်",
+    "password": "ကသပ်",
+    "name": "နာမ်",
+    "phone": "ဖုန်",
+    "passwordConfirmation": "ကသပ်ထပက်",
+    "forgotPassword": "ကသပ်ကောဒးမဲ့?",
+    "resetPassword": "ပြောၚ်ကသပ်",
+    "noAccount": "ဟွံမဲ့ဒၟာ?",
+    "hasAccount": "မဲ့ဒၟာ?",
+    "loginSuccess": "ဝေၚ်ဒၟာ!",
+    "logoutSuccess": "ဂၠာဲကဆံၚ်ဒးတၠ"
   },
   "books": {
-    "title": "လိက်",
-    "free": "ဟွံပသောၚ်",
-    "purchase": "ရင်ၚ်",
-    "read": "ဗၠးၜး",
-    "download": "ဒေါသပတ်",
-    "chapters": "ကတောဝ်",
-    "related": "လိက်ဍောၚ်",
-    "reviews": "ဒုၚ်သဇိုၚ်",
-    "rating": "ဒဵုရေၚ်",
-    "pages": "{count} မုက်",
-    "viewAll": "ဆဵုဒၟံၚ်ဂမၠိုၚ်"
+    "title": "လိက်ပတ်",
+    "free": "ပဓာတ်",
+    "read": "ဒိုဟ်",
+    "purchase": "ဓမ်ၚိုဟ်",
+    "chapters": "ကဏ္ဍ",
+    "related": "လိက်ပတ်ဆက်",
+    "pages": "{count} ဒၞာဲ",
+    "rating": "ဒပ်ပဲါ",
+    "noBooks": "လိက်ပတ်ဟွံမဲ့"
   },
   "articles": {
     "title": "ပရိုၚ်",
-    "read": "ဗၠးၜးပရိုၚ်",
-    "purchase": "ရင်ၚ်ပရိုၚ်",
-    "related": "ပရိုၚ်ဍောၚ်"
+    "free": "ပဓာတ်",
+    "read": "ဒိုဟ်",
+    "purchase": "ဓမ်ၚိုဟ်",
+    "noArticles": "ပရိုၚ်ဟွံမဲ့"
   },
   "authors": {
     "title": "ညးကၠောန်လိက်",
-    "follow": "ဒှ်ဗ",
-    "unfollow": "ကဆံၚ်ဒှ်ဗ",
-    "followers": "{count} ညးဒှ်ဗ",
-    "works": "ကၠောန်ဂမၠိုၚ်"
+    "follow": "ပြောၚ်",
+    "unfollow": "ဟွံပြောၚ်",
+    "books": "{count} လိက်",
+    "followers": "{count} ညးပြောၚ်",
+    "noAuthors": "ညးကၠောန်လိက်ဟွံမဲ့"
   },
   "music": {
-    "title": "ဂဥုဲ",
-    "albums": "ဂကောံဂဥုဲ",
-    "trending": "နၚ်ဒၟံၚ်",
-    "play": "ပ္ကောန်",
-    "pause": "ကတဵု",
-    "like": "ကျိုၚ်",
-    "unlike": "ကဆံၚ်ကျိုၚ်"
+    "title": "သဵုဇြဳ",
+    "play": "သၠဳ",
+    "pause": "ကဆံၚ်",
+    "noMusic": "သဵုဇြဳဟွံမဲ့"
   },
   "search": {
     "placeholder": "ဃောဒၟံၚ်လိက်, ပရိုၚ်, ညးကၠောန်လိက်…",
     "results": "ဒတုဲဖိုဟ်",
-    "noResults": ""{query}" ဒၟံၚ်မဲ့"
+    "noResults": "ဒတုဲဖိုဟ်ဟွံမဲ့: {query}"
   },
   "library": {
     "title": "ကမ်ဍိုပ်ညးကဵုကဵု",
@@ -80,33 +93,22 @@
     "purchased": "ရင်ၚ်ၜိုန်"
   },
   "purchases": {
-    "title": "ပသောၚ်",
-    "coins": "ကဆေၚ်",
-    "buyCoins": "ရင်ၚ်ကဆေၚ်",
-    "balance": "ကဆေၚ်: {amount}",
-    "pending": "ဗိုၚ်ဒၟံၚ်",
-    "approved": "ကဒုၚ်",
-    "bankTransfer": "ဘဏ္ဍာ",
-    "coupon": "ကူပဝ်",
-    "redeemCoupon": "ကဒုၚ်ကူပဝ်"
+    "title": "ဓမ်ၚိုဟ်",
+    "coins": "ကိုင်",
+    "buyCoins": "ဓမ်ကိုင်",
+    "balance": "ကိုင် {amount}",
+    "pending": "ဒၟံၚ်ဆောံ",
+    "approved": "ပတှေ်ဒးတၠ",
+    "rejected": "ဟွံပတှေ်",
+    "redeemCoupon": "ကူပုၚ်",
+    "history": "သမုတ်ဓမ်"
   },
-  "common": {
-    "loading": "ဒေါသပတ်ဒၟံၚ်…",
-    "error": "ဟွံကေတ်ဆောၚ်",
-    "retry": "ပ္ညဳဗက်",
-    "cancel": "ကဆံၚ်",
-    "confirm": "ကဒုၚ်",
-    "save": "ဆိုင်",
-    "edit": "ဆေၚ်",
-    "delete": "ဒေါသ",
-    "close": "ပိတ်",
-    "back": "ဂၠာဲဂၠံၚ်ပြာပ်",
-    "next": "ဆက်",
-    "more": "ဍုၚ်",
-    "all": "ဂမၠိုၚ်",
-    "by": "ဒ္ဂေတ်",
-    "free": "ဟွံပသောၚ်",
-    "notFound": "ဟွံဆဵုဒၟံၚ်",
-    "comingSoon": "ဒေၚ်ဒကး"
+  "settings": {
+    "title": "ပၠောပ်ပလေဝ်",
+    "theme": "တၠအဲ",
+    "language": "ဘာသာ",
+    "notifications": "ပရောၚ်",
+    "account": "ဒၟာနၚ်",
+    "deleteAccount": "ဖျေဟ်ဒၟာနၚ်"
   }
 }

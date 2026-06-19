@@ -5,7 +5,6 @@ import type { MediaItem } from '@loikmon/api'
 const current = ref<MediaItem | null>(null)
 const playing = ref(false)
 const progress = ref(0)
-const volume = ref(0.8)
 
 function toggle() { playing.value = !playing.value }
 function close() { current.value = null; playing.value = false }

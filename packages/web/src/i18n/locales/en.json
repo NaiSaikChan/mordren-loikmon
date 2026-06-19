@@ -1,77 +1,90 @@
 {
-  "app": {
-    "name": "Loikmon",
-    "tagline": "Mon Digital Library"
-  },
   "nav": {
     "home": "Home",
     "books": "Books",
     "articles": "Articles",
     "authors": "Authors",
     "music": "Music",
-    "search": "Search",
-    "library": "My Library",
+    "library": "Library",
     "purchases": "Purchases",
-    "collections": "Collections",
     "categories": "Categories",
+    "collections": "Collections",
+    "inbox": "Inbox",
     "settings": "Settings",
     "about": "About",
-    "faq": "FAQ"
+    "faq": "FAQ",
+    "search": "Search",
+    "logout": "Logout",
+    "login": "Login",
+    "register": "Register"
+  },
+  "common": {
+    "loading": "Loading…",
+    "more": "Load More",
+    "notFound": "Not Found",
+    "back": "Back",
+    "by": "by",
+    "comingSoon": "Coming Soon",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "submit": "Submit",
+    "error": "An error occurred. Please try again."
   },
   "auth": {
-    "login": "Login",
-    "register": "Register",
-    "logout": "Logout",
-    "email": "Email address",
+    "login": "Log In",
+    "register": "Sign Up",
+    "email": "Email",
     "password": "Password",
-    "name": "Full name",
-    "confirmPassword": "Confirm password",
+    "name": "Full Name",
+    "phone": "Phone Number",
+    "passwordConfirmation": "Confirm Password",
     "forgotPassword": "Forgot password?",
-    "resetPassword": "Reset password",
+    "resetPassword": "Reset Password",
     "noAccount": "Don't have an account?",
     "hasAccount": "Already have an account?",
-    "verifyEmail": "Please verify your email",
-    "resendLink": "Resend verification link"
+    "loginSuccess": "Welcome back!",
+    "logoutSuccess": "Logged out successfully."
   },
   "books": {
     "title": "Books",
     "free": "Free",
+    "read": "Read Now",
     "purchase": "Purchase",
-    "read": "Read",
-    "download": "Download",
     "chapters": "Chapters",
     "related": "Related Books",
-    "reviews": "Reviews",
-    "rating": "Rating",
     "pages": "{count} pages",
-    "viewAll": "View all"
+    "rating": "Rating",
+    "noBooks": "No books found."
   },
   "articles": {
     "title": "Articles",
-    "read": "Read article",
-    "purchase": "Purchase article",
-    "related": "Related articles"
+    "free": "Free",
+    "read": "Read Now",
+    "purchase": "Purchase",
+    "noArticles": "No articles found."
   },
   "authors": {
     "title": "Authors",
     "follow": "Follow",
     "unfollow": "Unfollow",
+    "books": "{count} books",
     "followers": "{count} followers",
-    "works": "Works"
+    "noAuthors": "No authors found."
   },
   "music": {
     "title": "Music",
-    "albums": "Albums",
-    "trending": "Trending",
     "play": "Play",
     "pause": "Pause",
-    "like": "Like",
-    "unlike": "Unlike"
+    "noMusic": "No music found."
   },
   "search": {
     "placeholder": "Search books, articles, authors…",
     "results": "Search results",
-    "noResults": "No results found for "{query}""
+    "noResults": "No results found for: {query}"
   },
   "library": {
     "title": "My Library",
@@ -86,27 +99,16 @@
     "balance": "Balance: {amount} coins",
     "pending": "Pending",
     "approved": "Approved",
-    "bankTransfer": "Bank Transfer",
-    "coupon": "Coupon",
-    "redeemCoupon": "Redeem coupon"
+    "rejected": "Rejected",
+    "redeemCoupon": "Redeem Coupon",
+    "history": "Purchase History"
   },
-  "common": {
-    "loading": "Loading…",
-    "error": "Something went wrong",
-    "retry": "Try again",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "save": "Save",
-    "edit": "Edit",
-    "delete": "Delete",
-    "close": "Close",
-    "back": "Back",
-    "next": "Next",
-    "more": "More",
-    "all": "All",
-    "by": "by",
-    "free": "Free",
-    "notFound": "Page not found",
-    "comingSoon": "Coming soon"
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "language": "Language",
+    "notifications": "Notifications",
+    "account": "Account",
+    "deleteAccount": "Delete Account"
   }
 }

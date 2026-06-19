@@ -7,7 +7,7 @@
 
 /* ── Custom theme tokens ─────────────────────────── */
 @theme {
-  /* Brand palette — Loikmon indigo/violet */
+  /* Brand palette */
   --color-brand-50:  oklch(0.97 0.02 270);
   --color-brand-100: oklch(0.93 0.05 270);
   --color-brand-200: oklch(0.86 0.09 270);
@@ -20,46 +20,36 @@
   --color-brand-900: oklch(0.22 0.13 270);
   --color-brand-950: oklch(0.14 0.09 270);
 
-  /* Surface/background — dark-mode aware */
-  --color-surface-50:  oklch(0.98 0 0);
-  --color-surface-100: oklch(0.95 0 0);
-  --color-surface-800: oklch(0.18 0 0);
-  --color-surface-900: oklch(0.12 0 0);
-  --color-surface-950: oklch(0.08 0 0);
+  /* Surface/background neutrals */
+  --color-surface-50:  oklch(0.985 0 0);
+  --color-surface-100: oklch(0.97 0 0);
+  --color-surface-800: oklch(0.18 0.004 264);
+  --color-surface-900: oklch(0.13 0.004 264);
+  --color-surface-950: oklch(0.09 0.004 264);
 
   /* Typography */
-  --font-sans: "Inter", "Noto Sans Mon", system-ui, sans-serif;
-  --font-display: "Inter", system-ui, sans-serif;
+  --font-sans: 'Noto Sans', 'Padauk', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Custom breakpoint */
-  --breakpoint-xs: 30rem;
+  /* Radius tokens */
+  --radius-xl:  0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
 
-  /* Animations */
-  --animate-fade-in: fade-in 0.25s ease-out;
-  @keyframes fade-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0);   }
-  }
-
-  --animate-slide-left: slide-left 0.25s ease-out;
-  @keyframes slide-left {
-    from { opacity: 0; transform: translateX(20px); }
-    to   { opacity: 1; transform: translateX(0);    }
-  }
+  /* Shadow tokens */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.07);
 }
 
-/* ── Base layer ──────────────────────────────────── */
+/* ── Base styles ─────────────────────────────────── */
 @layer base {
-  html { @apply scroll-smooth; }
+  html { scroll-behavior: smooth; }
 
   body {
     @apply bg-surface-50 text-gray-900 antialiased;
     @apply dark:bg-surface-950 dark:text-gray-100;
-    font-family: var(--font-sans);
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-display);
     @apply font-semibold tracking-tight;
   }
 
@@ -67,50 +57,67 @@
 
   :focus-visible { @apply outline-2 outline-offset-2 outline-brand-500; }
 
-  /* Custom scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full dark:bg-gray-700; }
 }
 
-/* ── Component layer ─────────────────────────────── */
+/* ── Component classes ───────────────────────────── */
+/* NOTE: In Tailwind v4 custom classes must NOT @apply each other.
+   All utilities are inlined directly. */
 @layer components {
-  .btn {
+
+  /* Buttons — base + variants */
+  .btn-primary {
     @apply inline-flex items-center justify-center gap-2;
     @apply px-4 py-2 rounded-lg font-medium text-sm;
     @apply transition-all duration-150 cursor-pointer;
     @apply focus-visible:outline-2 focus-visible:outline-offset-2;
     @apply disabled:opacity-50 disabled:cursor-not-allowed;
-  }
-
-  .btn-primary {
-    @apply btn bg-brand-600 text-white;
+    @apply bg-brand-600 text-white;
     @apply hover:bg-brand-500 active:bg-brand-700;
     @apply focus-visible:outline-brand-600;
     @apply dark:bg-brand-500 dark:hover:bg-brand-400;
   }
 
   .btn-secondary {
-    @apply btn bg-gray-100 text-gray-700;
+    @apply inline-flex items-center justify-center gap-2;
+    @apply px-4 py-2 rounded-lg font-medium text-sm;
+    @apply transition-all duration-150 cursor-pointer;
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-gray-100 text-gray-700;
     @apply hover:bg-gray-200 active:bg-gray-300;
     @apply dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700;
   }
 
   .btn-ghost {
-    @apply btn text-gray-600 hover:bg-gray-100;
+    @apply inline-flex items-center justify-center gap-2;
+    @apply px-4 py-2 rounded-lg font-medium text-sm;
+    @apply transition-all duration-150 cursor-pointer;
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply text-gray-600 hover:bg-gray-100;
     @apply dark:text-gray-300 dark:hover:bg-gray-800;
   }
 
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-500;
+    @apply inline-flex items-center justify-center gap-2;
+    @apply px-4 py-2 rounded-lg font-medium text-sm;
+    @apply transition-all duration-150 cursor-pointer;
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-red-600 text-white hover:bg-red-500;
   }
 
+  /* Card */
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-gray-100;
     @apply dark:bg-surface-900 dark:border-gray-800;
     @apply transition-shadow hover:shadow-md;
   }
 
+  /* Form input */
   .input {
     @apply w-full px-3 py-2 rounded-lg border border-gray-300;
     @apply bg-white text-gray-900 placeholder:text-gray-400;
@@ -119,40 +126,60 @@
     @apply transition-colors text-sm;
   }
 
+  /* Badges */
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
   }
 
-  .badge-brand  { @apply badge bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300; }
-  .badge-green  { @apply badge bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300; }
-  .badge-yellow { @apply badge bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300; }
-  .badge-red    { @apply badge bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300; }
-  .badge-gray   { @apply badge bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300; }
-
-  /* Book / Media card grid */
-  .content-grid {
-    @apply grid gap-4;
-    @apply grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6;
+  .badge-green {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400;
   }
 
-  /* Section heading */
-  .section-title {
-    @apply text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3;
+  .badge-brand {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-brand-100 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400;
   }
 
-  /* Sidebar nav link */
+  .badge-yellow {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400;
+  }
+
+  .badge-gray {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400;
+  }
+
+  /* Navigation link */
   .nav-link {
-    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium;
-    @apply text-gray-600 hover:bg-brand-50 hover:text-brand-700;
-    @apply dark:text-gray-400 dark:hover:bg-brand-900/30 dark:hover:text-brand-300;
-    @apply transition-colors cursor-pointer;
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl;
+    @apply text-gray-600 dark:text-gray-400 font-medium text-sm;
+    @apply hover:bg-brand-50 hover:text-brand-700;
+    @apply dark:hover:bg-brand-900/20 dark:hover:text-brand-300;
+    @apply transition-all duration-150;
   }
 
-  .nav-link-active {
-    @apply bg-brand-50 text-brand-700 font-semibold;
-    @apply dark:bg-brand-900/40 dark:text-brand-300;
+  .nav-link.active {
+    @apply bg-brand-50 text-brand-700;
+    @apply dark:bg-brand-900/30 dark:text-brand-300;
   }
 
-  /* Page wrapper */
-  .page-wrapper { @apply p-4 sm:p-6 max-w-screen-xl mx-auto animate-fade-in; }
+  /* Layout helpers */
+  .page-wrapper {
+    @apply p-4 sm:p-6 lg:p-8 max-w-screen-xl mx-auto;
+  }
+
+  .content-grid {
+    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4;
+  }
+
+  .section-title {
+    @apply text-lg font-bold text-gray-900 dark:text-white;
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded dark:bg-gray-700;
+  }
 }

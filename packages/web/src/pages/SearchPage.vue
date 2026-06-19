@@ -14,10 +14,15 @@ const router = useRouter()
 const store = useSearchStore()
 const query = ref((route.query.q as string) ?? '')
 
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
 watch(query, (q) => {
-  router.replace({ query: q ? { q } : {} })
-  store.search(q)
-}, { debounce: 300 })
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    router.replace({ query: q ? { q } : {} })
+    if (q.trim()) store.search(q.trim())
+  }, 350)
+})
 
 onMounted(() => {
   if (query.value) store.search(query.value)
@@ -36,7 +41,6 @@ onMounted(() => {
     <LoadingSpinner v-if="store.loading" />
 
     <div v-else-if="store.results">
-      <!-- Books -->
       <section v-if="store.results.books?.length" class="mb-8">
         <h2 class="section-title">📚 Books</h2>
         <div class="content-grid">
@@ -44,7 +48,6 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- Articles -->
       <section v-if="store.results.articles?.length" class="mb-8">
         <h2 class="section-title">📰 Articles</h2>
         <div class="space-y-3">
@@ -52,7 +55,6 @@ onMounted(() => {
         </div>
       </section>
 
-      <!-- Authors -->
       <section v-if="store.results.authors?.length" class="mb-8">
         <h2 class="section-title">✍️ Authors</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">

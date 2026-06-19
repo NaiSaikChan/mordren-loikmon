@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useUiStore } from '@/stores/ui'
-import type { Theme, Locale } from '@/stores/ui'
+import type { Theme } from '@/stores/ui'
 
 const { t } = useI18n()
 const uiStore = useUiStore()
@@ -15,10 +15,10 @@ const themes: { value: Theme; label: string; icon: string }[] = [
 
 <template>
   <div class="page-wrapper max-w-2xl">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">{{ t('nav.settings') }}</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">{{ t('settings.title') }}</h1>
 
     <div class="card p-6 mb-4">
-      <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">Theme</h2>
+      <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">{{ t('settings.theme') }}</h2>
       <div class="flex gap-3">
         <button
           v-for="th in themes"
@@ -36,7 +36,7 @@ const themes: { value: Theme; label: string; icon: string }[] = [
     </div>
 
     <div class="card p-6">
-      <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">Language</h2>
+      <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">{{ t('settings.language') }}</h2>
       <div class="flex gap-3">
         <button
           v-for="lang in ([{ value: 'en', label: 'English' }, { value: 'mon', label: 'မန်ဘာသာ' }] as const)"
