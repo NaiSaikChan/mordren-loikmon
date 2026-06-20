@@ -3,11 +3,13 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import type { Theme, Locale } from '@/stores/ui'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const uiStore = useUiStore()
+const authStore = useAuthStore()
 const searchQuery = ref('')
 
 function handleSearch() {
@@ -27,6 +29,11 @@ function toggleLocale() {
   const next: Locale = uiStore.locale === 'en' ? 'mon' : 'en'
   uiStore.setLocale(next)
   locale.value = next
+}
+
+function logout() {
+  authStore.logout()
+  router.push('/')
 }
 
 const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
@@ -66,6 +73,26 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
 
       <!-- Inbox -->
       <button class="btn-ghost p-2 rounded-lg text-base" @click="$router.push('/inbox')">📬</button>
+
+      <!-- Auth: Login button or user avatar+logout -->
+      <template v-if="authStore.isLoggedIn">
+        <div class="flex items-center gap-2 pl-1 border-l border-gray-200 dark:border-gray-700 ml-1">
+          <span class="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:block truncate max-w-[100px]">
+            {{ authStore.displayName }}
+          </span>
+          <button class="btn-ghost px-2.5 py-1.5 text-xs" @click="logout">
+            {{ t('nav.logout') }}
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <RouterLink
+          to="/auth"
+          class="ml-1 btn-primary px-3 py-1.5 text-xs"
+        >
+          {{ t('nav.login') }}
+        </RouterLink>
+      </template>
     </div>
   </header>
 </template>

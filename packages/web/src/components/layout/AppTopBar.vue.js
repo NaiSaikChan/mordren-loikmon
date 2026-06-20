@@ -3,9 +3,11 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useUiStore } from '@/stores/ui';
+import { useAuthStore } from '@/stores/auth';
 const { t, locale } = useI18n();
 const router = useRouter();
 const uiStore = useUiStore();
+const authStore = useAuthStore();
 const searchQuery = ref('');
 function handleSearch() {
     if (searchQuery.value.trim()) {
@@ -22,6 +24,10 @@ function toggleLocale() {
     const next = uiStore.locale === 'en' ? 'mon' : 'en';
     uiStore.setLocale(next);
     locale.value = next;
+}
+function logout() {
+    authStore.logout();
+    router.push('/');
 }
 const themeIcon = { light: '☀️', dark: '🌙', system: '💻' };
 debugger; /* PartiallyEnd: #3632/scriptSetup.vue */
@@ -84,6 +90,36 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
         } },
     ...{ class: "btn-ghost p-2 rounded-lg text-base" },
 });
+if (__VLS_ctx.authStore.isLoggedIn) {
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
+        ...{ class: "flex items-center gap-2 pl-1 border-l border-gray-200 dark:border-gray-700 ml-1" },
+    });
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
+        ...{ class: "text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:block truncate max-w-[100px]" },
+    });
+    (__VLS_ctx.authStore.displayName);
+    __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
+        ...{ onClick: (__VLS_ctx.logout) },
+        ...{ class: "btn-ghost px-2.5 py-1.5 text-xs" },
+    });
+    (__VLS_ctx.t('nav.logout'));
+}
+else {
+    const __VLS_0 = {}.RouterLink;
+    /** @type {[typeof __VLS_components.RouterLink, typeof __VLS_components.RouterLink, ]} */ ;
+    // @ts-ignore
+    const __VLS_1 = __VLS_asFunctionalComponent(__VLS_0, new __VLS_0({
+        to: "/auth",
+        ...{ class: "ml-1 btn-primary px-3 py-1.5 text-xs" },
+    }));
+    const __VLS_2 = __VLS_1({
+        to: "/auth",
+        ...{ class: "ml-1 btn-primary px-3 py-1.5 text-xs" },
+    }, ...__VLS_functionalComponentArgsRest(__VLS_1));
+    __VLS_3.slots.default;
+    (__VLS_ctx.t('nav.login'));
+    var __VLS_3;
+}
 /** @type {__VLS_StyleScopedClasses['h-14']} */ ;
 /** @type {__VLS_StyleScopedClasses['flex']} */ ;
 /** @type {__VLS_StyleScopedClasses['items-center']} */ ;
@@ -135,16 +171,43 @@ __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElement
 /** @type {__VLS_StyleScopedClasses['p-2']} */ ;
 /** @type {__VLS_StyleScopedClasses['rounded-lg']} */ ;
 /** @type {__VLS_StyleScopedClasses['text-base']} */ ;
+/** @type {__VLS_StyleScopedClasses['flex']} */ ;
+/** @type {__VLS_StyleScopedClasses['items-center']} */ ;
+/** @type {__VLS_StyleScopedClasses['gap-2']} */ ;
+/** @type {__VLS_StyleScopedClasses['pl-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-l']} */ ;
+/** @type {__VLS_StyleScopedClasses['border-gray-200']} */ ;
+/** @type {__VLS_StyleScopedClasses['dark:border-gray-700']} */ ;
+/** @type {__VLS_StyleScopedClasses['ml-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-sm']} */ ;
+/** @type {__VLS_StyleScopedClasses['font-medium']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-gray-700']} */ ;
+/** @type {__VLS_StyleScopedClasses['dark:text-gray-300']} */ ;
+/** @type {__VLS_StyleScopedClasses['hidden']} */ ;
+/** @type {__VLS_StyleScopedClasses['sm:block']} */ ;
+/** @type {__VLS_StyleScopedClasses['truncate']} */ ;
+/** @type {__VLS_StyleScopedClasses['max-w-[100px]']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-ghost']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-2.5']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-1.5']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
+/** @type {__VLS_StyleScopedClasses['ml-1']} */ ;
+/** @type {__VLS_StyleScopedClasses['btn-primary']} */ ;
+/** @type {__VLS_StyleScopedClasses['px-3']} */ ;
+/** @type {__VLS_StyleScopedClasses['py-1.5']} */ ;
+/** @type {__VLS_StyleScopedClasses['text-xs']} */ ;
 var __VLS_dollars;
 const __VLS_self = (await import('vue')).defineComponent({
     setup() {
         return {
             t: t,
             uiStore: uiStore,
+            authStore: authStore,
             searchQuery: searchQuery,
             handleSearch: handleSearch,
             cycleTheme: cycleTheme,
             toggleLocale: toggleLocale,
+            logout: logout,
             themeIcon: themeIcon,
         };
     },
