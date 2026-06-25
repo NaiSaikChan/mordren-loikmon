@@ -3,16 +3,14 @@ import { getClient } from '../client.js'
 
 export const articles = {
   fetchArticles: (params?: Record<string, unknown>) =>
-    getClient().get<ApiResponse<{ articles: Article[] }>>('fetcharticles', { params }),
+    getClient().post<ApiResponse<{ articles: Article[] }>>('fetcharticles', params ?? {}),
 
-  purchaseArticle: (articleId: string | number, paymentData: Record<string, unknown>) =>
-    getClient().post<ApiResponse<null>>('purchasearticle', {
-      article_id: articleId,
-      ...paymentData,
-    }),
+  getArticle: (id: string | number) =>
+    getClient().post<ApiResponse<{ article: Article }>>('getarticle', { id }),
 
-  updateArticleViews: (articleId: string | number) =>
-    getClient().post<ApiResponse<null>>('update_article_total_views', {
-      article_id: articleId,
-    }),
+  likeArticle: (id: string | number) =>
+    getClient().post<ApiResponse<null>>('likearticle', { id }),
+
+  purchaseArticle: (id: string | number, paymentData: Record<string, unknown>) =>
+    getClient().post<ApiResponse<null>>('purchasearticle', { article_id: id, ...paymentData }),
 }

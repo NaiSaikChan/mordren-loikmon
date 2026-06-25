@@ -1,37 +1,26 @@
-import type { ApiResponse, Author } from '../types.js'
+import type { ApiResponse } from '../types.js'
 import { getClient } from '../client.js'
+
+export interface Author {
+  id: string | number
+  name: string
+  bio?: string
+  avatar?: string
+  avatar_url?: string
+  books_count?: number
+  is_following?: boolean
+}
 
 export const authors = {
   fetchAuthors: (params?: Record<string, unknown>) =>
-    getClient().get<ApiResponse<{ authors: Author[] }>>('fetchauthors', { params }),
+    getClient().post<ApiResponse<{ authors: Author[] }>>('fetchauthors', params ?? {}),
 
-  getAuthor: (authorId: string | number) =>
-    getClient().get<ApiResponse<{ author: Author }>>('getauthor', {
-      params: { author_id: authorId },
-    }),
+  getAuthor: (id: string | number) =>
+    getClient().post<ApiResponse<{ author: Author }>>('getauthor', { id }),
 
-  getAuthorData: (authorId: string | number) =>
-    getClient().get<ApiResponse<{ author: Author }>>('get_author_data', {
-      params: { author_id: authorId },
-    }),
+  fetchAuthorBooks: (authorId: string | number) =>
+    getClient().post<ApiResponse<{ books: any[] }>>('fetchauthorbooks', { author_id: authorId }),
 
-  followUnfollow: (authorId: string | number) =>
-    getClient().post<ApiResponse<{ is_following: boolean }>>('follow_unfollow_author', {
-      author_id: authorId,
-    }),
-
-  fetchAuthorCategories: () =>
-    getClient().get<ApiResponse<{ categories: unknown[] }>>('fetchauthorcategories'),
-
-  fetchAuthorInbox: () =>
-    getClient().get<ApiResponse<{ messages: unknown[] }>>('fetch_author_inbox'),
-
-  artistDashboard: (params?: Record<string, unknown>) =>
-    getClient().get<ApiResponse<unknown>>('artistdashboard', { params }),
-
-  artistFilterDashboard: (params: Record<string, unknown>) =>
-    getClient().get<ApiResponse<unknown>>('artistfilterdashboard', { params }),
-
-  editArtistApp: (data: Record<string, unknown>) =>
-    getClient().post<ApiResponse<Author>>('editArtistApp', data),
+  followUnfollow: (id: string | number) =>
+    getClient().post<ApiResponse<{ is_following: boolean }>>('followunfollow', { author_id: id }),
 }

@@ -1,51 +1,25 @@
-import type { ApiResponse, FaqItem, InboxMessage, Collection, SearchResult, AppInitData, Country } from '../types.js'
+import type { ApiResponse } from '../types.js'
 import { getClient } from '../client.js'
 
 export const misc = {
-  initApp: () =>
-    getClient().get<ApiResponse<AppInitData>>('/misc/initapp'),
+  fetchCollections: (params?: Record<string, unknown>) =>
+    getClient().post<ApiResponse<{ collections: any[] }>>('fetchcollections', params ?? {}),
 
-  overview: () =>
-    getClient().get<ApiResponse<unknown>>('/misc/overview'),
+  getCollection: (id: string | number) =>
+    getClient().post<ApiResponse<{ collection: any }>>('getcollection', { id }),
 
-  search: (query: string, params?: Record<string, unknown>) =>
-    getClient().get<ApiResponse<SearchResult>>('/misc/search', { params: { q: query, ...params } }),
+  fetchLeagues: (params?: Record<string, unknown>) =>
+    getClient().post<ApiResponse<{ leagues: any[] }>>('fetchleagues', params ?? {}),
 
-  fetchFaqs: () =>
-    getClient().get<ApiResponse<{ faqs: FaqItem[] }>>('/misc/fetchfaqs'),
+  fetchNotifications: (params?: Record<string, unknown>) =>
+    getClient().post<ApiResponse<{ notifications: any[] }>>('fetchnotifications', params ?? {}),
 
-  fetchContactUs: () =>
-    getClient().get<ApiResponse<unknown>>('/misc/fetchcontactus'),
+  fetchFaqs: (params?: Record<string, unknown>) =>
+    getClient().post<ApiResponse<{ faqs: any[] }>>('fetchfaqs', params ?? {}),
 
-  loadCountries: () =>
-    getClient().get<ApiResponse<{ countries: Country[] }>>('/misc/loadcountries'),
+  discover: (params?: Record<string, unknown>) =>
+    getClient().post<ApiResponse<any>>('discover', params ?? {}),
 
-  fetchInbox: () =>
-    getClient().get<ApiResponse<{ messages: InboxMessage[] }>>('/misc/fetch_inbox'),
-
-  fetchCollections: () =>
-    getClient().get<ApiResponse<{ collections: Collection[] }>>('/misc/fetch_collections'),
-
-  fetchSingleCollection: (id: string | number) =>
-    getClient().get<ApiResponse<{ collection: Collection }>>('/misc/fetchSingleCollection', {
-      params: { id },
-    }),
-
-  fetchLeagues: () =>
-    getClient().get<ApiResponse<unknown>>('/misc/fetchleagues'),
-
-  deeplink: (path: string) =>
-    getClient().get<ApiResponse<unknown>>('/misc/deeplink', { params: { path } }),
-
-  getTerms: () =>
-    getClient().get<ApiResponse<{ content: string }>>('/misc/terms'),
-
-  getPrivacy: () =>
-    getClient().get<ApiResponse<{ content: string }>>('/misc/privacy'),
-
-  getAboutUs: () =>
-    getClient().get<ApiResponse<{ content: string }>>('/misc/aboutus'),
-
-  getDonate: () =>
-    getClient().get<ApiResponse<{ content: string }>>('/misc/donate'),
+  overview: (params?: Record<string, unknown>) =>
+    getClient().post<ApiResponse<any>>('overview', params ?? {}),
 }

@@ -1,5 +1,6 @@
-import type { ApiResponse, Book, Article, Author } from '../types.js'
+import type { ApiResponse, Book, Article } from '../types.js'
 import { getClient } from '../client.js'
+import type { Author } from './authors.js'
 
 export interface SearchResults {
   books?: Book[]
@@ -9,5 +10,5 @@ export interface SearchResults {
 
 export const search = {
   search: (query: string, params?: Record<string, unknown>) =>
-    getClient().get<ApiResponse<SearchResults>>('search', { params: { q: query, ...params } }),
+    getClient().post<ApiResponse<SearchResults>>('search', { keyword: query, ...params }),
 }
