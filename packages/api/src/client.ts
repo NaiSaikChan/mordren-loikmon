@@ -2,8 +2,13 @@ import axios, { type AxiosInstance } from 'axios'
 
 let _instance: AxiosInstance | null = null
 
-// Production: call loikmon.org directly (CORS allow-origin: *)
-// Dev: proxy through local BFF on :4000 to avoid cert issues
+// loikmon.org CORS: allow-origin:* but no Access-Control-Allow-Headers
+// → application/json triggers a preflight that returns 404 (no ACAO-Headers)
+// → browser blocks the request entirely
+//
+// Fix: send POST body as text/plain — this is a CORS "simple request"
+// (no preflight needed). The server parses it as JSON regardless.
+// This mirrors exactly how the Flutter http package sends requests.
 const DEFAULT_BASE = 'https://loikmon.org/webapis/'
 
 export function getClient(baseURL?: string): AxiosInstance {
@@ -12,13 +17,11 @@ export function getClient(baseURL?: string): AxiosInstance {
   _instance = axios.create({
     baseURL: baseURL ?? DEFAULT_BASE,
     timeout: 15000,
-    // NOTE: Content-Type omitted here — the server expects
-    // the body as plain JSON without explicit Content-Type header
-    // (mirrors how Flutter http package sends it)
+    // No default Content-Type — we set it per-request type below
   })
 
-  // Attach auth token if available
   _instance.interceptors.request.use((config) => {
+    // Auth token
     const token =
       typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
     if (token) {
@@ -26,16 +29,21 @@ export function getClient(baseURL?: string): AxiosInstance {
       config.headers['Authorization'] = `Bearer ${token}`
     }
 
-    // Wrap POST/PUT body in { data: ... } envelope that loikmon.org expects
+    // POST/PUT: wrap in {data:...} and send as text/plain to avoid CORS preflight
     if ((config.method === 'post' || config.method === 'put') && config.data !== undefined) {
-      // Only wrap if not already wrapped
-      if (
+      // Wrap payload in { data: ... } envelope (required by loikmon.org)
+      const wrapped =
         config.data !== null &&
         typeof config.data === 'object' &&
         !('data' in config.data)
-      ) {
-        config.data = { data: config.data }
-      }
+          ? { data: config.data }
+          : config.data
+
+      // Serialize to JSON string but declare as text/plain
+      // → browser treats this as a simple request (no preflight)
+      config.data = JSON.stringify(wrapped)
+      config.headers = config.headers ?? {}
+      config.headers['Content-Type'] = 'text/plain'
     }
 
     return config
