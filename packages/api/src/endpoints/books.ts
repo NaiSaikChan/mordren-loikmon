@@ -8,8 +8,9 @@ export const books = {
   fetchOtherBooks: (params?: Record<string, unknown>) =>
     getClient().post<ApiResponse<{ books: Book[] }>>('fetchotherbooks', params ?? {}),
 
+  // Flutter sends { type: "book", id }
   getItem: (id: string | number) =>
-    getClient().post<ApiResponse<{ book: Book }>>('getitem', { id }),
+    getClient().post<ApiResponse<{ book: Book }>>('getitem', { type: 'book', id }),
 
   getChapters: (bookId: string | number) =>
     getClient().post<ApiResponse<{ chapters: BookChapter[] }>>('getBookChapters', {

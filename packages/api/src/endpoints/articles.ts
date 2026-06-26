@@ -5,8 +5,9 @@ export const articles = {
   fetchArticles: (params?: Record<string, unknown>) =>
     getClient().post<ApiResponse<{ articles: Article[] }>>('fetcharticles', params ?? {}),
 
+  // Flutter uses 'articleid' key, not 'id'
   getArticle: (id: string | number) =>
-    getClient().post<ApiResponse<{ article: Article }>>('getarticle', { id }),
+    getClient().post<ApiResponse<{ article: Article }>>('getarticle', { articleid: id }),
 
   likeArticle: (id: string | number) =>
     getClient().post<ApiResponse<null>>('likearticle', { id }),

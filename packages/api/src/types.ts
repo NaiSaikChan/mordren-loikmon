@@ -43,28 +43,45 @@ export interface AuthResult {
 }
 
 // ─────────────────────────────────────────────────
-// Books
+// Books  — field names match loikmon.org exactly
 // ─────────────────────────────────────────────────
 export interface Book {
   id: string | number
   title: string
-  cover?: string
-  cover_url?: string
+  // Cover image — server uses 'thumbnail' and 'coverphoto'
+  thumbnail?: string
+  coverphoto?: string
+  cover?: string        // alias kept for compatibility
+  cover_url?: string    // alias kept for compatibility
+  // Author
   author?: string
+  authorname?: string
+  authorid?: string | number
   author_id?: string | number
+  // Content URLs
+  pdf?: string
+  epub?: string
+  pdfhttp?: string | number
+  epubhttp?: string | number
+  has_audio?: boolean | number
+  audioduration?: string
+  // Meta
   description?: string
   price?: number
+  amount?: number
   currency?: string
   is_free?: boolean
   is_purchased?: boolean
   category_id?: string | number
-  category?: Category
-  pages?: number
-  file_url?: string
-  epub_url?: string
+  category?: string | Category
+  categoryname?: string
+  subcategory?: string | number
+  pages?: string | number
+  publisher?: string
+  publishdate?: string
   views?: number
-  rating?: number
-  ratings_count?: number
+  rating?: string | number
+  itmsales?: number
   created_at?: string
 }
 
@@ -78,22 +95,32 @@ export interface BookChapter {
 }
 
 // ─────────────────────────────────────────────────
-// Articles
+// Articles  — field names match loikmon.org exactly
 // ─────────────────────────────────────────────────
 export interface Article {
   id: string | number
   title: string
   content?: string
+  description?: string
   thumbnail?: string
   thumbnail_url?: string
+  thumbnail2?: string
+  audio?: string
   author?: string
+  authorname?: string
+  authorid?: string | number
   author_id?: string | number
-  category_id?: string | number
-  category?: Category
+  category?: string | number
+  categoryname?: string
   is_free?: boolean
   is_purchased?: boolean
   price?: number
+  amount?: number
   views?: number
+  rating?: string | number
+  itmsales?: number
+  date?: string
+  articledate?: string
   created_at?: string
 }
 
@@ -137,18 +164,10 @@ export interface MediaItem {
   file_url?: string
   duration?: number
   artist_id?: string | number
-  artist?: Author
   album_id?: string | number
-  album?: Album
-  genre?: string
-  mood?: string
   is_free?: boolean
   is_purchased?: boolean
   price?: number
-  views?: number
-  likes?: number
-  is_liked?: boolean
-  created_at?: string
 }
 
 export interface Album {
@@ -160,59 +179,6 @@ export interface Album {
   tracks_count?: number
   price?: number
   is_purchased?: boolean
-}
-
-// ─────────────────────────────────────────────────
-// Reviews & Comments
-// ─────────────────────────────────────────────────
-export interface Review {
-  id: string | number
-  user_id: string | number
-  user?: User
-  book_id?: string | number
-  article_id?: string | number
-  rating?: number
-  comment: string
-  created_at?: string
-  replies?: Reply[]
-}
-
-export interface Reply {
-  id: string | number
-  user_id: string | number
-  user?: User
-  review_id: string | number
-  content: string
-  created_at?: string
-}
-
-// ─────────────────────────────────────────────────
-// Purchases
-// ─────────────────────────────────────────────────
-export interface Purchase {
-  id: string | number
-  user_id: string | number
-  item_id: string | number
-  item_type: 'book' | 'article' | 'media' | 'album'
-  amount: number
-  status: 'pending' | 'approved' | 'rejected'
-  payment_method?: 'coins' | 'bank' | 'coupon'
-  created_at?: string
-}
-
-export interface Coin {
-  id: string | number
-  amount: number
-  price: number
-  currency?: string
-}
-
-export interface Bank {
-  id: string | number
-  name: string
-  account_number?: string
-  account_name?: string
-  logo?: string
 }
 
 // ─────────────────────────────────────────────────
@@ -244,16 +210,6 @@ export interface SearchResult {
   books?: Book[]
   articles?: Article[]
   authors?: Author[]
-  media?: MediaItem[]
-}
-
-export interface AppInitData {
-  featured_books?: Book[]
-  trending?: MediaItem[]
-  categories?: Category[]
-  banners?: string[]
-  app_name?: string
-  app_version?: string
 }
 
 export interface Country {
@@ -261,4 +217,45 @@ export interface Country {
   name: string
   code?: string
   flag?: string
+}
+
+export interface Purchase {
+  id: string | number
+  user_id: string | number
+  item_id: string | number
+  item_type: 'book' | 'article' | 'media' | 'album'
+  amount: number
+  status: 'pending' | 'approved' | 'rejected'
+  payment_method?: 'coins' | 'bank' | 'coupon'
+  created_at?: string
+}
+
+// ─────────────────────────────────────────────────
+// Reviews & Replies
+// ─────────────────────────────────────────────────
+export interface Review {
+  id: string | number
+  user_id: string | number
+  user?: User
+  book_id?: string | number
+  article_id?: string | number
+  rating?: number
+  comment: string
+  created_at?: string
+  replies?: Reply[]
+}
+
+export interface Reply {
+  id: string | number
+  user_id: string | number
+  user?: User
+  review_id: string | number
+  content: string
+  created_at?: string
+}
+
+export type SearchResults = {
+  books?: Book[]
+  articles?: Article[]
+  authors?: Author[]
 }

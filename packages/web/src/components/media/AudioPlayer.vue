@@ -23,7 +23,7 @@ function close() { current.value = null; playing.value = false }
         <div class="w-10 h-10 rounded-lg bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-xl">🎵</div>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-semibold text-gray-900 dark:text-white truncate">{{ current.title }}</p>
-          <p class="text-xs text-gray-400 truncate">{{ current.artist?.name }}</p>
+          <p class="text-xs text-gray-400 truncate">{{ (current as any).artist?.name ?? (current as any).authorname ?? '' }}</p>
         </div>
         <div class="flex items-center gap-2">
           <button class="w-10 h-10 rounded-full bg-brand-600 text-white flex items-center justify-center text-lg hover:bg-brand-500 transition-colors" @click="toggle">

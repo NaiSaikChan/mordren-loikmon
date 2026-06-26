@@ -13,9 +13,14 @@ export const useSearchStore = defineStore('search', () => {
     query.value = q
     loading.value = true
     try {
-      const res = await searchApi.search(q)
-      const body = res.data as any
-      results.value = body.data ?? body ?? {}
+      // Fetch books (type=0) and articles (type=1) in parallel
+      const [booksRes, articlesRes] = await Promise.all([
+        searchApi.search(q, 0, 0),
+        searchApi.search(q, 1, 0),
+      ])
+      const books  = (booksRes.data as any)?.search   ?? []
+      const articles = (articlesRes.data as any)?.search ?? []
+      results.value = { books, articles }
     } finally {
       loading.value = false
     }

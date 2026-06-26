@@ -1,6 +1,5 @@
-import type { ApiResponse, Book, Article } from '../types.js'
+import type { ApiResponse, Book, Article, Author } from '../types.js'
 import { getClient } from '../client.js'
-import type { Author } from './authors.js'
 
 export interface SearchResults {
   books?: Book[]
@@ -9,6 +8,8 @@ export interface SearchResults {
 }
 
 export const search = {
-  search: (query: string, params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<SearchResults>>('search', { keyword: query, ...params }),
+  // Flutter sends: { query, type (0=books,1=articles), offset }
+  // Response key is 'search', not 'data'
+  search: (query: string, type = 0, offset = 0) =>
+    getClient().post<any>('search', { query, type, offset }),
 }

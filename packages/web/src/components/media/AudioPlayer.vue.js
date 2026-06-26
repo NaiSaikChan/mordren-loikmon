@@ -48,7 +48,7 @@ if (__VLS_ctx.current) {
     __VLS_asFunctionalElement(__VLS_intrinsicElements.p, __VLS_intrinsicElements.p)({
         ...{ class: "text-xs text-gray-400 truncate" },
     });
-    (__VLS_ctx.current.artist?.name);
+    (__VLS_ctx.current.artist?.name ?? __VLS_ctx.current.authorname ?? '');
     __VLS_asFunctionalElement(__VLS_intrinsicElements.div, __VLS_intrinsicElements.div)({
         ...{ class: "flex items-center gap-2" },
     });
