@@ -1,0 +1,1 @@
+import{_ as r}from"./_plugin-vue_export-helper-DlAUqK2U.js";import{l as n,t,v as o}from"./vendor-BqmWECEH.js";const s={},a={class:"flex items-center justify-center py-12"};function c(d,e){return n(),t("div",a,[...e[0]||(e[0]=[o("div",{class:"w-8 h-8 rounded-full border-2 border-brand-200 border-t-brand-600 animate-spin"},null,-1)])])}const f=r(s,[["render",c]]);export{f as L};
