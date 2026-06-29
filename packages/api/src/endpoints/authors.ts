@@ -1,26 +1,18 @@
-import type { ApiResponse } from '../types.js'
 import { getClient } from '../client.js'
 
-export interface Author {
-  id: string | number
-  name: string
-  bio?: string
-  avatar?: string
-  avatar_url?: string
-  books_count?: number
-  is_following?: boolean
-}
-
 export const authors = {
+  // Flutter: { page:'0' }
   fetchAuthors: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ authors: Author[] }>>('fetchauthors', params ?? {}),
+    getClient().post<any>('fetchauthors', params ?? {}),
 
+  // Flutter: { author_id }
+  getAuthorData: (id: string | number) =>
+    getClient().post<any>('get_author_data', { author_id: id }),
+
+  // Alias kept for store compatibility
   getAuthor: (id: string | number) =>
-    getClient().post<ApiResponse<{ author: Author }>>('getauthor', { id }),
+    getClient().post<any>('get_author_data', { author_id: id }),
 
-  fetchAuthorBooks: (authorId: string | number) =>
-    getClient().post<ApiResponse<{ books: any[] }>>('fetchauthorbooks', { author_id: authorId }),
-
-  followUnfollow: (id: string | number) =>
-    getClient().post<ApiResponse<{ is_following: boolean }>>('followunfollow', { author_id: id }),
+  followUnfollow: (authorId: string | number, email?: string) =>
+    getClient().post<any>('followunfollow', { author_id: authorId, ...(email ? { email } : {}) }),
 }

@@ -2,16 +2,19 @@ import type { ApiResponse, Article } from '../types.js'
 import { getClient } from '../client.js'
 
 export const articles = {
+  // page=0-indexed; optional: email, id(author), type, cat
   fetchArticles: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ articles: Article[] }>>('fetcharticles', params ?? {}),
+    getClient().post<any>('fetcharticles', params ?? {}),
 
-  // Flutter uses 'articleid' key, not 'id'
+  // Flutter: { articleid }
   getArticle: (id: string | number) =>
-    getClient().post<ApiResponse<{ article: Article }>>('getarticle', { articleid: id }),
+    getClient().post<any>('getarticle', { articleid: id }),
 
-  likeArticle: (id: string | number) =>
-    getClient().post<ApiResponse<null>>('likearticle', { id }),
+  // Flutter: { articleid }
+  updateArticleTotalViews: (id: string | number) =>
+    getClient().post<any>('update_article_total_views', { articleid: id }),
 
-  purchaseArticle: (id: string | number, paymentData: Record<string, unknown>) =>
-    getClient().post<ApiResponse<null>>('purchasearticle', { article_id: id, ...paymentData }),
+  // Flutter: { email, articleid, amount }
+  purchaseArticle: (email: string, id: string | number, amount: number) =>
+    getClient().post<any>('purchasearticle', { email, articleid: id, amount }),
 }

@@ -33,7 +33,7 @@ export const useAuthStore = defineStore('auth', () => {
         throw error.value
       }
       token.value = body.token
-      user.value = body.user ?? null
+      user.value = (body.user as User) ?? null
       localStorage.setItem('token', body.token)
     } catch (err: unknown) {
       if (typeof err === 'string') throw err
@@ -58,7 +58,7 @@ export const useAuthStore = defineStore('auth', () => {
       // Some accounts require email verification — token may not be present
       if (body.token) {
         token.value = body.token
-        user.value = body.user ?? null
+        user.value = (body.user as User) ?? null
         localStorage.setItem('token', body.token)
       }
     } catch (err: unknown) {
@@ -83,7 +83,7 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await authApi.updateProfile(data)
       const body = res.data
       if (body.status !== 'error' && body.user) {
-        user.value = body.user
+        user.value = body.user as unknown as User
       }
     } finally {
       loading.value = false

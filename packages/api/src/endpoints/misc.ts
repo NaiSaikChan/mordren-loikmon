@@ -1,25 +1,36 @@
-import type { ApiResponse } from '../types.js'
 import { getClient } from '../client.js'
 
 export const misc = {
-  fetchCollections: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ collections: any[] }>>('fetchcollections', params ?? {}),
+  // Dashboard: { email, lastseeninbox:0 }
+  initApp: (email?: string) =>
+    getClient().post<any>('initapp', { email: email ?? '', lastseeninbox: 0 }),
 
-  getCollection: (id: string | number) =>
-    getClient().post<ApiResponse<{ collection: any }>>('getcollection', { id }),
+  overview: (email?: string) =>
+    getClient().post<any>('overview', { email: email ?? '', lastseeninbox: 0 }),
 
-  fetchLeagues: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ leagues: any[] }>>('fetchleagues', params ?? {}),
+  // Collections — correct endpoint names from API doc
+  fetchCollections: (page = 0) =>
+    getClient().post<any>('fetch_collections', { page: String(page) }),
 
-  fetchNotifications: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ notifications: any[] }>>('fetchnotifications', params ?? {}),
+  fetchSingleCollection: (collectionId: string | number) =>
+    getClient().post<any>('fetchSingleCollection', { collection_id: collectionId }),
 
-  fetchFaqs: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ faqs: any[] }>>('fetchfaqs', params ?? {}),
+  fetchLeagues: () =>
+    getClient().post<any>('fetchleagues', {}),
 
-  discover: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<any>>('discover', params ?? {}),
+  // FAQs — GET per API doc
+  fetchFaqs: () =>
+    getClient().get<any>('fetchfaqs'),
 
-  overview: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<any>>('overview', params ?? {}),
+  // Countries — GET per API doc
+  loadCountries: () =>
+    getClient().get<any>('loadcountries'),
+
+  // Banks — POST { country }
+  loadBanks: (countryId: string | number) =>
+    getClient().post<any>('loadbanks', { country: countryId }),
+
+  // Inbox/Notifications — POST { email, lastseeninbox }
+  fetchInbox: (email?: string, lastSeen = 0) =>
+    getClient().post<any>('initapp', { email: email ?? '', lastseeninbox: lastSeen }),
 }

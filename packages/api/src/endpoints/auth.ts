@@ -1,20 +1,18 @@
-import type { ApiResponse, LoginPayload, RegisterPayload, User } from '../types.js'
 import { getClient } from '../client.js'
 
-// Real API response shape from loikmon.org (flat, not wrapped in data:{})
 export interface RawAuthResponse {
-  status: 'ok' | 'error'
+  status: string
   message?: string
   token?: string
-  user?: User
-  isadminuser?: number | string
+  user?: Record<string, unknown>
+  isadminuser?: number
 }
 
 export const auth = {
-  login: (payload: LoginPayload) =>
+  login: (payload: { email: string; password: string }) =>
     getClient().post<RawAuthResponse>('loginapp', payload),
 
-  register: (payload: RegisterPayload) =>
+  register: (payload: { email: string; password: string; name: string; phone?: string }) =>
     getClient().post<RawAuthResponse>('createaccount', payload),
 
   resetPassword: (email: string) =>
@@ -23,12 +21,9 @@ export const auth = {
   resendVerifyLink: (email: string) =>
     getClient().post<RawAuthResponse>('resendVerificationMail', { email }),
 
-  updateProfile: (data: Partial<User> & { password?: string }) =>
-    getClient().post<RawAuthResponse>('updateUserProfile', data),
-
   deleteAccount: (email: string) =>
     getClient().post<RawAuthResponse>('deletemyaccount', { email }),
 
-  storeFcmToken: (token: string) =>
-    getClient().post<RawAuthResponse>('storefcmtoken', { token }),
+  updateProfile: (data: Record<string, unknown>) =>
+    getClient().post<RawAuthResponse>('updateprofile', data),
 }

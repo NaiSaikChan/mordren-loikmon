@@ -1,59 +1,127 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useArticlesStore } from '@/stores/articles'
+import { useReviewsStore } from '@/stores/reviews'
+import { useAuthStore } from '@/stores/auth'
+import { articles as articlesApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()
-const store = useArticlesStore()
-const article = computed(() => store.detail)
+const store  = useArticlesStore()
+const reviews = useReviewsStore()
+const auth   = useAuthStore()
 
-function fixUrl(url: string): string {
+const article  = computed(() => store.detail)
+const tab      = ref<'content' | 'reviews'>('content')
+const newReview  = ref('')
+const newRating  = ref(5)
+const submitting = ref(false)
+const reviewMsg  = ref('')
+
+function fixUrl(url?: string) {
   if (!url) return ''
-  let u = url.replace(/\\/g, '/')
-  u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-  return u
+  return url.replace(/\\/g, '/').replace(/ /g, '%20').replace(/\u202f/gi, '%20')
 }
 
-const thumbnail = computed(() =>
-  fixUrl(article.value?.thumbnail ?? article.value?.thumbnail_url ?? '')
-)
+async function submitReview() {
+  if (!newReview.value.trim()) return
+  submitting.value = true
+  try {
+    await reviews.submitReview(props.id, 'article', newReview.value, newRating.value)
+    newReview.value = ''
+    reviewMsg.value = 'Review submitted!'
+  } catch { reviewMsg.value = 'Failed' }
+  finally { submitting.value = false }
+}
 
 onMounted(async () => {
   await store.fetchDetail(props.id)
+  await reviews.loadReviews(props.id, 'article')
+  articlesApi.updateArticleTotalViews(props.id)
 })
 </script>
 
 <template>
-  <div class="page-wrapper max-w-3xl mx-auto">
+  <div class="page-wrapper max-w-3xl">
     <RouterLink to="/articles" class="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-500 mb-6">
-      ← {{ t('common.back') }}
+      ← {{ t('articles.title') }}
     </RouterLink>
 
     <LoadingSpinner v-if="store.loading && !article" />
 
-    <article v-else-if="article" class="card overflow-hidden">
-      <div v-if="thumbnail" class="w-full aspect-video overflow-hidden bg-gray-100 dark:bg-surface-800">
-        <img :src="thumbnail" :alt="article.title" class="w-full h-full object-cover"
+    <div v-else-if="article">
+      <!-- Thumbnail banner -->
+      <div v-if="fixUrl(article.thumbnail_url ?? article.thumbnail)"
+        class="w-full h-52 rounded-2xl overflow-hidden mb-6 bg-gray-100 dark:bg-surface-800">
+        <img :src="fixUrl(article.thumbnail_url ?? article.thumbnail)" :alt="article.title"
+          class="w-full h-full object-cover"
           @error="($event.target as HTMLImageElement).style.display='none'" />
       </div>
-      <div class="p-6 sm:p-8">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">{{ article.title }}</h1>
-        <div class="flex flex-wrap gap-2 mb-6 text-xs text-gray-500 dark:text-gray-400">
-          <span v-if="article.authorname ?? article.author">✍️ {{ article.authorname ?? article.author }}</span>
-          <span v-if="article.categoryname">📂 {{ article.categoryname }}</span>
-          <span v-if="article.articledate ?? article.date">📅 {{ article.articledate ?? article.date }}</span>
-        </div>
-        <div v-if="article.content"
-          class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed"
-          v-html="article.content" />
-        <p v-else-if="article.description" class="text-gray-600 dark:text-gray-300 leading-relaxed">
-          {{ article.description }}
-        </p>
-        <p v-else class="text-gray-400 italic">No content available.</p>
+
+      <!-- Meta -->
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-3">{{ article.title }}</h1>
+      <div class="flex items-center gap-3 text-sm text-gray-400 mb-6 flex-wrap">
+        <span v-if="article.author">✍️ {{ article.author }}</span>
+        <span v-if="article.category ?? article.cat">📂 {{ article.category ?? article.cat }}</span>
+        <span v-if="article.created_at ?? article.date">📅 {{ new Date(article.created_at ?? article.date ?? '').toLocaleDateString() }}</span>
+        <span v-if="article.is_free" class="text-green-500 font-semibold">Free</span>
+        <span v-else-if="article.price" class="text-brand-600 font-semibold">🪙 {{ article.price }}</span>
       </div>
-    </article>
+
+      <!-- Tabs -->
+      <div class="flex gap-2 mb-6">
+        <button :class="['px-4 py-2 rounded-xl text-sm font-medium', tab === 'content' ? 'bg-brand-600 text-white' : 'btn-ghost']"
+          @click="tab = 'content'">Content</button>
+        <button :class="['px-4 py-2 rounded-xl text-sm font-medium', tab === 'reviews' ? 'bg-brand-600 text-white' : 'btn-ghost']"
+          @click="tab = 'reviews'">Reviews ({{ reviews.list.length }})</button>
+      </div>
+
+      <!-- Content -->
+      <div v-if="tab === 'content'" class="card p-6">
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
+          {{ article.content ?? article.description ?? article.body ?? 'No content available.' }}
+        </div>
+      </div>
+
+      <!-- Reviews -->
+      <div v-if="tab === 'reviews'">
+        <div v-if="auth.isLoggedIn" class="card p-5 mb-6">
+          <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Write a Review</h3>
+          <div class="flex gap-1 mb-3">
+            <button v-for="s in 5" :key="s"
+              :class="['text-2xl transition-transform hover:scale-110', s <= newRating ? 'text-yellow-400' : 'text-gray-300']"
+              @click="newRating = s">★</button>
+          </div>
+          <textarea v-model="newReview" class="input w-full h-24 resize-none" placeholder="Share your thoughts..." />
+          <div class="flex items-center justify-between mt-3">
+            <p v-if="reviewMsg" class="text-sm text-green-500">{{ reviewMsg }}</p>
+            <button class="btn-primary ml-auto" :disabled="submitting" @click="submitReview">
+              {{ submitting ? 'Submitting...' : 'Submit' }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="reviews.list.length" class="space-y-4">
+          <div v-for="r in reviews.list" :key="r.id" class="card p-4">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center shrink-0 font-bold text-brand-600">
+                {{ (r.author_name ?? r.username ?? 'U').charAt(0) }}
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-medium text-sm text-gray-900 dark:text-white">{{ r.author_name ?? r.username }}</span>
+                  <span class="text-yellow-400 text-xs">{{ '★'.repeat(r.rating ?? 0) }}</span>
+                </div>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">{{ r.content ?? r.comment }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div v-else class="text-center py-8 text-gray-400">No reviews yet.</div>
+      </div>
+    </div>
 
     <div v-else class="text-center py-20 text-gray-400">
       <div class="text-5xl mb-3">📰</div>

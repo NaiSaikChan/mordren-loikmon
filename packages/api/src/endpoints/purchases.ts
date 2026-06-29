@@ -1,13 +1,39 @@
-import type { ApiResponse } from '../types.js'
 import { getClient } from '../client.js'
 
 export const purchases = {
-  fetchUserPurchases: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ purchases: any[] }>>('fetchuserpurchases', params ?? {}),
+  // { email }  → { books:[ids], articles:[ids] }
+  fetchUserPurchases: (email: string) =>
+    getClient().post<any>('fetchuserpurchases', { email }),
 
-  fetchUserPurchasedBooks: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ books: any[] }>>('fetchuserpurchasedbooks', params ?? {}),
+  // { email }  → { books:[...] }
+  fetchPurchasedBooks: (email: string) =>
+    getClient().post<any>('fetchuserpurchasedbooks', { email }),
 
-  fetchUserPurchasedArticles: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ articles: any[] }>>('fetchuserpurchasedarticles', params ?? {}),
+  // { email }  → { articles:[...] }
+  fetchPurchasedArticles: (email: string) =>
+    getClient().post<any>('fetchuserpurchasedarticles', { email }),
+
+  // { email }  → { coins:'150' }
+  getUserCoins: (email: string) =>
+    getClient().post<any>('getusercoins', { email }),
+
+  // GET  → { coins:[...] }
+  fetchCoinPackages: () =>
+    getClient().get<any>('fetchcoins'),
+
+  // { email, bookid, amount }
+  purchaseBook: (email: string, bookId: string | number, amount: number) =>
+    getClient().post<any>('purchasebook', { email, bookid: bookId, amount }),
+
+  // { email, articleid, amount }
+  purchaseArticle: (email: string, articleId: string | number, amount: number) =>
+    getClient().post<any>('purchasearticle', { email, articleid: articleId, amount }),
+
+  // { email, book(mediaId), amount }
+  purchaseMedia: (email: string, mediaId: string | number, amount: number) =>
+    getClient().post<any>('purchase_media', { email, book: mediaId, amount }),
+
+  // { email, code, book_id }
+  redeemCoupon: (email: string, code: string, bookId: string | number) =>
+    getClient().post<any>('subscribeBookCoupon', { email, code, book_id: bookId }),
 }

@@ -1,15 +1,20 @@
-export * from './types.js'
-export * from './client.js'
+// Types
+export type {
+  User, Book, BookChapter, Article, Author, Review, Reply,
+  MediaItem, SearchResults, ApiResponse, LoginPayload, RegisterPayload, RawAuthResponse
+} from './types.js'
 
-// Endpoint groups
-export { auth } from './endpoints/auth.js'
-export type { RawAuthResponse } from './endpoints/auth.js'
-export { books } from './endpoints/books.js'
-export { articles } from './endpoints/articles.js'
-export { authors } from './endpoints/authors.js'
-export { categories } from './endpoints/categories.js'
-export { media } from './endpoints/media.js'
-export { reviews } from './endpoints/reviews.js'
-export { purchases } from './endpoints/purchases.js'
-export { search } from './endpoints/search.js'
-export type { SearchResults } from './endpoints/search.js'
+// Endpoints
+export { auth }        from './endpoints/auth.js'
+export { books }       from './endpoints/books.js'
+export { articles }    from './endpoints/articles.js'
+export { authors }     from './endpoints/authors.js'
+export { categories }  from './endpoints/categories.js'
+export { purchases }   from './endpoints/purchases.js'
+export { reviews }     from './endpoints/reviews.js'
+export { media }       from './endpoints/media.js'
+export { misc }        from './endpoints/misc.js'
+export { search }      from './endpoints/search.js'
+
+// Client
+export { getClient }   from './client.js'

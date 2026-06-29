@@ -2,47 +2,38 @@ import type { ApiResponse, Book, BookChapter } from '../types.js'
 import { getClient } from '../client.js'
 
 export const books = {
+  // page=0-indexed; optional: email, id(author), type, cat, sub
   fetchBooks: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ books: Book[] }>>('fetchbooks', params ?? {}),
+    getClient().post<any>('fetchbooks', params ?? {}),
 
   fetchOtherBooks: (params?: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ books: Book[] }>>('fetchotherbooks', params ?? {}),
+    getClient().post<any>('fetchotherbooks', params ?? {}),
 
-  // Flutter sends { type: "book", id }
+  // Flutter: { type:'book', id }
   getItem: (id: string | number) =>
-    getClient().post<ApiResponse<{ book: Book }>>('getitem', { type: 'book', id }),
+    getClient().post<any>('getitem', { type: 'book', id }),
 
+  // Flutter: { bookid }
   getChapters: (bookId: string | number) =>
-    getClient().post<ApiResponse<{ chapters: BookChapter[] }>>('getBookChapters', {
-      book_id: bookId,
-    }),
+    getClient().post<any>('getBookChapters', { bookid: bookId }),
 
-  rateBook: (bookId: string | number, rating: number) =>
-    getClient().post<ApiResponse<null>>('ratebook', { book_id: bookId, rating }),
+  // Flutter: { bookid, email? }
+  relatedBooks: (bookId: string | number, email?: string) =>
+    getClient().post<any>('relatedbooks', { bookid: bookId, ...(email ? { email } : {}) }),
 
-  relatedBooks: (bookId: string | number) =>
-    getClient().post<ApiResponse<{ books: Book[] }>>('relatedbooks', { book_id: bookId }),
+  // Flutter: { bookid, rate, email? }
+  rateBook: (bookId: string | number, rate: number, email?: string) =>
+    getClient().post<any>('ratebook', { bookid: bookId, rate: String(rate), ...(email ? { email } : {}) }),
 
-  relatedMagazines: (bookId: string | number) =>
-    getClient().post<ApiResponse<{ magazines: Book[] }>>('relatedmagazines', { book_id: bookId }),
-
-  getBookViewsRates: (bookId: string | number) =>
-    getClient().post<ApiResponse<{ views: number; rating: number }>>('getbookviewsrates', {
-      book_id: bookId,
-    }),
-
+  // Flutter: { bookid }
   updateTotalViews: (bookId: string | number) =>
-    getClient().post<ApiResponse<null>>('update_total_views', { book_id: bookId }),
+    getClient().post<any>('update_total_views', { bookid: bookId }),
 
-  purchaseBook: (bookId: string | number, paymentData: Record<string, unknown>) =>
-    getClient().post<ApiResponse<{ id: string | number; status: string }>>('purchasebook', {
-      book_id: bookId,
-      ...paymentData,
-    }),
+  // Flutter: { email, bookid, amount }
+  purchaseBook: (email: string, bookId: string | number, amount: number) =>
+    getClient().post<any>('purchasebook', { email, bookid: bookId, amount }),
 
-  reportBook: (bookId: string | number, reason: string) =>
-    getClient().post<ApiResponse<null>>('reportbook', { book_id: bookId, reason }),
-
-  redeemBookCoupon: (code: string, bookId: string | number) =>
-    getClient().post<ApiResponse<null>>('subscribeBookCoupon', { code, book_id: bookId }),
+  // Flutter: { email, code, book_id }
+  redeemCoupon: (email: string, code: string, bookId: string | number) =>
+    getClient().post<any>('subscribeBookCoupon', { email, code, book_id: bookId }),
 }
