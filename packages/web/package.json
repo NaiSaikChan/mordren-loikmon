@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@loikmon/api": "workspace:*",
@@ -24,9 +27,13 @@
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^20.14.2",
     "@vitejs/plugin-vue": "^5.0.5",
+    "@vitest/coverage-v8": "^2.1.9",
+    "@vue/test-utils": "^2.4.11",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.4.5",
     "vite": "^5.3.1",
+    "vitest": "^2.1.9",
     "vue-tsc": "^2.0.21"
   }
 }
