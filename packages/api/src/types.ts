@@ -1,15 +1,23 @@
 export interface User {
   id: string | number
-  name: string
+  name?: string           // computed from firstname+lastname
+  firstname?: string
+  lastname?: string
+  username?: string
   email: string
   avatar?: string
   avatar_url?: string
-  coins?: number
+  thumbnail?: string      // actual avatar field from server
+  coins?: number | string
   phone?: string
   country?: string
+  seller?: string | number
+  author?: string | number
+  isadminuser?: string | number
   email_verified?: boolean
   created_at?: string
-  [key: string]: unknown   // allow extra server fields without TS errors
+  date?: string
+  [key: string]: unknown
 }
 
 export interface Book {
@@ -120,7 +128,11 @@ export interface RawAuthResponse {
   message?: string
   token?: string
   user?: Record<string, unknown>
-  isadminuser?: number
+  isadminuser?: string | number
+  statuscode?: number
+  devices?: unknown[]
+  devices_in_use?: number
+  device_limit?: number
 }
 
 export interface ApiResponse<T = unknown> {
