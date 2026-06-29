@@ -1,6 +1,7 @@
 # Mordren Loikmon (Modern Loikmon)
 
 > Rebuild of the [loikmon-zcro](https://github.com/NaiSaikChan/loikmon-zcro) Flutter app as a modern web + mobile stack.
+> API Document: [loikmon-APO](https://github.com/NaiSaikChan/loikmon-zcro/blob/main/API_ENDPOINTS_SUMMARY.md)
 
 ## Stack
 
@@ -11,7 +12,7 @@
 | State (web) | Pinia |
 | Mobile | React Native / Expo (Phase 4) |
 | API | `https://loikmon.org/webapis/` |
-| i18n | English + Mon (လိုက်မန်) |
+| i18n | English + Mon (လိက်မန်) |
 
 ## Monorepo Structure
 
@@ -41,3 +42,4 @@ pnpm dev:server  # Start Express BFF
 - 🛒 Purchases — Coins, bank transfer, coupons
 - 🌙 Dark Mode — System-aware with manual override
 - 🌐 i18n — English & Mon language support
+- 🖥️ auto layout responsive design
