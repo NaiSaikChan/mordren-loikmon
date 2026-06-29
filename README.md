@@ -1,7 +1,7 @@
 # Mordren Loikmon (Modern Loikmon)
 
 > Rebuild of the [loikmon-zcro](https://github.com/NaiSaikChan/loikmon-zcro) Flutter app as a modern web + mobile stack.
-> API Document: [loikmon-APO](https://github.com/NaiSaikChan/loikmon-zcro/blob/main/API_ENDPOINTS_SUMMARY.md)
+> API Document: [loikmon-API](https://github.com/NaiSaikChan/loikmon-zcro/blob/main/API_ENDPOINTS_SUMMARY.md)
 
 ## Stack
 
