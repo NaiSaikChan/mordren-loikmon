@@ -10,5 +10,8 @@
     "build:server": "pnpm --filter @loikmon/server build",
     "build:api": "pnpm --filter @loikmon/api build"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@fontsource/padauk": "^5.2.8"
+  }
 }
