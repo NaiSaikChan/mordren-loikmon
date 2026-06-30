@@ -13,16 +13,23 @@ export const useAuthorsStore = defineStore('authors', () => {
     try {
       const res = await authorsApi.fetchAuthors(params)
       const body = res.data as any
-      list.value = body.authors ?? body.data?.authors ?? (Array.isArray(body) ? body : [])
+      // Handle both direct array and nested response formats
+      const authors = body.authors ?? body.data?.authors ?? (Array.isArray(body) ? body : [])
+      // Append on pagination (if page > 0), otherwise replace
+      if (params?.page && params.page !== '0') {
+        list.value = [...list.value, ...authors]
+      } else {
+        list.value = authors
+      }
     } finally {
       loading.value = false
     }
   }
 
-  async function fetchDetail(id: string | number) {
+  async function fetchDetail(id: string | number, email?: string) {
     loading.value = true
     try {
-      const res = await authorsApi.getAuthor(id)
+      const res = await authorsApi.getAuthor(id, email)
       const body = res.data as any
       detail.value = body.author ?? body.data?.author ?? null
     } finally {

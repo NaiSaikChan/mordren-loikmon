@@ -80,8 +80,8 @@ onMounted(async () => {
 
       <!-- Content -->
       <div v-if="tab === 'content'" class="card p-6">
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-          {{ article.content ?? article.description ?? article.body ?? 'No content available.' }}
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line"
+          v-html="article.content ?? article.description ?? article.body ?? 'No content available.'">
         </div>
       </div>
 

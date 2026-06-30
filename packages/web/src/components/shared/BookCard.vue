@@ -39,8 +39,8 @@ const isFree = computed(() => {
         />
         <div v-else class="w-full h-full flex items-center justify-center text-4xl">📚</div>
       </div>
-      <div class="p-2.5">
-        <h3 class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 leading-tight mb-1">
+      <div class="p-3">
+        <h3 class="text-xs font-semibold text-gray-900 dark:text-white truncate mb-3">
           {{ book.title }}
         </h3>
         <p v-if="authorDisplay" class="text-xs text-gray-400 truncate">{{ authorDisplay }}</p>

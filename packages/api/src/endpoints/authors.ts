@@ -1,18 +1,23 @@
 import { getClient } from '../client.js'
 
 export const authors = {
-  // Flutter: { page:'0' }
+  // Fetch all authors with proper body format
   fetchAuthors: (params?: Record<string, unknown>) =>
-    getClient().post<any>('fetchauthors', params ?? {}),
+    getClient().post<any>('fetchauthors', {
+      type: 'book',
+      page: String(params?.page ?? '0'),
+      query: String(params?.query ?? ''),
+      email: String(params?.email ?? ''),
+    }),
 
-  // Flutter: { author_id }
-  getAuthorData: (id: string | number) =>
-    getClient().post<any>('get_author_data', { author_id: id }),
+  // Flutter: { author }
+  getAuthorData: (id: string | number, email?: string) =>
+    getClient().post<any>('get_author_data', { author: id, email: email || ''}),
 
   // Alias kept for store compatibility
-  getAuthor: (id: string | number) =>
-    getClient().post<any>('get_author_data', { author_id: id }),
+  getAuthor: (id: string | number, email?: string) =>
+    getClient().post<any>('get_author_data', { author: id, email: email || ''}),
 
   followUnfollow: (authorId: string | number, email?: string) =>
-    getClient().post<any>('followunfollow', { author_id: authorId, ...(email ? { email } : {}) }),
+    getClient().post<any>('followunfollow', { author: authorId, ...(email ? { email } : {}) }),
 }
