@@ -33,3 +33,7 @@ Thumbs.db
 .expo/
 android/
 ios/
+
+# Agents Skills
+.agents
+.github

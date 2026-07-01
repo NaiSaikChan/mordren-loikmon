@@ -12,20 +12,29 @@ const store = useArticlesStore()
 const catStore = useCategoriesStore()
 
 const page = ref(0)
-const selectedCat = ref('')
+const selectedCat = ref(0)
 const isLastPage = ref(false)
 
 async function loadArticles(reset = true) {
   if (reset) { page.value = 0; store.list = [] }
-  const params: Record<string, unknown> = { page: String(page.value) }
-  if (selectedCat.value) params.cat = selectedCat.value
+  const params: Record<string, unknown> = {
+    page: page.value,
+    type: 1,
+    query: '',
+    category: selectedCat.value
+  }
   await store.fetchArticles(params)
 }
 
 async function loadMore() {
   page.value++
   const prevLen = store.list.length
-  await store.fetchArticles({ page: String(page.value), ...(selectedCat.value ? { cat: selectedCat.value } : {}) })
+  await store.fetchArticles({
+    page: page.value,
+    type: 1,
+    query: '',
+    category: selectedCat.value
+  })
   if (store.list.length === prevLen) isLastPage.value = true
 }
 
@@ -40,12 +49,12 @@ onMounted(async () => {
 
     <div v-if="catStore.list.length" class="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-none">
       <button :class="['shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-          !selectedCat ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-300']"
-        @click="selectedCat = ''; loadArticles()">All</button>
+          selectedCat === 0 ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-300']"
+        @click="selectedCat = 0; loadArticles()">All</button>
       <button v-for="cat in catStore.list" :key="cat.id"
         :class="['shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
-          selectedCat === String(cat.id) ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-300']"
-        @click="selectedCat = String(cat.id); loadArticles()">
+          selectedCat === cat.id ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-300']"
+        @click="selectedCat = cat.id; loadArticles()">
         {{ cat.name }}
       </button>
     </div>

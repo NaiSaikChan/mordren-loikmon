@@ -41,8 +41,23 @@ onMounted(async () => {
   await authorsStore.fetchDetail(props.id)
   // Fetch books and articles by this author in parallel
   const [br, ar] = await Promise.all([
-    booksStore.fetchBooks({ id: props.id, page: '0' }),
-    articlesStore.fetchArticles({ id: props.id, page: '0' }),
+    booksStore.fetchBooks({
+      email: 'null',
+      id: props.id,
+      type: 1,
+      page: '0',
+      cat: 0,
+      sub: '0'
+    }),
+    articlesStore.fetchArticles({
+      category: 0,
+      email: 'null',
+      itm: props.id,
+      itmtype: 1,
+      page: '0',
+      sub: '0',
+      type: 0
+    }),
   ])
   authorBooks.value    = booksStore.list
   authorArticles.value = articlesStore.list

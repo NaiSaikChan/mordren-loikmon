@@ -6,7 +6,11 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    dependencies:
+      '@fontsource/padauk':
+        specifier: ^5.2.8
+        version: 5.2.8
 
   packages/api:
     dependencies:
@@ -532,6 +536,9 @@ packages:
     peerDependenciesMeta:
       '@noble/hashes':
         optional: true
+
+  '@fontsource/padauk@5.2.8':
+    resolution: {integrity: sha512-57WBW/wFX4sNoEB2yhmWS84vh+CJc1V3yJYOAoil4Hr3WMKFojw/WcdLUhK1/lgsMDNsoeH1YzvhqRdXFiXx/A==}
 
   '@intlify/core-base@9.14.5':
     resolution: {integrity: sha512-5ah5FqZG4pOoHjkvs8mjtv+gPKYU0zCISaYNjBNNqYiaITxW8ZtVih3GS/oTOqN8d9/mDLyrjD46GBApNxmlsA==}
@@ -2387,6 +2394,8 @@ snapshots:
   '@exodus/bytes@1.15.1(@noble/hashes@1.8.0)':
     optionalDependencies:
       '@noble/hashes': 1.8.0
+
+  '@fontsource/padauk@5.2.8': {}
 
   '@intlify/core-base@9.14.5':
     dependencies:

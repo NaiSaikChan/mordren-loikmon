@@ -4,7 +4,7 @@
     "books": "Books",
     "articles": "Articles",
     "authors": "Authors",
-    "music": "Music",
+    "music": "Audio Books",
     "library": "Library",
     "purchases": "Purchases",
     "categories": "Categories",
@@ -76,10 +76,10 @@
     "noAuthors": "No authors found."
   },
   "music": {
-    "title": "Music",
+    "title": "Audio Books",
     "play": "Play",
     "pause": "Pause",
-    "noMusic": "No music found."
+    "noMusic": "No audio books found."
   },
   "search": {
     "placeholder": "Search books, articles, authors…",

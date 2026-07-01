@@ -69,7 +69,7 @@ onMounted(async () => {
 
     <!-- Leagues / Music Categories -->
     <div v-if="leagues.length" class="mb-8">
-      <SectionHeader title="🎵 Music" :to="'/music'" />
+      <SectionHeader title="🎵 Audio Books" :to="'/music'" />
       <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
         <RouterLink v-for="l in leagues" :key="l.id"
           :to="`/music?league=${l.id}`"

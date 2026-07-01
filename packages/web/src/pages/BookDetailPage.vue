@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useBooksStore } from '@/stores/books'
 import { useReviewsStore } from '@/stores/reviews'
@@ -15,22 +15,20 @@ const reviews = useReviewsStore()
 const auth   = useAuthStore()
 
 const book    = computed(() => store.detail)
-const tab     = ref<'details' | 'reviews'>('details')
-const newReview = ref('')
-const newRating = ref(5)
-const submitting = ref(false)
-const reviewMsg  = ref('')
+const cover   = computed(() => {
+  if (!book.value) return ''
+  return fixUrl(book.value.thumbnail ?? book.value.coverphoto ?? book.value.cover_url ?? book.value.cover ?? '')
+})
+const tab          = ref<'details' | 'reviews'>('details')
+const coverError   = ref(false)
+const newReview    = ref('')
+const newRating    = ref(5)
+const submitting   = ref(false)
+const reviewMsg    = ref('')
 
 function fixUrl(url?: string) {
   if (!url) return ''
   return url.replace(/\\/g, '/').replace(/ /g, '%20').replace(/\u202f/gi, '%20')
-}
-
-function coverUrl(book: any) {
-  for (const k of ['thumbnail', 'coverphoto', 'cover_url', 'cover']) {
-    if (book[k]) return fixUrl(book[k])
-  }
-  return ''
 }
 
 function openReader() {
@@ -48,12 +46,18 @@ async function submitReview() {
   finally { submitting.value = false }
 }
 
-onMounted(async () => {
+async function loadBook() {
+  coverError.value = false
   await store.fetchDetail(props.id)
   await reviews.loadReviews(props.id, 'book')
   booksApi.updateTotalViews(props.id)
   if (book.value) store.fetchRelated(props.id)
-})
+}
+
+onMounted(loadBook)
+
+// Handle route param changes (navigating between different books)
+watch(() => props.id, loadBook)
 </script>
 
 <template>
@@ -70,10 +74,12 @@ onMounted(async () => {
         <div class="flex flex-col sm:flex-row gap-6 p-6">
           <!-- Cover -->
           <div class="w-full sm:w-40 shrink-0">
-            <div class="aspect-[3/4] rounded-xl overflow-hidden bg-gray-100 dark:bg-surface-800 shadow-lg">
-              <img v-if="coverUrl(book)" :src="coverUrl(book)" :alt="book.title"
+            <div class="aspect-3/4 rounded-xl overflow-hidden bg-gray-100 dark:bg-surface-800 shadow-lg">
+              <img v-if="cover" 
+                :src="cover" 
+                :alt="book.title"
                 class="w-full h-full object-cover"
-                @error="($event.target as HTMLImageElement).style.display='none'" />
+                @error="coverError = true" />
               <div v-else class="w-full h-full flex items-center justify-center text-5xl">📚</div>
             </div>
           </div>
