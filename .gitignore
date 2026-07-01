@@ -7,6 +7,11 @@ dist/
 build/
 *.tsbuildinfo
 
+# TypeScript compiler emit artifacts — vue-tsc must always run with --noEmit
+# These .js/.js.map files inside src/ are never intentional; delete & ignore them
+packages/web/src/**/*.js
+packages/web/src/**/*.js.map
+
 # Env files
 .env
 .env.local
