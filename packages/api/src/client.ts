@@ -17,20 +17,19 @@ export function getClient(baseURL?: string): AxiosInstance {
   _instance = axios.create({
     baseURL: baseURL ?? DEFAULT_BASE,
     timeout: 15000,
-    // No default Content-Type — we set it per-request type below
+    // No default Content-Type — set per-request below
   })
 
   _instance.interceptors.request.use((config) => {
-    // Auth token
-    const token =
-      typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
-    if (token) {
-      config.headers = config.headers ?? {}
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
+    // ── IMPORTANT: do NOT add Authorization header ────────────────────────────
+    // loikmon.org does not use token auth. Adding ANY custom header (including
+    // Authorization) causes the browser to fire a CORS OPTIONS preflight.
+    // The server returns 404 for OPTIONS → browser blocks the request entirely.
+    // Authentication is handled by passing email in the POST body payload.
+    // ─────────────────────────────────────────────────────────────────────────
 
     // POST/PUT: wrap in {data:...} and send as text/plain to avoid CORS preflight
-    if ((config.method === 'post' || config.method === 'put') && config.data !== undefined) {
+    if ((config.method === 'post' || config.method === 'put') && config.data != null) {
       // Wrap payload in { data: ... } envelope (required by loikmon.org)
       const wrapped =
         config.data !== null &&
@@ -40,7 +39,7 @@ export function getClient(baseURL?: string): AxiosInstance {
           : config.data
 
       // Serialize to JSON string but declare as text/plain
-      // → browser treats this as a simple request (no preflight)
+      // → browser treats this as a "simple request" (no preflight needed)
       config.data = JSON.stringify(wrapped)
       config.headers = config.headers ?? {}
       config.headers['Content-Type'] = 'text/plain'
@@ -57,7 +56,7 @@ export function getClient(baseURL?: string): AxiosInstance {
   return _instance
 }
 
-/** Replace with a custom Axios instance (useful in SSR or testing) */
-export function setClient(instance: AxiosInstance): void {
+/** Replace or reset the singleton (pass null to reset, useful in tests) */
+export function setClient(instance: AxiosInstance | null): void {
   _instance = instance
 }
