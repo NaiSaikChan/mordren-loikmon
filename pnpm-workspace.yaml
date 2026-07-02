@@ -1,2 +1,5 @@
 packages:
   - 'packages/*'
+
+overrides:
+  pdfjs-dist: 5.4.530

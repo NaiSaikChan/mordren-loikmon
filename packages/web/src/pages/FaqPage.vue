@@ -32,7 +32,7 @@ function toggle(id: string) {
     <div v-else-if="faqs.length" class="space-y-3">
       <div v-for="faq in faqs" :key="faq.id" class="card overflow-hidden">
         <button class="w-full flex items-center justify-between p-4 text-left" @click="toggle(String(faq.id))">
-          <span class="font-medium text-gray-900 dark:text-white pr-4">{{ faq.question ?? faq.title }}</span>
+          <span class="font-medium text-gray-900 dark:text-white pr-4">{{ faq.question ?? faq.name }}</span>
           <span :class="['text-gray-400 transition-transform shrink-0', openId === String(faq.id) ? 'rotate-180' : '']">▼</span>
         </button>
         <div v-if="openId === String(faq.id)" class="px-4 pb-4 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-100 dark:border-surface-700 pt-3">

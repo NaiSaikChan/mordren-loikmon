@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useBooksStore } from '@/stores/books'
 import { useReviewsStore } from '@/stores/reviews'
 import { useAuthStore } from '@/stores/auth'
+import { useRouter } from 'vue-router'
 import { books as booksApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import BookCard from '@/components/shared/BookCard.vue'
@@ -13,6 +14,7 @@ const { t } = useI18n()
 const store  = useBooksStore()
 const reviews = useReviewsStore()
 const auth   = useAuthStore()
+const router = useRouter()
 
 const book    = computed(() => store.detail)
 const cover   = computed(() => {
@@ -32,7 +34,7 @@ function fixUrl(url?: string) {
 }
 
 function openReader() {
-  window.open(`/mordren-loikmon/reader/${props.id}`, '_blank')
+  router.push(`/books/${props.id}/read`)
 }
 
 async function submitReview() {
@@ -111,7 +113,7 @@ watch(() => props.id, loadBook)
                 target="_blank" class="btn-secondary">
                 ⬇️ Download PDF
               </a>
-              <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/reader`" class="btn-secondary">
+              <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/read`" class="btn-secondary">
                 📑 Chapters ({{ store.chapters.length }})
               </RouterLink>
             </div>

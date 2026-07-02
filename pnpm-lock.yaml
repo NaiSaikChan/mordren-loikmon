@@ -112,6 +112,9 @@ importers:
       vue-router:
         specifier: ^4.3.3
         version: 4.6.4(vue@3.5.38(typescript@5.9.3))
+      vue3-pdf-app:
+        specifier: ^1.0.3
+        version: 1.0.3(vue@3.5.38(typescript@5.9.3))
     devDependencies:
       '@tailwindcss/forms':
         specifier: ^0.5.7
@@ -2118,6 +2121,11 @@ packages:
     peerDependencies:
       typescript: '>=5.0.0'
 
+  vue3-pdf-app@1.0.3:
+    resolution: {integrity: sha512-qegWTIF4wYKiocZ3KreB70wRXhqSdXWbdERDyyKzT7d5PbjKbS9tD6vaKkCqh3PzTM84NyKPYrQ3iuwJb60YPQ==}
+    peerDependencies:
+      vue: ^3.0.0
+
   vue@3.5.38:
     resolution: {integrity: sha512-vAMKHfImQlYSy0C+PBue4s3ERZ2xGKfgZg5GXAsLInq1dyh2H78ILVP5sK0KPFPVW4kv+OGCIvBEondcjpZp7A==}
     peerDependencies:
@@ -4040,6 +4048,10 @@ snapshots:
       '@volar/typescript': 2.4.15
       '@vue/language-core': 2.2.12(typescript@5.9.3)
       typescript: 5.9.3
+
+  vue3-pdf-app@1.0.3(vue@3.5.38(typescript@5.9.3)):
+    dependencies:
+      vue: 3.5.38(typescript@5.9.3)
 
   vue@3.5.38(typescript@5.9.3):
     dependencies:

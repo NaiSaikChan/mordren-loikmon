@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useBooksStore } from '@/stores/books'
 import { useI18n } from 'vue-i18n'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import VuePdfApp from 'vue3-pdf-app'
+import 'vue3-pdf-app/dist/icons/main.css'
 
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()
 const store = useBooksStore()
-const pdfError = ref(false)
 
 function fixUrl(url: string): string {
   if (!url) return ''
@@ -18,9 +19,12 @@ function fixUrl(url: string): string {
 
 const book    = computed(() => store.detail)
 const pdfUrl  = computed(() => fixUrl(store.detail?.pdf ?? ''))
-const viewerUrl = computed(() => {
+const viewerPdfUrl = computed(() => {
   if (!pdfUrl.value) return ''
-  return `https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl.value)}&embedded=true`
+  if (/^https?:\/\//i.test(pdfUrl.value)) {
+    return `/api/misc/pdf-proxy?url=${encodeURIComponent(pdfUrl.value)}`
+  }
+  return pdfUrl.value
 })
 
 onMounted(async () => {
@@ -45,8 +49,8 @@ onMounted(async () => {
 
     <LoadingSpinner v-if="store.loading && !book" />
 
-    <div v-else-if="viewerUrl && !pdfError" class="flex-1 overflow-hidden">
-      <iframe :src="viewerUrl" class="w-full h-full border-0" allow="fullscreen" @error="pdfError = true" />
+    <div v-else-if="viewerPdfUrl" class="flex-1 overflow-hidden">
+      <VuePdfApp :pdf="viewerPdfUrl" class="w-full h-full" style="height: 100%;" />
     </div>
 
     <div v-else-if="pdfUrl" class="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
