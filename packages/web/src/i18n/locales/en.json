@@ -110,5 +110,8 @@
     "notifications": "Notifications",
     "account": "Account",
     "deleteAccount": "Delete Account"
+  },
+  "reader": {
+    "notAvailable": "No readable file available for this book."
   }
 }

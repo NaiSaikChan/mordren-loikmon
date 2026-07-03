@@ -110,5 +110,8 @@
     "notifications": "တၚ်ကဵုသတိ",
     "account": "စရၚ် အဲ",
     "deleteAccount": "ဇိုတ်ကၠေံ စရၚ်အဲ"
+  },
+  "reader": {
+    "notAvailable": "No readable file available for this book."
   }
 }
