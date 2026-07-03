@@ -19,6 +19,13 @@ function fixUrl(url: string): string {
     .replace(/ /g, '%20')
 }
 
+// Keyboard arrow navigation (called from parent window AND from inside the iframe)
+function onKeyDown(e: KeyboardEvent) {
+  if (!rendition) return
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') rendition.next()
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   rendition.prev()
+}
+
 async function render(url: string) {
   if (!container.value || !url) return
 
@@ -40,6 +47,18 @@ async function render(url: string) {
       allowScriptedContent: false,
     })
     await rendition.display()
+    // Force a white background inside the iframe so text stays readable
+    // regardless of the app's dark-mode theme (the iframe is transparent by default).
+    rendition.themes?.default({
+      body: {
+        background:       '#ffffff !important',
+        'background-color': '#ffffff !important',
+        color:            '#111827 !important',
+      },
+    })
+    // Also capture keydown events fired inside the epubjs iframe,
+    // which do not bubble up to the parent window.
+    rendition.on('keydown', onKeyDown)
   } catch (e: any) {
     errorMsg.value = e?.message ?? 'Failed to load EPUB'
   } finally {
@@ -47,15 +66,12 @@ async function render(url: string) {
   }
 }
 
-// Keyboard arrow navigation
-function onKeyDown(e: KeyboardEvent) {
-  if (!rendition) return
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') rendition.next()
-  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   rendition.prev()
-}
+function goPrev() { rendition?.prev() }
+function goNext() { rendition?.next() }
 
 onMounted(() => {
   render(props.url)
+  // Capture keys when the parent window is focused
   window.addEventListener('keydown', onKeyDown)
 })
 
@@ -88,7 +104,26 @@ watch(() => props.url, (url) => render(url))
       </div>
     </div>
 
-    <!-- epubjs render target -->
-    <div ref="container" class="w-full h-full overflow-auto bg-white dark:bg-surface-900" />
+    <!-- epubjs render target: always white so epub text stays readable in dark mode -->
+    <div ref="container" class="w-full h-full overflow-auto bg-white" />
+
+    <!-- Chapter navigation buttons -->
+    <div v-if="!loading && !errorMsg"
+      class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 z-20">
+      <button
+        @click="goPrev"
+        class="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+        aria-label="Previous chapter"
+      >
+        &#8592;
+      </button>
+      <button
+        @click="goNext"
+        class="flex items-center justify-center w-10 h-10 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+        aria-label="Next chapter"
+      >
+        &#8594;
+      </button>
+    </div>
   </div>
 </template>
