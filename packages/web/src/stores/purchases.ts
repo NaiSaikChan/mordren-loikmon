@@ -40,5 +40,37 @@ export const usePurchasesStore = defineStore('purchases', () => {
     return res.data as any
   }
 
-  return { books, articles, coinBalance, coinPackages, loading, fetchAll, fetchCoinPackages, redeemCoupon }
+  const buyLoading = ref(false)
+  const buyError   = ref<string | null>(null)
+
+  async function buyCoins(
+    packageId: string,
+    packageName: string,
+    coinAmount: string,
+    file: File,
+  ) {
+    const auth = useAuthStore()
+    if (!auth.user?.email) throw new Error('Not logged in')
+    buyLoading.value = true
+    buyError.value   = null
+    try {
+      const res  = await purchasesApi.proofOfPayment(
+        auth.user.email as string,
+        packageId,
+        packageName,
+        coinAmount,
+        file,
+      )
+      const body = res.data as any
+      if (body?.status !== 'ok') throw new Error(body?.msg ?? 'Payment submission failed')
+      return body
+    } catch (e: any) {
+      buyError.value = e.message ?? 'Unknown error'
+      throw e
+    } finally {
+      buyLoading.value = false
+    }
+  }
+
+  return { books, articles, coinBalance, coinPackages, loading, fetchAll, fetchCoinPackages, redeemCoupon, buyLoading, buyError, buyCoins }
 })

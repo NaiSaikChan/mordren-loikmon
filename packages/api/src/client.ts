@@ -29,7 +29,8 @@ export function getClient(baseURL?: string): AxiosInstance {
     // ─────────────────────────────────────────────────────────────────────────
 
     // POST/PUT: wrap in {data:...} and send as text/plain to avoid CORS preflight
-    if ((config.method === 'post' || config.method === 'put') && config.data != null) {
+    // Skip FormData — multipart/form-data requests must not be wrapped or stringified
+    if ((config.method === 'post' || config.method === 'put') && config.data != null && !(config.data instanceof FormData)) {
       // Wrap payload in { data: ... } envelope (required by loikmon.org)
       const wrapped =
         config.data !== null &&

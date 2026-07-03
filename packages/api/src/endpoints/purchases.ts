@@ -36,4 +36,29 @@ export const purchases = {
   // { email, code, book_id }
   redeemCoupon: (email: string, code: string, bookId: string | number) =>
     getClient().post<any>('subscribeBookCoupon', { email, code, book_id: bookId }),
+
+  /**
+   * Upload bank-transfer proof of payment.
+   * Sends as multipart/form-data (NOT text/plain) — server requires a file upload.
+   * The client interceptor wraps {data:...} for text/plain only; here we bypass that
+   * by passing a FormData directly with explicit Content-Type header.
+   * Fields: email, packageid, package (name), amount (coin count as string), file
+   */
+  proofOfPayment: (
+    email: string,
+    packageId: string,
+    packageName: string,
+    coinAmount: string,
+    file: File,
+  ) => {
+    const form = new FormData()
+    form.append('email',     email)
+    form.append('packageid', packageId)
+    form.append('package',   packageName)
+    form.append('amount',    coinAmount)
+    form.append('file',      file)
+    // Pass FormData directly — Axios will set multipart/form-data + boundary automatically
+    // Do NOT wrap in {data:...} — the interceptor skips FormData instances
+    return getClient().post<any>('proofofpayment', form)
+  },
 }
