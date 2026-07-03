@@ -105,14 +105,19 @@ watch(() => props.id, loadBook)
             </div>
 
             <!-- Action buttons -->
-            <div class="flex gap-3 flex-wrap">
-              <button v-if="book.pdf ?? book.pdffile" class="btn-primary" @click="openReader">
+            <div class="flex gap-3 flex-wrap items-center">
+              <button v-if="book.epub || book.pdf || book.pdffile" class="btn-primary" @click="openReader">
                 📖 Read Now
               </button>
-              <a v-if="book.pdf ?? book.pdffile" :href="fixUrl(book.pdf ?? book.pdffile)"
-                target="_blank" class="btn-secondary">
-                ⬇️ Download PDF
-              </a>
+              <!-- Format badge -->
+              <span v-if="book.epub"
+                class="inline-block text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                EPUB
+              </span>
+              <span v-else-if="book.pdf || book.pdffile"
+                class="inline-block text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
+                PDF
+              </span>
               <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/read`" class="btn-secondary">
                 📑 Chapters ({{ store.chapters.length }})
               </RouterLink>

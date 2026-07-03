@@ -3,6 +3,7 @@ import { onMounted, computed } from 'vue'
 import { useBooksStore } from '@/stores/books'
 import { useI18n } from 'vue-i18n'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import EpubReader from '@/components/shared/EpubReader.vue'
 import VuePdfApp from 'vue3-pdf-app'
 import 'vue3-pdf-app/dist/icons/main.css'
 
@@ -61,12 +62,17 @@ onMounted(async () => {
 
     <LoadingSpinner v-if="store.loading && !book" />
 
-    <!-- PDF viewer (download + print disabled via :config) -->
+    <!-- EPUB reader (epubjs) -->
+    <div v-else-if="epubUrl" class="flex-1 overflow-hidden">
+      <EpubReader :url="epubUrl" />
+    </div>
+
+    <!-- PDF reader (download + print disabled) -->
     <div v-else-if="viewerPdfUrl" class="flex-1 overflow-hidden">
       <VuePdfApp :pdf="viewerPdfUrl" :config="pdfConfig" class="w-full h-full" style="height: 100%;" />
     </div>
 
-    <!-- No readable file -->
+    <!-- Nothing available -->
     <div v-else class="flex-1 flex items-center justify-center text-gray-400 text-center p-8">
       <div>
         <div class="text-5xl mb-3">📚</div>
