@@ -101,7 +101,11 @@
     "approved": "Approved",
     "rejected": "Rejected",
     "redeemCoupon": "Redeem Coupon",
-    "history": "Purchase History"
+    "history": "Purchase History",
+    "paymentInstructions": "Payment Instructions",
+    "submitProof": "Submit Proof",
+    "submitting": "Submitting…",
+    "proofSubmitted": "Payment proof submitted! Coins will be credited after admin review."
   },
   "settings": {
     "title": "Settings",

@@ -23,6 +23,48 @@ async function redeemCoupon() {
   }
 }
 
+// --- Buy Coins modal state ---
+const selectedPkg   = ref<any>(null)
+const proofFile     = ref<File | null>(null)
+const fileInputRef  = ref<HTMLInputElement | null>(null)
+const buyMsg        = ref('')
+const buySuccess    = ref(false)
+
+function selectPackage(pkg: any) {
+  selectedPkg.value = pkg
+  proofFile.value   = null
+  buyMsg.value      = ''
+  buySuccess.value  = false
+}
+
+function onFileChange(e: Event) {
+  proofFile.value = (e.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function submitPayment() {
+  if (!selectedPkg.value || !proofFile.value) return
+  buyMsg.value = ''
+  try {
+    await store.buyCoins(
+      String(selectedPkg.value.id),
+      selectedPkg.value.name,
+      String(selectedPkg.value.amount),
+      proofFile.value,
+    )
+    buySuccess.value = true
+    buyMsg.value = t('purchases.proofSubmitted')
+  } catch {
+    buyMsg.value = store.buyError ?? 'Submission failed. Please try again.'
+  }
+}
+
+function closeModal() {
+  selectedPkg.value = null
+  buySuccess.value  = false
+  buyMsg.value      = ''
+  proofFile.value   = null
+}
+
 onMounted(async () => {
   if (authStore.isLoggedIn) {
     await store.fetchAll()
@@ -60,10 +102,11 @@ onMounted(async () => {
           <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ t('purchases.buyCoins') }}</h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div v-for="pkg in store.coinPackages" :key="pkg.id"
-              class="card p-4 text-center hover:border-brand-400 cursor-pointer transition-colors">
-              <div class="text-2xl font-bold text-brand-600 dark:text-brand-400">{{ pkg.coins }}</div>
-              <div class="text-sm text-gray-400 mt-0.5">coins</div>
-              <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{{ pkg.price ?? pkg.amount }}</div>
+              class="card p-4 text-center hover:border-brand-400 cursor-pointer transition-colors"
+              @click="selectPackage(pkg)">
+              <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ pkg.name }}</div>
+              <div class="text-2xl font-bold text-brand-600 dark:text-brand-400">{{ pkg.amount }} 🪙</div>
+              <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{{ pkg.value }} MMK</div>
             </div>
           </div>
         </div>
@@ -106,4 +149,84 @@ onMounted(async () => {
       </div>
     </div>
   </div>
+
+  <!-- Buy Coins Modal -->
+  <Teleport to="body">
+    <div v-if="selectedPkg"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      @click.self="closeModal">
+      <div class="bg-white dark:bg-surface-800 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+            {{ t('purchases.buyCoins') }}: {{ selectedPkg.name }}
+          </h3>
+          <button @click="closeModal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">&times;</button>
+        </div>
+
+        <!-- Package summary -->
+        <div class="bg-brand-50 dark:bg-brand-900/20 rounded-xl p-4 text-center">
+          <div class="text-3xl font-bold text-brand-600 dark:text-brand-400">{{ selectedPkg.amount }} 🪙</div>
+          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ selectedPkg.value }} MMK</div>
+        </div>
+
+        <!-- Success state -->
+        <div v-if="buySuccess" class="text-center py-4 space-y-3">
+          <div class="text-5xl">✅</div>
+          <p class="text-green-600 dark:text-green-400 font-semibold">Proof submitted!</p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">{{ buyMsg }}</p>
+          <button @click="closeModal" class="btn-primary mt-2 px-6">{{ t('common.close') }}</button>
+        </div>
+
+        <!-- Upload form -->
+        <div v-else class="space-y-4">
+          <!-- Payment instructions -->
+          <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+            <p class="font-semibold">{{ t('purchases.paymentInstructions') }}</p>
+            <ol class="list-decimal list-inside space-y-1 text-gray-500 dark:text-gray-400">
+              <li>Transfer <strong class="text-gray-700 dark:text-gray-200">{{ selectedPkg.value }} MMK</strong> to our bank account.</li>
+              <li>Take a screenshot or photo of the transfer receipt.</li>
+              <li>Upload the proof image below and tap Submit.</li>
+            </ol>
+            <p class="text-xs text-gray-400 pt-1">Coins are credited within 24 hours after admin review.</p>
+          </div>
+
+          <!-- File upload -->
+          <label class="block">
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Payment Proof</span>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept="image/*,application/pdf"
+              class="block w-full text-sm text-gray-500 dark:text-gray-400
+                file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                file:text-sm file:font-medium
+                file:bg-brand-50 file:text-brand-700
+                dark:file:bg-brand-900/30 dark:file:text-brand-400
+                hover:file:bg-brand-100 dark:hover:file:bg-brand-900/50 cursor-pointer"
+              @change="onFileChange"
+            />
+          </label>
+
+          <!-- Error -->
+          <p v-if="buyMsg && !buySuccess" class="text-red-500 dark:text-red-400 text-sm">{{ buyMsg }}</p>
+
+          <!-- Actions -->
+          <div class="flex gap-3 pt-1">
+            <button class="btn-ghost flex-1" @click="closeModal">{{ t('common.cancel') }}</button>
+            <button
+              class="btn-primary flex-1"
+              :disabled="!proofFile || store.buyLoading"
+              :class="{ 'opacity-50 cursor-not-allowed': !proofFile || store.buyLoading }"
+              @click="submitPayment">
+              <span v-if="store.buyLoading">{{ t('purchases.submitting') }}</span>
+              <span v-else>{{ t('purchases.submitProof') }}</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </Teleport>
 </template>

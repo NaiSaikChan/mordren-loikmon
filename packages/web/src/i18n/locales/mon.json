@@ -101,7 +101,11 @@
     "approved": "သ္ပဒတန်",
     "rejected": "တးပါဲထောံ",
     "redeemCoupon": "ကူပံၚ်",
-    "history": "ဝၚ်"
+    "history": "ဝၚ်",
+    "paymentInstructions": "ညးစၟတ်တ္ၚဲဗ္ဒမ်",
+    "submitProof": "ဒုၚ်စ သက်သဳ",
+    "submitting": "ဒုၚ်စဒၟံၚ်…",
+    "proofSubmitted": "သက်သဳဒုၚ်စတုဲ! တၚ်္ကာဒၞဲါဂၠံၚ်တရဴ ၂၄ နာဍဳ မ္ဂးကဵုစၟဳစၟတ်ပ္ဍဲ ပရဟ်ကၟက်ရ။"
   },
   "settings": {
     "title": "ဒၞာဲထိၚ်",
