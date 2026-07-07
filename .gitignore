@@ -12,6 +12,9 @@ build/
 packages/web/src/**/*.js
 packages/web/src/**/*.js.map
 
+# Mobile — npm creates this when running `npx expo install` inside a pnpm workspace
+packages/mobile/package-lock.json
+
 # Env files
 .env
 .env.local
