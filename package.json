@@ -2,16 +2,13 @@
   "name": "mordren-loikmon",
   "private": true,
   "version": "1.0.0",
-  "description": "Loikmon eBook & Audio Platform \u2014 Vue 3 + Node.js + Expo rebuild",
+  "description": "Loikmon eBook & Audio Platform — Vue 3 + Node.js + Expo rebuild",
   "scripts": {
     "dev:web": "pnpm --filter @loikmon/web dev",
     "dev:server": "pnpm --filter @loikmon/server dev",
     "build:web": "pnpm --filter @loikmon/web build",
     "build:server": "pnpm --filter @loikmon/server build",
-    "build:api": "pnpm --filter @loikmon/api build",
-    "dev:mobile": "pnpm --filter @loikmon/mobile start",
-    "build:mobile:android": "pnpm --filter @loikmon/mobile android",
-    "build:mobile:ios": "pnpm --filter @loikmon/mobile ios"
+    "build:api": "pnpm --filter @loikmon/api build"
   },
   "packageManager": "pnpm@9.0.0",
   "dependencies": {
