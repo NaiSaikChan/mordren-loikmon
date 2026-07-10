@@ -11,13 +11,11 @@ const mockDestroy    = vi.fn()
 const mockDisplay    = vi.fn().mockResolvedValue(undefined)
 const mockNext       = vi.fn()
 const mockPrev       = vi.fn()
-const mockOn         = vi.fn()
 const mockRenderTo   = vi.fn().mockReturnValue({
   display: mockDisplay,
   destroy: mockDestroy,
   next:    mockNext,
   prev:    mockPrev,
-  on:      mockOn,
 })
 const mockBookDestroy = vi.fn()
 
