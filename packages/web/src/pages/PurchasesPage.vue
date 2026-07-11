@@ -106,7 +106,7 @@ onMounted(async () => {
               @click="selectPackage(pkg)">
               <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ pkg.name }}</div>
               <div class="text-2xl font-bold text-brand-600 dark:text-brand-400">{{ pkg.amount }} 🪙</div>
-              <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{{ pkg.value }} MMK</div>
+              <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{{ pkg.value }} THB</div>
             </div>
           </div>
         </div>
@@ -168,7 +168,7 @@ onMounted(async () => {
         <!-- Package summary -->
         <div class="bg-brand-50 dark:bg-brand-900/20 rounded-xl p-4 text-center">
           <div class="text-3xl font-bold text-brand-600 dark:text-brand-400">{{ selectedPkg.amount }} 🪙</div>
-          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ selectedPkg.value }} MMK</div>
+          <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ selectedPkg.value }} THB</div>
         </div>
 
         <!-- Success state -->
@@ -185,7 +185,7 @@ onMounted(async () => {
           <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
             <p class="font-semibold">{{ t('purchases.paymentInstructions') }}</p>
             <ol class="list-decimal list-inside space-y-1 text-gray-500 dark:text-gray-400">
-              <li>Transfer <strong class="text-gray-700 dark:text-gray-200">{{ selectedPkg.value }} MMK</strong> to our bank account.</li>
+              <li>Transfer <strong class="text-gray-700 dark:text-gray-200">{{ selectedPkg.value }} THB</strong> to our bank account.</li>
               <li>Take a screenshot or photo of the transfer receipt.</li>
               <li>Upload the proof image below and tap Submit.</li>
             </ol>
