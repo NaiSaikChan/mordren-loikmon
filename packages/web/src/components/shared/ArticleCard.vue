@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Article } from '@loikmon/api'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{ article: Article }>()
 
@@ -17,6 +17,29 @@ const formattedRating = computed(() => {
   const rating = Number(props.article.rating ?? 0)
   return rating > 0 ? rating.toFixed(1) : null
 })
+
+// Format articledate as "dd MMM yyyy"
+const formattedDate = computed(() => {
+  const raw = props.article.articledate as string | undefined
+  if (!raw) return null
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return raw
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+})
+
+// Social share
+const copied = ref(false)
+async function shareArticle(e: MouseEvent) {
+  e.preventDefault()
+  const url = `${window.location.origin}/articles/${props.article.id}`
+  if (navigator.share) {
+    try { await navigator.share({ title: String(props.article.title ?? ''), url }) } catch { /* cancelled */ }
+  } else {
+    await navigator.clipboard.writeText(url)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+  }
+}
 </script>
 
 <template>
@@ -55,6 +78,11 @@ const formattedRating = computed(() => {
           {{ article.title }}
         </h3>
 
+        <!-- Article Date -->
+        <div v-if="formattedDate" class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          📅 {{ formattedDate }}
+        </div>
+
         <!-- Author Info -->
         <div v-if="article.authorname" class="flex items-center gap-1.5 mb-2 text-xs text-gray-600 dark:text-gray-400">
           <span>✍️</span>
@@ -74,6 +102,16 @@ const formattedRating = computed(() => {
             <span class="text-sm">⭐</span>
             <span class="text-xs font-semibold text-yellow-500">{{ formattedRating }}</span>
           </div>
+
+          <!-- Share button -->
+          <button
+            class="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-brand-500 dark:hover:text-brand-400 transition-colors focus-visible:outline-none"
+            :title="copied ? 'Link copied!' : 'Share'"
+            @click="shareArticle"
+          >
+            <span class="text-sm">{{ copied ? '✅' : '🔗' }}</span>
+            <span>{{ copied ? 'Copied!' : 'Share' }}</span>
+          </button>
         </div>
       </div>
     </div>

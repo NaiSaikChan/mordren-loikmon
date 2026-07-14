@@ -226,7 +226,7 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 // ─── Swipe gesture (outer div + iframe proxy) ─────────────────────────────────
-let _swipeLock = false
+let _swipeLock = true
 let _tx = 0
 let _ty = 0
 
@@ -541,11 +541,11 @@ watch(() => props.url, url => render(url))
         </div>
       </div>
 
-      <!-- Previous page button -->
+      <!-- Previous page button (hidden on mobile — swipe handles navigation) -->
       <button
         v-if="!loading && !errorMsg"
         @click="goPrev"
-        class="absolute left-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-10 sm:w-12 h-20 sm:h-24 rounded-r-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        class="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-12 h-24 rounded-r-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :style="{ background: `${effectiveBg}d0`, color: effectiveColor }"
         style="backdrop-filter: blur(2px);"
         aria-label="Previous page"
@@ -555,11 +555,11 @@ watch(() => props.url, url => render(url))
         </svg>
       </button>
 
-      <!-- Next page button -->
+      <!-- Next page button (hidden on mobile — swipe handles navigation) -->
       <button
         v-if="!loading && !errorMsg"
         @click="goNext"
-        class="absolute right-0 top-1/2 -translate-y-1/2 z-10 flex items-center justify-center w-10 sm:w-12 h-20 sm:h-24 rounded-l-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        class="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-12 h-24 rounded-l-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :style="{ background: `${effectiveBg}d0`, color: effectiveColor }"
         style="backdrop-filter: blur(2px);"
         aria-label="Next page"

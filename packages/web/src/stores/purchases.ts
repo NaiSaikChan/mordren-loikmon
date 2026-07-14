@@ -33,6 +33,14 @@ export const usePurchasesStore = defineStore('purchases', () => {
     coinPackages.value = (res.data as any).coins ?? []
   }
 
+  function hasBook(id: string | number): boolean {
+    return books.value.some(b => String(b?.id ?? b) === String(id))
+  }
+
+  function hasArticle(id: string | number): boolean {
+    return articles.value.some(a => String(a?.id ?? a) === String(id))
+  }
+
   async function redeemCoupon(code: string, bookId: string | number) {
     const auth = useAuthStore()
     if (!auth.user?.email) throw new Error('Not logged in')
@@ -42,6 +50,44 @@ export const usePurchasesStore = defineStore('purchases', () => {
 
   const buyLoading = ref(false)
   const buyError   = ref<string | null>(null)
+
+  async function purchaseBook(bookId: string | number, amount: number) {
+    const auth = useAuthStore()
+    if (!auth.user?.email) throw new Error('Not logged in')
+    buyLoading.value = true
+    buyError.value   = null
+    try {
+      const res = await purchasesApi.purchaseBook(auth.user.email as string, bookId, amount)
+      const body = res.data as any
+      if (body?.status !== 'ok') throw new Error(body?.msg ?? body?.message ?? 'Purchase failed')
+      await fetchAll()
+      return body
+    } catch (e: any) {
+      buyError.value = e.message ?? 'Unknown error'
+      throw e
+    } finally {
+      buyLoading.value = false
+    }
+  }
+
+  async function purchaseArticle(articleId: string | number, amount: number) {
+    const auth = useAuthStore()
+    if (!auth.user?.email) throw new Error('Not logged in')
+    buyLoading.value = true
+    buyError.value   = null
+    try {
+      const res = await purchasesApi.purchaseArticle(auth.user.email as string, articleId, amount)
+      const body = res.data as any
+      if (body?.status !== 'ok') throw new Error(body?.msg ?? body?.message ?? 'Purchase failed')
+      await fetchAll()
+      return body
+    } catch (e: any) {
+      buyError.value = e.message ?? 'Unknown error'
+      throw e
+    } finally {
+      buyLoading.value = false
+    }
+  }
 
   async function buyCoins(
     packageId: string,
@@ -72,5 +118,5 @@ export const usePurchasesStore = defineStore('purchases', () => {
     }
   }
 
-  return { books, articles, coinBalance, coinPackages, loading, fetchAll, fetchCoinPackages, redeemCoupon, buyLoading, buyError, buyCoins }
+  return { books, articles, coinBalance, coinPackages, loading, fetchAll, hasBook, hasArticle, fetchCoinPackages, redeemCoupon, buyLoading, buyError, buyCoins, purchaseBook, purchaseArticle }
 })

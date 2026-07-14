@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useArticlesStore } from '@/stores/articles'
 import { useReviewsStore } from '@/stores/reviews'
 import { useAuthStore } from '@/stores/auth'
+import { usePurchasesStore } from '@/stores/purchases'
 import { articles as articlesApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 
@@ -12,6 +13,7 @@ const { t } = useI18n()
 const store  = useArticlesStore()
 const reviews = useReviewsStore()
 const auth   = useAuthStore()
+const purchasesStore = usePurchasesStore()
 
 const article  = computed(() => store.detail)
 const tab      = ref<'content' | 'reviews'>('content')
@@ -19,6 +21,21 @@ const newReview  = ref('')
 const newRating  = ref(5)
 const submitting = ref(false)
 const reviewMsg  = ref('')
+const isPurchasing = ref(false)
+const purchaseMsg  = ref('')
+
+const isPaid = computed(() => {
+  if (!article.value) return false
+  if (article.value.is_free) return false
+  return Number(article.value.price ?? article.value.amount ?? 0) > 0
+})
+
+const canRead = computed(() => {
+  if (!article.value) return false
+  if (!isPaid.value) return true
+  if (!auth.isLoggedIn) return false
+  return purchasesStore.hasArticle(props.id)
+})
 
 function fixUrl(url?: string) {
   if (!url) return ''
@@ -36,9 +53,25 @@ async function submitReview() {
   finally { submitting.value = false }
 }
 
+async function buyArticle() {
+  isPurchasing.value = true
+  purchaseMsg.value  = ''
+  try {
+    await purchasesStore.purchaseArticle(props.id, Number(article.value?.price ?? article.value?.amount ?? 0))
+    purchaseMsg.value = 'Purchase successful! You can now read this article.'
+  } catch (e: any) {
+    purchaseMsg.value = e.message ?? 'Purchase failed. Please check your coin balance.'
+  } finally {
+    isPurchasing.value = false
+  }
+}
+
 onMounted(async () => {
-  await store.fetchDetail(props.id)
-  await reviews.loadReviews(props.id, 'article')
+  await Promise.all([
+    store.fetchDetail(props.id),
+    auth.isLoggedIn ? purchasesStore.fetchAll() : Promise.resolve(),
+  ])
+  reviews.loadReviews(props.id, 'article')
   articlesApi.updateArticleTotalViews(props.id)
 })
 </script>
@@ -67,7 +100,7 @@ onMounted(async () => {
         <span v-if="article.category ?? article.cat">📂 {{ article.category ?? article.cat }}</span>
         <span v-if="article.created_at ?? article.date">📅 {{ new Date(article.created_at ?? article.date ?? '').toLocaleDateString() }}</span>
         <span v-if="article.is_free" class="text-green-500 font-semibold">Free</span>
-        <span v-else-if="article.price" class="text-brand-600 font-semibold">🪙 {{ article.price }}</span>
+        <span v-else-if="article.price ?? article.amount" class="text-brand-600 font-semibold">🪙 {{ article.price ?? article.amount }}</span>
       </div>
 
       <!-- Tabs -->
@@ -80,7 +113,24 @@ onMounted(async () => {
 
       <!-- Content -->
       <div v-if="tab === 'content'" class="card p-6">
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line"
+        <!-- Locked: paid article not yet purchased -->
+        <div v-if="!canRead" class="text-center py-10">
+          <div class="text-4xl mb-3">🔒</div>
+          <p class="font-semibold text-gray-700 dark:text-gray-200 mb-2">This article requires purchase</p>
+          <p class="text-sm text-gray-400 mb-5">🪙 {{ article.price ?? article.amount }} coins for full access</p>
+          <button v-if="auth.isLoggedIn" class="btn-primary" @click="buyArticle"
+            :disabled="purchasesStore.buyLoading || isPurchasing">
+            {{ purchasesStore.buyLoading || isPurchasing ? 'Purchasing…' : `🪙 Buy for ${article.price ?? article.amount} coins` }}
+          </button>
+          <RouterLink v-else to="/auth" class="btn-primary inline-flex">🔐 Login to Read</RouterLink>
+          <p v-if="purchaseMsg" class="text-sm mt-3"
+            :class="purchaseMsg.includes('successful') ? 'text-green-500' : 'text-red-400'">
+            {{ purchaseMsg }}
+          </p>
+        </div>
+        <!-- Content available -->
+        <div v-else
+          class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line"
           v-html="article.content ?? article.description ?? article.body ?? 'No content available.'">
         </div>
       </div>

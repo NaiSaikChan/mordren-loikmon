@@ -37,6 +37,7 @@ export interface Book {
   pdffile?: string
   epub?: string
   price?: number | string
+  amount?: number | string
   is_free?: boolean
   rating?: number | string
   views?: number | string
@@ -69,6 +70,7 @@ export interface Article {
   description?: string
   body?: string
   price?: number | string
+  amount?: number | string
   is_free?: boolean
   created_at?: string
   date?: string

@@ -6,12 +6,15 @@ import AppTopBar from './AppTopBar.vue'
 import AudioPlayer from '@/components/media/AudioPlayer.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { usePurchasesStore } from '@/stores/purchases'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const purchasesStore = usePurchasesStore()
 
-onMounted(() => {
-  authStore.restore()
+onMounted(async () => {
+  await authStore.restore()
+  if (authStore.isLoggedIn) purchasesStore.fetchAll()
 })
 </script>
 

@@ -35,8 +35,8 @@ function toggle(id: string) {
           <span class="font-medium text-gray-900 dark:text-white pr-4">{{ faq.question ?? faq.name }}</span>
           <span :class="['text-gray-400 transition-transform shrink-0', openId === String(faq.id) ? 'rotate-180' : '']">▼</span>
         </button>
-        <div v-if="openId === String(faq.id)" class="px-4 pb-4 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-100 dark:border-surface-700 pt-3">
-          {{ faq.answer ?? faq.content }}
+        <div v-if="openId === String(faq.id)" class="px-4 pb-4 text-sm text-gray-600 dark:text-gray-300 border-t border-gray-100 dark:border-surface-700 pt-3 prose prose-sm dark:prose-invert max-w-none"
+          v-html="faq.answer ?? faq.content">
         </div>
       </div>
     </div>

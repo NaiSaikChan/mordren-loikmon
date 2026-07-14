@@ -4,12 +4,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { usePurchasesStore } from '@/stores/purchases'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const purchasesStore = usePurchasesStore()
 
 const navItems = computed(() => [
   { key: 'home',        icon: '🏠', label: t('nav.home'),       path: '/' },
@@ -74,7 +76,7 @@ async function handleLogout() {
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ authStore.displayName }}</div>
-          <div class="text-xs text-gray-400 truncate">{{ authStore.coinBalance }} coins</div>
+          <div class="text-xs text-gray-400 truncate">{{ purchasesStore.coinBalance }} coins</div>
         </div>
       </div>
     </div>

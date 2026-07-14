@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useBooksStore } from '@/stores/books'
 import { useReviewsStore } from '@/stores/reviews'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { usePurchasesStore } from '@/stores/purchases'
 import { books as booksApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import BookCard from '@/components/shared/BookCard.vue'
@@ -14,7 +14,7 @@ const { t } = useI18n()
 const store  = useBooksStore()
 const reviews = useReviewsStore()
 const auth   = useAuthStore()
-const router = useRouter()
+const purchasesStore = usePurchasesStore()
 
 const book    = computed(() => store.detail)
 const cover   = computed(() => {
@@ -27,14 +27,27 @@ const newReview    = ref('')
 const newRating    = ref(5)
 const submitting   = ref(false)
 const reviewMsg    = ref('')
+const isPurchasing = ref(false)
+const purchaseMsg  = ref('')
+
+// A book is paid if it has a positive price and is not flagged free
+const isPaid = computed(() => {
+  if (!book.value) return false
+  if (book.value.is_free) return false
+  return Number(book.value.price ?? book.value.amount ?? 0) > 0
+})
+
+// User can read when: book is free/no price, OR they purchased it
+const canRead = computed(() => {
+  if (!book.value) return false
+  if (!isPaid.value) return true
+  if (!auth.isLoggedIn) return false
+  return purchasesStore.hasBook(props.id)
+})
 
 function fixUrl(url?: string) {
   if (!url) return ''
   return url.replace(/\\/g, '/').replace(/ /g, '%20').replace(/\u202f/gi, '%20')
-}
-
-function openReader() {
-  router.push(`/books/${props.id}/read`)
 }
 
 async function submitReview() {
@@ -48,12 +61,26 @@ async function submitReview() {
   finally { submitting.value = false }
 }
 
+async function buyBook() {
+  isPurchasing.value = true
+  purchaseMsg.value  = ''
+  try {
+    await purchasesStore.purchaseBook(props.id, Number(book.value?.price ?? book.value?.amount ?? 0))
+    purchaseMsg.value = 'Purchase successful! You can now read this book.'
+  } catch (e: any) {
+    purchaseMsg.value = e.message ?? 'Purchase failed. Please check your coin balance.'
+  } finally {
+    isPurchasing.value = false
+  }
+}
+
 async function loadBook() {
   coverError.value = false
   await store.fetchDetail(props.id)
   await reviews.loadReviews(props.id, 'book')
   booksApi.updateTotalViews(props.id)
   if (book.value) store.fetchRelated(props.id)
+  if (auth.isLoggedIn) purchasesStore.fetchAll()
 }
 
 onMounted(loadBook)
@@ -101,26 +128,47 @@ watch(() => props.id, loadBook)
               <span v-if="book.rating">⭐ {{ book.rating }}/5</span>
               <span v-if="book.views ?? book.total_views">👁 {{ book.views ?? book.total_views }} views</span>
               <span v-if="book.is_free" class="text-green-500 font-semibold">Free</span>
-              <span v-else-if="book.price" class="text-brand-600 font-semibold">🪙 {{ book.price }} coins</span>
+              <span v-else-if="book.price ?? book.amount" class="text-brand-600 font-semibold">🪙 {{ book.price ?? book.amount }} coins</span>
             </div>
 
             <!-- Action buttons -->
             <div class="flex gap-3 flex-wrap items-center">
-              <button v-if="book.epub || book.pdf || book.pdffile" class="btn-primary" @click="openReader">
-                📖 Read Now
-              </button>
-              <!-- Format badge -->
-              <span v-if="book.epub"
-                class="inline-block text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                EPUB
-              </span>
-              <span v-else-if="book.pdf || book.pdffile"
-                class="inline-block text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
-                PDF
-              </span>
-              <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/read`" class="btn-secondary">
-                📑 Chapters ({{ store.chapters.length }})
-              </RouterLink>
+              <!-- Free / purchased: show read buttons -->
+              <template v-if="canRead">
+                <template v-if="book.epub">
+                  <RouterLink :to="`/books/${props.id}/read?format=epub`" class="btn-primary">
+                    📖 Read EPUB
+                  </RouterLink>
+                  <span class="inline-block text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                    EPUB
+                  </span>
+                </template>
+                <template v-if="book.pdf || book.pdffile">
+                  <RouterLink :to="`/books/${props.id}/read?format=pdf`" class="btn-primary">
+                    📄 Read PDF
+                  </RouterLink>
+                  <span class="inline-block text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
+                    PDF
+                  </span>
+                </template>
+                <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/read`" class="btn-secondary">
+                  📑 Chapters ({{ store.chapters.length }})
+                </RouterLink>
+              </template>
+              <!-- Paid & not purchased: show buy / login prompt -->
+              <template v-else-if="isPaid">
+                <button v-if="auth.isLoggedIn" class="btn-primary" @click="buyBook"
+                  :disabled="purchasesStore.buyLoading || isPurchasing">
+                  {{ purchasesStore.buyLoading || isPurchasing ? 'Purchasing…' : `🪙 Buy for ${book.price ?? book.amount} coins` }}
+                </button>
+                <RouterLink v-else to="/auth" class="btn-primary">
+                  🔐 Login to Read
+                </RouterLink>
+                <p v-if="purchaseMsg" class="text-sm w-full mt-1"
+                  :class="purchaseMsg.includes('successful') ? 'text-green-500' : 'text-red-400'">
+                  {{ purchaseMsg }}
+                </p>
+              </template>
             </div>
           </div>
         </div>
