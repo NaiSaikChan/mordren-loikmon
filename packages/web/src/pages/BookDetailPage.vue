@@ -47,7 +47,7 @@ const canRead = computed(() => {
 
 function fixUrl(url?: string) {
   if (!url) return ''
-  return url.replace(/\\/g, '/').replace(/ /g, '%20').replace(/\u202f/gi, '%20')
+  return url.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
 }
 
 async function submitReview() {

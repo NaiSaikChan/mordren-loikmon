@@ -354,6 +354,21 @@ async function render(url: string) {
           st.id = '__epub-fonts__'
           st.textContent = fontFaceCSS
           doc.head.appendChild(st)
+          // Ensure content doesn't sit under the side nav buttons — add padding
+          try {
+            doc.getElementById('__epub-adjust__')?.remove()
+            const adj = doc.createElement('style')
+            adj.id = '__epub-adjust__'
+            adj.textContent = `
+              /* Add horizontal padding so text is not hidden beneath Prev/Next overlays */
+              .element-bodymatter {
+                box-sizing: border-box !important;
+                padding-left: 60px !important;
+                padding-right: 60px !important;
+              }
+            `
+            doc.head.appendChild(adj)
+          } catch { /* ignore adjust errors */ }
         } catch { /* ignore */ }
       })
     }
@@ -545,7 +560,7 @@ watch(() => props.url, url => render(url))
       <button
         v-if="!loading && !errorMsg"
         @click="goPrev"
-        class="absolute left-0 top-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-12 h-24 rounded-r-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        class="absolute left-0 top-1/2 -translate-y-1/2 z-10 sm:flex items-center justify-center w-12 h-24 rounded-r-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :style="{ background: `${effectiveBg}d0`, color: effectiveColor }"
         style="backdrop-filter: blur(2px);"
         aria-label="Previous page"
@@ -559,7 +574,7 @@ watch(() => props.url, url => render(url))
       <button
         v-if="!loading && !errorMsg"
         @click="goNext"
-        class="absolute right-0 top-1/2 -translate-y-1/2 z-10 hidden sm:flex items-center justify-center w-12 h-24 rounded-l-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+        class="absolute right-0 top-1/2 -translate-y-1/2 z-10 sm:flex items-center justify-center w-12 h-24 rounded-l-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :style="{ background: `${effectiveBg}d0`, color: effectiveColor }"
         style="backdrop-filter: blur(2px);"
         aria-label="Next page"
