@@ -44,9 +44,15 @@ const canAccess = computed(() => {
 })
 const viewerPdfUrl = computed(() => {
   if (!pdfUrl.value) return ''
-  if (/^https?:\/\//i.test(pdfUrl.value)) {
+
+  // GitHub Pages is a static deploy with no backend, so /api/misc/pdf-proxy
+  // returns 404 there. loikmon.org serves PDFs with Access-Control-Allow-Origin: *
+  // and accepts byte-range requests, so direct loading works in production.
+  // Dev still uses the local BFF proxy for cross-origin consistency.
+  if (import.meta.env.DEV && /^https?:\/\//i.test(pdfUrl.value)) {
     return `/api/misc/pdf-proxy?url=${encodeURIComponent(pdfUrl.value)}`
   }
+
   return pdfUrl.value
 })
 
