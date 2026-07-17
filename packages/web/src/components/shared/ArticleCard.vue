@@ -44,16 +44,16 @@ async function shareArticle(e: MouseEvent) {
 
 <template>
   <RouterLink :to="`/articles/${article.id}`" class="group block h-full">
-    <div class="overflow-hidden h-full flex gap-4 bg-white dark:bg-surface-900 hover:shadow-lg transition-all duration-300 rounded-xl border border-gray-200 dark:border-surface-700 p-4">
-      
+    <div
+      class="group overflow-hidden h-full flex gap-4 bg-white dark:bg-surface-900 hover:shadow-lg transition-all duration-300 rounded-xl border border-gray-200 dark:border-surface-700 p-4">
+
       <!-- Left Column: Thumbnail -->
-      <div v-if="article.thumbnail_url || article.thumbnail" class="relative shrink-0 w-32 h-32 rounded-lg overflow-hidden bg-linear-to-br from-gray-100 to-gray-200 dark:from-surface-800 dark:to-surface-700">
-        <img
-          :src="article.thumbnail_url ?? article.thumbnail"
-          :alt="article.title"
-          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-          loading="lazy"
-        />
+      <div
+        class="md:w-56 h-auto object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0 flex items-center justify-center bg-linear-to-br">
+        <img v-if="article.thumbnail_url || article.thumbnail"
+          :src="(article.thumbnail_url ?? article.thumbnail) as string" :alt="article.title"
+          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" loading="lazy" />
+        <span v-else class="text-2xl">📰</span>
       </div>
 
       <!-- Right Column: Content -->
@@ -66,15 +66,18 @@ async function shareArticle(e: MouseEvent) {
             </span>
           </div>
           <div class="shrink">
-            <span v-if="article.is_free" class="inline-block px-2.5 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full">Free</span>
-            <span v-else-if="article.price" class="inline-block px-2.5 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
+            <span v-if="article.is_free"
+              class="inline-block px-2.5 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full">Free</span>
+            <span v-else-if="article.price"
+              class="inline-block px-2.5 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
               {{ article.price }} coins
             </span>
           </div>
         </div>
 
         <!-- Title -->
-        <h3 class="text-sm font-bold text-gray-900 dark:text-white line-clamp-2 leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors mb-2">
+        <h3
+          class="text-sm font-bold text-gray-900 dark:text-white line-clamp-2 leading-snug group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors mb-2">
           {{ article.title }}
         </h3>
 
@@ -106,9 +109,7 @@ async function shareArticle(e: MouseEvent) {
           <!-- Share button -->
           <button
             class="ml-auto flex items-center gap-1 text-xs text-gray-400 hover:text-brand-500 dark:hover:text-brand-400 transition-colors focus-visible:outline-none"
-            :title="copied ? 'Link copied!' : 'Share'"
-            @click="shareArticle"
-          >
+            :title="copied ? 'Link copied!' : 'Share'" @click="shareArticle">
             <span class="text-sm">{{ copied ? '✅' : '🔗' }}</span>
             <span>{{ copied ? 'Copied!' : 'Share' }}</span>
           </button>
@@ -117,4 +118,3 @@ async function shareArticle(e: MouseEvent) {
     </div>
   </RouterLink>
 </template>
-

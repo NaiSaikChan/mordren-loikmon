@@ -3,7 +3,7 @@ import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCategoriesStore } from '@/stores/categories'
 import ArticlesTable from '@/components/articles/ArticlesTable.vue'
-import ArticlesPagination from '@/components/articles/ArticlesPagination.vue'
+import Pagination from '@/components/shared/Pagination.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import { useArticlesList } from '@/composables/useArticlesList'
 
@@ -49,7 +49,7 @@ onMounted(async () => {
         @toggle-sort="toggleSort"
       />
 
-      <ArticlesPagination
+      <Pagination
         :page="page"
         :page-size="pageSize"
         :is-last-page="isLastPage"

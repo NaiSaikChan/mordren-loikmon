@@ -91,17 +91,17 @@ function fmtRating(r: unknown) {
         <tr
           v-for="article in articles"
           :key="article.id"
-          class="hover:bg-gray-50 dark:hover:bg-surface-800 transition-colors"
+          class="group hover:bg-gray-50 dark:hover:bg-surface-800 transition-colors"
         >
           <!-- Thumbnail -->
           <td class="px-4 py-3">
             <RouterLink :to="`/articles/${article.id}`" tabindex="-1">
-              <div class="w-80 aspect-[10/4] rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0 flex items-center justify-center">
+              <div class="w-56 md:w-48 h-auto object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0 flex items-center justify-center bg-linear-to-br">
                 <img
                   v-if="article.thumbnail_url || article.thumbnail"
                   :src="(article.thumbnail_url ?? article.thumbnail) as string"
                   :alt="article.title"
-                  class="w-full h-full object-cover"
+                  class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                   loading="lazy"
                 />
                 <span v-else class="text-2xl">📰</span>
@@ -112,7 +112,7 @@ function fmtRating(r: unknown) {
           <!-- Title + Category -->
           <td class="px-4 py-3 max-w-xs">
             <RouterLink :to="`/articles/${article.id}`" class="block group">
-              <p class="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors leading-snug">
+              <p class="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 w-100 dark:group-hover:text-brand-400 transition-colors leading-snug">
                 {{ article.title }}
               </p>
             </RouterLink>

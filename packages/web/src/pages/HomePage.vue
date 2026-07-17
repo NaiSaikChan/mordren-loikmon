@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useBooksStore } from '@/stores/books'
 import { useArticlesStore } from '@/stores/articles'
@@ -18,6 +18,33 @@ const authStore    = useAuthStore()
 const sliders   = ref<any[]>([])
 const leagues   = ref<any[]>([])
 const initDone  = ref(false)
+const currentSlideIndex = ref(0)
+
+const currentSlide = computed(() => sliders.value[currentSlideIndex.value] || null)
+
+function nextSlide() {
+  if (sliders.value.length > 0) {
+    currentSlideIndex.value = (currentSlideIndex.value + 1) % sliders.value.length
+  }
+}
+
+function prevSlide() {
+  if (sliders.value.length > 0) {
+    currentSlideIndex.value = (currentSlideIndex.value - 1 + sliders.value.length) % sliders.value.length
+  }
+}
+
+function goToSlide(index: number) {
+  if (index >= 0 && index < sliders.value.length) {
+    currentSlideIndex.value = index
+  }
+}
+
+function handleSliderClick(slider: any) {
+  if (slider.link) {
+    window.open(slider.link, '_blank')
+  }
+}
 
 onMounted(async () => {
   try {
@@ -33,23 +60,76 @@ onMounted(async () => {
   if (!booksStore.list.length)    booksStore.fetchBooks()
   if (!articlesStore.list.length) articlesStore.fetchArticles()
   initDone.value = true
+
+  // Auto-rotate sliders every 5 seconds
+  if (sliders.value.length > 1) {
+    const autoRotate = setInterval(() => {
+      nextSlide()
+    }, 5000)
+    return () => clearInterval(autoRotate)
+  }
 })
 </script>
 
 <template>
   <div class="page-wrapper">
-    <!-- Welcome Banner -->
-    <div class="mb-8 rounded-2xl bg-linear-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg">
-      <p class="text-brand-200 text-xs font-medium leading-tight mb-1">Welcome back 👋</p>
-      <h1 class="text-2xl font-bold leading-tight mb-1">{{ authStore.displayName || 'Reader' }}</h1>
-      <p class="text-brand-100 text-sm leading-snug">Explore thousands of Mon books and articles</p>
-      <div class="mt-4 flex gap-3 flex-wrap">
-        <RouterLink to="/books" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium transition-colors">
-          📚 Browse Books
-        </RouterLink>
-        <RouterLink to="/music" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium transition-colors">
-          🎵 Listen
-        </RouterLink>
+    <!-- Sliders Carousel -->
+    <div v-if="sliders.length" class="mb-8 rounded-2xl overflow-hidden bg-gray-100 dark:bg-surface-800 shadow-lg">
+      <div class="relative w-full aspect-16/6 md:aspect-16/5 overflow-hidden bg-gray-200 dark:bg-surface-700">
+        <!-- Slider Images -->
+        <div class="relative w-full h-full">
+          <button
+            v-for="(slider, idx) in sliders"
+            :key="slider.id"
+            :aria-current="idx === currentSlideIndex ? 'true' : 'false'"
+            class="absolute inset-0 w-full h-full cursor-pointer transition-opacity duration-500"
+            :class="idx === currentSlideIndex ? 'opacity-100 visible' : 'opacity-0 invisible'"
+            @click="handleSliderClick(slider)"
+          >
+            <img
+              v-if="slider.thumbnail"
+              :src="slider.thumbnail"
+              :alt="slider.name || `Slider ${idx + 1}`"
+              class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+            <div v-else class="w-full h-full flex items-center justify-center bg-gray-300 dark:bg-surface-600 text-gray-400">
+              📸
+            </div>
+          </button>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <button
+          v-if="sliders.length > 1"
+          class="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+          @click.stop="prevSlide"
+          :title="t('common.previous') || 'Previous'"
+        >
+          ←
+        </button>
+        <button
+          v-if="sliders.length > 1"
+          class="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+          @click.stop="nextSlide"
+          :title="t('common.next') || 'Next'"
+        >
+          →
+        </button>
+
+        <!-- Pagination Indicators -->
+        <div v-if="sliders.length > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2">
+          <button
+            v-for="(_, idx) in sliders"
+            :key="`indicator-${idx}`"
+            class="w-2 h-2 rounded-full transition-all"
+            :class="idx === currentSlideIndex
+              ? 'bg-white w-6'
+              : 'bg-white/50 hover:bg-white/75'"
+            @click.stop="goToSlide(idx)"
+            :aria-label="`Go to slide ${idx + 1}`"
+          />
+        </div>
       </div>
     </div>
 
@@ -65,18 +145,6 @@ onMounted(async () => {
         <span class="text-2xl">{{ item.icon }}</span>
         <span class="text-xs font-semibold">{{ item.label }}</span>
       </RouterLink>
-    </div>
-
-    <!-- Leagues / Music Categories -->
-    <div v-if="leagues.length" class="mb-8">
-      <SectionHeader title="🎵 Audio Books" :viewAllPath="'/music'" />
-      <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
-        <RouterLink v-for="l in leagues" :key="l.id"
-          :to="`/music?league=${l.id}`"
-          class="shrink-0 px-4 py-2 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 text-sm font-medium hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-          {{ l.name ?? l.title }}
-        </RouterLink>
-      </div>
     </div>
 
     <!-- Books -->

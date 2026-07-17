@@ -119,7 +119,7 @@ watch(() => props.id, loadBook)
               {{ book.authorname ?? book.author }}
             </p>
             <p v-if="book.category ?? book.cat" class="text-xs text-gray-400 mb-3">
-              📂 {{ book.category ?? book.cat }}
+              📂 {{ book.categoryname ?? book.cat }}
             </p>
 
             <!-- Stats row -->
