@@ -39,10 +39,10 @@ onMounted(async () => {
 <template>
   <div class="page-wrapper">
     <!-- Welcome Banner -->
-    <div class="mb-8 rounded-2xl bg-gradient-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg">
-      <p class="text-brand-200 text-sm font-medium mb-1">Welcome back 👋</p>
-      <h1 class="text-2xl font-bold">{{ authStore.displayName || 'Reader' }}</h1>
-      <p class="mt-1 text-brand-100 text-sm">Explore thousands of Mon books and articles</p>
+    <div class="mb-8 rounded-2xl bg-linear-to-br from-brand-600 to-indigo-700 p-6 text-white shadow-lg">
+      <p class="text-brand-200 text-xs font-medium leading-tight mb-1">Welcome back 👋</p>
+      <h1 class="text-2xl font-bold leading-tight mb-1">{{ authStore.displayName || 'Reader' }}</h1>
+      <p class="text-brand-100 text-sm leading-snug">Explore thousands of Mon books and articles</p>
       <div class="mt-4 flex gap-3 flex-wrap">
         <RouterLink to="/books" class="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-medium transition-colors">
           📚 Browse Books
@@ -69,7 +69,7 @@ onMounted(async () => {
 
     <!-- Leagues / Music Categories -->
     <div v-if="leagues.length" class="mb-8">
-      <SectionHeader title="🎵 Audio Books" :to="'/music'" />
+      <SectionHeader title="🎵 Audio Books" :viewAllPath="'/music'" />
       <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
         <RouterLink v-for="l in leagues" :key="l.id"
           :to="`/music?league=${l.id}`"
@@ -80,14 +80,14 @@ onMounted(async () => {
     </div>
 
     <!-- Books -->
-    <SectionHeader :title="t('books.title')" :to="'/books'" />
+    <SectionHeader :title="t('books.title')" :viewAllPath="'/books'" />
     <LoadingSpinner v-if="booksStore.loading && !booksStore.list.length" />
     <div v-else class="content-grid mb-8">
       <BookCard v-for="book in booksStore.list.slice(0, 12)" :key="book.id" :book="book" />
     </div>
 
     <!-- Articles -->
-    <SectionHeader :title="t('articles.title')" :to="'/articles'" />
+    <SectionHeader :title="t('articles.title')" :viewAllPath="'/articles'" />
     <LoadingSpinner v-if="articlesStore.loading && !articlesStore.list.length" />
     <div v-else class="space-y-3">
       <ArticleCard v-for="article in articlesStore.list.slice(0, 5)" :key="article.id" :article="article" />

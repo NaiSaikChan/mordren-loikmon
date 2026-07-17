@@ -9,14 +9,19 @@ export const useBooksStore = defineStore('books', () => {
   const chapters = ref<BookChapter[]>([])
   const related = ref<Book[]>([])
   const loading = ref(false)
+  const total   = shallowRef(0)
 
-  async function fetchBooks(params?: Record<string, unknown>) {
+  async function fetchBooks(params?: Record<string, unknown>): Promise<number> {
     loading.value = true
     try {
       const res = await booksApi.fetchBooks(params)
       // API returns top-level array directly in many cases, or {books:[...]}
-      const body = res.data
-      list.value = (body as any).books ?? (Array.isArray(body) ? body : [])
+      const body = res.data as any
+      const items: Book[] = body.books ?? (Array.isArray(body) ? body : [])
+      const t = body.total ?? body.data?.total ?? body.count ?? body.data?.count
+      if (t != null) total.value = Number(t)
+      list.value = items
+      return items.length
     } finally {
       loading.value = false
     }
@@ -49,5 +54,5 @@ export const useBooksStore = defineStore('books', () => {
     await booksApi.rateBook(bookId, rating)
   }
 
-  return { list, detail, chapters, related, loading, fetchBooks, fetchDetail, fetchChapters, fetchRelated, rateBook }
+  return { list, detail, chapters, related, loading, total, fetchBooks, fetchDetail, fetchChapters, fetchRelated, rateBook }
 })

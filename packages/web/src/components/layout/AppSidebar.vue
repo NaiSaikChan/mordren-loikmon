@@ -19,7 +19,7 @@ const navItems = computed(() => [
   { key: 'articles',    icon: '📰', label: t('nav.articles'),   path: '/articles' },
   { key: 'authors',     icon: '✍️',  label: t('nav.authors'),   path: '/authors' },
   { key: 'music',       icon: '🎵', label: t('nav.music'),      path: '/music' },
-  { key: 'search',      icon: '🔍', label: t('nav.search'),     path: '/search' },
+  // { key: 'search',      icon: '🔍', label: t('nav.search'),     path: '/search' },
   { key: 'library',     icon: '📁', label: t('nav.library'),    path: '/library' },
   { key: 'purchases',   icon: '💳', label: t('nav.purchases'),  path: '/purchases' },
   { key: 'collections', icon: '📦', label: t('nav.collections'), path: '/collections' },

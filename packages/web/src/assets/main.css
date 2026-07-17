@@ -122,7 +122,7 @@
   body {
     @apply bg-surface-50 text-gray-900 antialiased;
     @apply dark:bg-surface-950 dark:text-gray-100;
-    font-family: 'Padauk', system-ui, sans-serif;
+    font-family: var(--ui-body-font, 'Padauk', system-ui, sans-serif);
     letter-spacing: 0.025em;
     line-height: 2.0;
     word-spacing: 0.1em;
@@ -130,7 +130,7 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-semibold tracking-tight;
-    font-family: 'Padauk', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    font-family: var(--ui-header-font, 'Padauk', system-ui, sans-serif);
     letter-spacing: 0.025em;
     line-height: 2.0;
   }
@@ -202,6 +202,7 @@
     @apply bg-white rounded-2xl shadow-sm border border-gray-100;
     @apply dark:bg-surface-900 dark:border-gray-800;
     @apply transition-shadow hover:shadow-md;
+    line-height: 1.5;   /* override global 2.0 for compact card UI */
   }
 
   /* Form input */
@@ -245,6 +246,7 @@
     @apply hover:bg-brand-50 hover:text-brand-700;
     @apply dark:hover:bg-brand-900/20 dark:hover:text-brand-300;
     @apply transition-all duration-150;
+    line-height: 1.5;   /* override global 2.0 for compact nav */
   }
 
   .nav-link.active {
@@ -269,4 +271,23 @@
   .skeleton {
     @apply animate-pulse bg-gray-200 rounded dark:bg-gray-700;
   }
+
+  /* Active nav link */
+  .nav-link-active {
+    background-color: var(--color-brand-50);
+    color: var(--color-brand-700);
+  }
+  :where(.dark) .nav-link-active {
+    background-color: color-mix(in oklch, var(--color-brand-900) 30%, transparent);
+    color: var(--color-brand-300);
+  }
 }
+
+/* ── Heading font scale (unlayered — wins over Tailwind text-size utilities) ── */
+/* Defaults match Tailwind text-2xl / text-xl / text-lg / text-base / text-sm  */
+/* --ui-header-scale is set by the ui store font settings (default: 1)          */
+h1           { font-size: calc(1.5rem   * var(--ui-header-scale, 1)); }
+h2           { font-size: calc(1.25rem  * var(--ui-header-scale, 1)); }
+h3           { font-size: calc(1.125rem * var(--ui-header-scale, 1)); }
+h4           { font-size: calc(1rem     * var(--ui-header-scale, 1)); }
+h5, h6       { font-size: calc(0.875rem * var(--ui-header-scale, 1)); }

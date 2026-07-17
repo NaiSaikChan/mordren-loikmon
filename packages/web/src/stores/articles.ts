@@ -7,13 +7,18 @@ export const useArticlesStore = defineStore('articles', () => {
   const list    = ref<Article[]>([])
   const detail  = shallowRef<Article | null>(null)   // ← was undefined, must be null
   const loading = ref(false)
+  const total   = shallowRef(0)
 
-  async function fetchArticles(params?: Record<string, unknown>) {
+  async function fetchArticles(params?: Record<string, unknown>, append = false): Promise<number> {
     loading.value = true
     try {
-      const res  = await articlesApi.fetchArticles(params)
-      const body = res.data as any
-      list.value = body.articles ?? body.data?.articles ?? (Array.isArray(body) ? body : [])
+      const res   = await articlesApi.fetchArticles(params)
+      const body  = res.data as any
+      const items: Article[] = body.articles ?? body.data?.articles ?? (Array.isArray(body) ? body : [])
+      const t = body.total ?? body.data?.total ?? body.count ?? body.data?.count
+      if (t != null) total.value = Number(t)
+      list.value  = append ? [...list.value, ...items] : items
+      return items.length
     } finally {
       loading.value = false
     }
@@ -54,5 +59,5 @@ export const useArticlesStore = defineStore('articles', () => {
     detail.value = article
   }
 
-  return { list, detail, loading, fetchArticles, fetchDetail, setDetail }
+  return { list, detail, loading, total, fetchArticles, fetchDetail, setDetail }
 })

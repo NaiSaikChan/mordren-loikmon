@@ -1,45 +1,22 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useArticlesStore } from '@/stores/articles'
 import { useCategoriesStore } from '@/stores/categories'
-import ArticleCard from '@/components/shared/ArticleCard.vue'
+import ArticlesTable from '@/components/articles/ArticlesTable.vue'
+import ArticlesPagination from '@/components/articles/ArticlesPagination.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
-import EmptyState from '@/components/shared/EmptyState.vue'
+import { useArticlesList } from '@/composables/useArticlesList'
 
 const { t } = useI18n()
-const store = useArticlesStore()
 const catStore = useCategoriesStore()
-
-const page = ref(0)
-const selectedCat = ref(0)
-const isLastPage = ref(false)
-
-async function loadArticles(reset = true) {
-  if (reset) { page.value = 0; store.list = [] }
-  const params: Record<string, unknown> = {
-    page: page.value,
-    type: 1,
-    query: '',
-    category: selectedCat.value
-  }
-  await store.fetchArticles(params)
-}
-
-async function loadMore() {
-  page.value++
-  const prevLen = store.list.length
-  await store.fetchArticles({
-    page: page.value,
-    type: 1,
-    query: '',
-    category: selectedCat.value
-  })
-  if (store.list.length === prevLen) isLastPage.value = true
-}
+const {
+  articles, page, pageSize, sortOrder, selectedCat,
+  isLastPage, totalPages, loading, PAGE_SIZES,
+  fetchPage, goToPage, changePageSize, changeCategory, toggleSort,
+} = useArticlesList()
 
 onMounted(async () => {
-  await Promise.all([catStore.fetchCategories(), loadArticles()])
+  await Promise.all([catStore.fetchCategories(), fetchPage()])
 })
 </script>
 
@@ -47,29 +24,42 @@ onMounted(async () => {
   <div class="page-wrapper">
     <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">{{ t('articles.title') }}</h1>
 
+    <!-- Category filter bar -->
     <div v-if="catStore.list.length" class="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-none">
-      <button :class="['shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+      <button
+        :class="['shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
           selectedCat === 0 ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-300']"
-        @click="selectedCat = 0; loadArticles()">All</button>
-      <button v-for="cat in catStore.list" :key="cat.id"
+        @click="changeCategory(0)"
+      >All</button>
+      <button
+        v-for="cat in catStore.list"
+        :key="cat.id"
         :class="['shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
           selectedCat === cat.id ? 'bg-brand-600 text-white' : 'bg-gray-100 dark:bg-surface-800 text-gray-600 dark:text-gray-300']"
-        @click="selectedCat = cat.id; loadArticles()">
-        {{ cat.name }}
-      </button>
+        @click="changeCategory(cat.id)"
+      >{{ cat.name }}</button>
     </div>
 
-    <LoadingSpinner v-if="store.loading && !store.list.length" />
-    <EmptyState v-else-if="!store.loading && !store.list.length" icon="📰" :title="t('common.notFound')" />
+    <LoadingSpinner v-if="loading && !articles.length" />
 
-    <div v-else class="space-y-3">
-      <ArticleCard v-for="article in store.list" :key="article.id" :article="article" />
-    </div>
+    <template v-else>
+      <ArticlesTable
+        :articles="articles"
+        :sort-order="sortOrder"
+        @toggle-sort="toggleSort"
+      />
 
-    <div v-if="!isLastPage && store.list.length" class="mt-6 text-center">
-      <button class="btn-secondary" :disabled="store.loading" @click="loadMore">
-        {{ store.loading ? t('common.loading') : t('common.more') }}
-      </button>
-    </div>
+      <ArticlesPagination
+        :page="page"
+        :page-size="pageSize"
+        :is-last-page="isLastPage"
+        :total-pages="totalPages"
+        :loading="loading"
+        :page-sizes="PAGE_SIZES"
+        @update:page="goToPage"
+        @update:page-size="changePageSize"
+      />
+    </template>
   </div>
 </template>
+

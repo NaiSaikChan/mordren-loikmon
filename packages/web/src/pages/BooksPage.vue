@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useBooksStore } from '@/stores/books'
@@ -7,30 +7,36 @@ import { useCategoriesStore } from '@/stores/categories'
 import BookCard from '@/components/shared/BookCard.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
+import ArticlesPagination from '@/components/articles/ArticlesPagination.vue'
 
 const { t } = useI18n()
 const route = useRoute()
 const store = useBooksStore()
 const catStore = useCategoriesStore()
 
-const page = ref(0)
+const PAGE_SIZE = 10
+const page = ref(1)  // 1-indexed for display; API receives page - 1 (0-indexed)
 const selectedCat = ref<string>((route.query.cat as string) ?? '')
 const isLastPage = ref(false)
 
+const totalPages = computed(() =>
+  store.total > 0 ? Math.ceil(store.total / PAGE_SIZE) : 0
+)
+
 async function loadBooks(reset = true) {
-  if (reset) { page.value = 0; store.list = [] }
-  const params: Record<string, unknown> = { page: String(page.value) }
+  if (reset) { page.value = 1; isLastPage.value = false }
+  const params: Record<string, unknown> = {
+    page: String(page.value - 1),
+    limit: PAGE_SIZE,
+  }
   if (selectedCat.value) params.cat = selectedCat.value
-  await store.fetchBooks(params)
+  const count = await store.fetchBooks(params)
+  isLastPage.value = count < PAGE_SIZE
 }
 
-async function loadMore() {
-  page.value++
-  const params: Record<string, unknown> = { page: String(page.value) }
-  if (selectedCat.value) params.cat = selectedCat.value
-  const prevLen = store.list.length
-  await store.fetchBooks(params)
-  if (store.list.length === prevLen) isLastPage.value = true
+function goToPage(p: number) {
+  page.value = p
+  loadBooks(false)
 }
 
 onMounted(async () => {
@@ -67,11 +73,15 @@ onMounted(async () => {
       <div class="content-grid">
         <BookCard v-for="book in store.list" :key="book.id" :book="book" />
       </div>
-      <div v-if="!isLastPage" class="mt-8 text-center">
-        <button class="btn-secondary" :disabled="store.loading" @click="loadMore">
-          {{ store.loading ? t('common.loading') : t('common.more') }}
-        </button>
-      </div>
+
+      <ArticlesPagination
+        :page="page"
+        :is-last-page="isLastPage"
+        :total-pages="totalPages"
+        :loading="store.loading"
+        @update:page="goToPage"
+      />
     </div>
   </div>
 </template>
+

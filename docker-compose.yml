@@ -1,0 +1,45 @@
+name: mordren-loikmon
+
+services:
+  app:
+    image: node:20-bookworm
+    container_name: mordren-loikmon-dev
+    working_dir: /workspace
+    env_file:
+      - ./.env
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "200"
+      WATCHPACK_POLLING: "true"
+      # Keep PNPM store outside the bind mount for better performance
+      PNPM_HOME: /pnpm
+    ports:
+      - "5173:5173" # Vite dev server
+      - "4000:4000" # Express BFF
+    volumes:
+      - ./:/workspace
+      - pnpm-store:/pnpm/store
+    command: >
+      bash -lc "
+      set -e
+      corepack enable
+      pnpm config set store-dir /pnpm/store
+      pnpm install --frozen-lockfile
+      pnpm dev:server &
+      pnpm --filter @loikmon/web dev --host 0.0.0.0 --port 5173
+      "
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  pnpm-store:

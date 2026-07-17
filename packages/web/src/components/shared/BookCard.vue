@@ -40,16 +40,16 @@ const isFree = computed(() => {
         <div v-else class="w-full h-full flex items-center justify-center text-4xl">📚</div>
       </div>
       <div class="p-3">
-        <h3 class="text-xs font-semibold text-gray-900 dark:text-white truncate mb-3">
+        <h3 class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 leading-snug mb-1.5">
           {{ book.title }}
         </h3>
-        <p v-if="authorDisplay" class="text-xs text-gray-400 truncate">{{ authorDisplay }}</p>
-        <div class="mt-1.5 flex items-center justify-between">
+        <p v-if="authorDisplay" class="text-xs text-gray-400 truncate leading-tight mb-2">{{ authorDisplay }}</p>
+        <div class="flex items-center justify-between gap-1">
           <span v-if="isFree" class="badge-green">Free</span>
-          <span v-else class="text-xs font-semibold text-brand-600 dark:text-brand-400">
+          <span v-else class="text-xs font-semibold text-brand-600 dark:text-brand-400 truncate">
             {{ book.amount ?? book.price }} coins
           </span>
-          <div v-if="book.rating" class="flex items-center gap-0.5 text-xs text-yellow-500">
+          <div v-if="book.rating" class="flex items-center gap-0.5 text-xs text-yellow-500 shrink-0">
             ⭐ {{ Number(book.rating).toFixed(1) }}
           </div>
         </div>
