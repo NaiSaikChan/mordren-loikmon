@@ -23,6 +23,8 @@
     "more": "ထပ်ကေတ်",
     "notFound": "တၚ်နၚ်ဟၟဲ",
     "back": "က္လေၚ်",
+    "previous": "မုက် လက္ကရဴ",
+    "next": "မုက် ဂတ",
     "by": "ကဵု",
     "comingSoon": "ခြာဟွံလအ် စၟဳ",
     "cancel": "တးပါဲ",
@@ -113,7 +115,13 @@
     "language": "ဘာသာ",
     "notifications": "တၚ်ကဵုသတိ",
     "account": "စရၚ် အဲ",
-    "deleteAccount": "ဇိုတ်ကၠေံ စရၚ်အဲ"
+    "deleteAccount": "ဇိုတ်ကၠေံ စရၚ်အဲ",
+    "typography": "ဗီုပြၚ် အယောၚ်အလာ မအက္ခရ်ပ္ဍဲမုက်လိက်ဂမၠိုၚ်",
+    "bodyFont": "အက္ခရ် ပိုဒ်လိက်",
+    "bodyTextSize": "အဝဲ အက္ခရ် ပိုဒ်လိက်",
+    "headingFont": "အက္ခရ် က္ဍိုပ်လိက်",
+    "headingSize": "အဝဲ အက္ခရ် က္ဍိုပ်လိက်",
+    "preview": "အယောၚ်အလာ မအက္ခရ်"
   },
   "reader": {
     "notAvailable": "No readable file available for this book."

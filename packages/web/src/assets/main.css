@@ -75,6 +75,14 @@
 }
 
 @font-face {
+  font-family: 'PyidaungsuNumbers';
+  src: url('./fonts/PyidaungsuNumbers-Regular.ttf') format('ttf');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
   font-family: 'Style1';
   src: url('./fonts/Style1.ttf') format('ttf');
   font-weight: 400;

@@ -52,11 +52,115 @@ function fmtRating(r: unknown) {
   const n = Number(r ?? 0)
   return n > 0 ? n.toFixed(1) : null
 }
+
+function getArticlePrice(article: Article): { isFree: boolean; amount: number | null } {
+  const price = Number(article.price ?? article.amount ?? 0)
+  const isFree = article.is_free || price === 0
+  return { isFree, amount: isFree ? null : price }
+}
 </script>
 
 <template>
-  <div class="overflow-x-auto rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900">
-    <table class="w-full text-sm text-left">
+  <div>
+    <!-- Mobile layout -->
+    <div class="space-y-3 md:hidden">
+      <div
+        v-for="article in articles"
+        :key="`mobile-${article.id}`"
+        class="group overflow-hidden h-full flex gap-4 bg-white dark:bg-surface-900 hover:shadow-lg transition-all duration-300 rounded-xl border border-gray-200 dark:border-surface-700 p-4"
+      >
+        <!-- Thumbnail -->
+        <RouterLink :to="`/articles/${article.id}`" tabindex="-1" class="shrink-0">
+          <div class="w-28 h-28 object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 flex items-center justify-center bg-linear-to-br">
+            <img
+              v-if="article.thumbnail_url || article.thumbnail"
+              :src="(article.thumbnail_url ?? article.thumbnail) as string"
+              :alt="article.title"
+              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+              loading="lazy"
+            />
+            <span v-else class="text-2xl">📰</span>
+          </div>
+        </RouterLink>
+
+        <!-- Content -->
+        <div class="flex-1 flex flex-col min-w-0">
+          <!-- title -->
+          <RouterLink :to="`/articles/${article.id}`" class="block group">
+            <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors leading-snug">
+              {{ article.title }}
+            </p>
+          </RouterLink>
+
+          <!-- category, coin -->
+          <div class="mt-1 flex flex-wrap gap-1">
+            <span
+              v-if="article.categoryname || article.category"
+              class="px-2 py-0.5 bg-brand-600 text-white text-xs font-semibold rounded-full"
+            >
+              {{ (article.categoryname ?? article.category) as string }}
+            </span>
+            <span
+              v-if="getArticlePrice(article).isFree"
+              class="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full"
+            >
+              Free
+            </span>
+            <span
+              v-else-if="getArticlePrice(article).amount"
+              class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full"
+            >
+              🪙 {{ getArticlePrice(article).amount }} coins
+            </span>
+          </div>
+
+          <!-- author, date -->
+          <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
+            <span v-if="article.authorname || article.author" class="truncate">✍️ {{ (article.authorname ?? article.author) as string }}</span>
+            <span>📅 {{ fmtDate(article.articledate ?? article.created_at ?? article.date) }}</span>
+          </div>
+
+          <!-- view, rating -->
+          <div class="mt-1 flex items-center gap-3 text-xs">
+            <span class="text-gray-700 dark:text-gray-300">👁️ {{ fmtViews(article.views ?? article.total_views) }}</span>
+            <span v-if="fmtRating(article.rating)" class="text-yellow-500 font-semibold">⭐ {{ fmtRating(article.rating) }}</span>
+          </div>
+
+          <!-- action -->
+          <div class="mt-2 pt-2 border-t border-gray-100 dark:border-surface-700 flex items-center justify-end gap-1">
+            <button
+              class="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 hover:bg-gray-100 dark:hover:bg-surface-700 transition-colors text-base leading-none"
+              :title="copied === article.id ? 'Link copied!' : 'Share'"
+              @click="shareArticle($event, article)"
+            >
+              {{ copied === article.id ? '✅' : '🔗' }}
+            </button>
+            <button
+              class="p-1.5 rounded-lg transition-colors text-base leading-none"
+              :class="bookmarked.has(article.id)
+                ? 'text-brand-500 hover:bg-brand-50 dark:hover:bg-surface-700'
+                : 'text-gray-400 hover:text-brand-500 hover:bg-gray-100 dark:hover:bg-surface-700'"
+              :title="bookmarked.has(article.id) ? 'Saved' : 'Save'"
+              @click="toggleBookmark(article.id)"
+            >
+              {{ bookmarked.has(article.id) ? '🔖' : '☆' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="!articles.length"
+        class="rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900 px-4 py-16 text-center"
+      >
+        <span class="text-4xl block mb-3">📰</span>
+        <p class="text-sm text-gray-400 dark:text-gray-500">No articles found.</p>
+      </div>
+    </div>
+
+    <!-- Desktop table layout -->
+    <div class="hidden md:block overflow-x-auto rounded-xl border border-gray-200 dark:border-surface-700 bg-white dark:bg-surface-900">
+      <table class="w-full text-sm text-left">
 
       <!-- Header -->
       <thead class="bg-gray-50 dark:bg-surface-800 border-b border-gray-200 dark:border-surface-700">
@@ -112,7 +216,7 @@ function fmtRating(r: unknown) {
           <!-- Title + Category -->
           <td class="px-4 py-3 max-w-xs">
             <RouterLink :to="`/articles/${article.id}`" class="block group">
-              <p class="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 w-100 dark:group-hover:text-brand-400 transition-colors leading-snug">
+              <p class="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 w-70 dark:group-hover:text-brand-400 transition-colors leading-snug">
                 {{ article.title }}
               </p>
             </RouterLink>
@@ -123,11 +227,17 @@ function fmtRating(r: unknown) {
               >
                 {{ (article.categoryname ?? article.category) as string }}
               </span>
-              <span v-if="article.is_free" class="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full">
+              <span
+                v-if="getArticlePrice(article).isFree"
+                class="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full"
+              >
                 Free
               </span>
-              <span v-else-if="article.price" class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full">
-                {{ article.price }} coins
+              <span
+                v-else-if="getArticlePrice(article).amount"
+                class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full"
+              >
+                🪙 {{ getArticlePrice(article).amount }} coins
               </span>
             </div>
           </td>
@@ -191,6 +301,7 @@ function fmtRating(r: unknown) {
           </td>
         </tr>
       </tbody>
-    </table>
+      </table>
+    </div>
   </div>
 </template>

@@ -30,6 +30,16 @@ function handleFontSizeChange(value: string) {
   }
 }
 
+function decreaseFontSize() {
+  const nextIndex = Math.max(0, currentFontSizeIndex.value - 1)
+  uiStore.setBodyFontSize(BODY_FONT_SIZES[nextIndex].id)
+}
+
+function increaseFontSize() {
+  const nextIndex = Math.min(BODY_FONT_SIZES.length - 1, currentFontSizeIndex.value + 1)
+  uiStore.setBodyFontSize(BODY_FONT_SIZES[nextIndex].id)
+}
+
 // Derived values for header scale slider
 const currentHeaderScaleIndex = computed(() => {
   return HEADER_SCALES.findIndex(sc => sc.id === uiStore.headerScaleId)
@@ -44,6 +54,16 @@ function handleHeaderScaleChange(value: string) {
   if (index >= 0 && index < HEADER_SCALES.length) {
     uiStore.setHeaderScale(HEADER_SCALES[index].id)
   }
+}
+
+function decreaseHeaderScale() {
+  const nextIndex = Math.max(0, currentHeaderScaleIndex.value - 1)
+  uiStore.setHeaderScale(HEADER_SCALES[nextIndex].id)
+}
+
+function increaseHeaderScale() {
+  const nextIndex = Math.min(HEADER_SCALES.length - 1, currentHeaderScaleIndex.value + 1)
+  uiStore.setHeaderScale(HEADER_SCALES[nextIndex].id)
 }
 </script>
 
@@ -75,7 +95,7 @@ function handleHeaderScaleChange(value: string) {
       <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">{{ t('settings.language') }}</h2>
       <div class="flex gap-3">
         <button
-          v-for="lang in ([{ value: 'en', label: 'English' }, { value: 'mon', label: 'မန်ဘာသာ' }] as const)"
+          v-for="lang in ([{ value: 'en', label: 'English' }, { value: 'mon', label: 'ဘာသာမန်' }] as const)"
           :key="lang.value"
           :class="['flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-all',
             uiStore.locale === lang.value
@@ -90,11 +110,11 @@ function handleHeaderScaleChange(value: string) {
 
     <!-- Typography -->
     <div class="card p-6">
-      <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-5">Typography</h2>
+      <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-5">{{ t('settings.typography') }}</h2>
 
       <!-- Body Font -->
       <div class="mb-4">
-        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Body Font</h3>
+        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{{ t('settings.bodyFont') }}</h3>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="font in UI_FONT_OPTIONS"
@@ -114,12 +134,19 @@ function handleHeaderScaleChange(value: string) {
       <!-- Body Font Size -->
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Body Text Size</h3>
+          <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ t('settings.bodyTextSize') }}</h3>
           <span class="text-xs font-medium text-brand-600 dark:text-brand-400">
             {{ currentFontSize?.label }} ({{ currentFontSize?.px }}px)
           </span>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <button
+            @click="decreaseFontSize"
+            class="w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold transition-colors hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label="Decrease body font size"
+          >
+            −
+          </button>
           <input
             type="range"
             :value="currentFontSizeIndex"
@@ -128,6 +155,13 @@ function handleHeaderScaleChange(value: string) {
             @change="e => handleFontSizeChange((e.target as HTMLInputElement).value)"
             class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
           />
+          <button
+            @click="increaseFontSize"
+            class="w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold transition-colors hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label="Increase body font size"
+          >
+            +
+          </button>
         </div>
         <div class="flex justify-between text-xs text-gray-400 mt-2">
           <span>{{ BODY_FONT_SIZES[0].label }}</span>
@@ -140,7 +174,7 @@ function handleHeaderScaleChange(value: string) {
 
       <!-- Heading Font -->
       <div class="mb-4">
-        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Heading Font</h3>
+        <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">{{ t('settings.headingFont') }}</h3>
         <div class="flex flex-wrap gap-2">
           <button
             v-for="font in UI_FONT_OPTIONS"
@@ -160,12 +194,19 @@ function handleHeaderScaleChange(value: string) {
       <!-- Heading Scale -->
       <div class="mb-6">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">Heading Size</h3>
+          <h3 class="text-sm font-medium text-gray-600 dark:text-gray-400">{{ t('settings.headingSize') }}</h3>
           <span class="text-xs font-medium text-brand-600 dark:text-brand-400">
             {{ currentHeaderScale?.label }} ({{ Math.round((currentHeaderScale?.scale ?? 1) * 100) }}%)
           </span>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <button
+            @click="decreaseHeaderScale"
+            class="w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold transition-colors hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label="Decrease heading scale"
+          >
+            −
+          </button>
           <input
             type="range"
             :value="currentHeaderScaleIndex"
@@ -174,6 +215,13 @@ function handleHeaderScaleChange(value: string) {
             @change="e => handleHeaderScaleChange((e.target as HTMLInputElement).value)"
             class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
           />
+          <button
+            @click="increaseHeaderScale"
+            class="w-8 h-8 rounded-lg flex items-center justify-center text-base font-bold transition-colors hover:bg-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label="Increase heading scale"
+          >
+            +
+          </button>
         </div>
         <div class="flex justify-between text-xs text-gray-400 mt-2">
           <span>{{ HEADER_SCALES[0].label }}</span>
@@ -183,7 +231,7 @@ function handleHeaderScaleChange(value: string) {
 
       <!-- Live preview -->
       <div class="rounded-xl bg-gray-50 dark:bg-surface-800 border border-gray-100 dark:border-gray-700 p-4">
-        <p class="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">Preview</p>
+        <p class="text-xs font-medium text-gray-400 mb-3 uppercase tracking-wider">{{ t('settings.preview') }}</p>
         <h3
           :style="{ fontFamily: getFontStack(uiStore.headerFont) }"
           class="font-semibold text-gray-900 dark:text-white mb-2 leading-snug"

@@ -23,6 +23,8 @@
     "more": "Load More",
     "notFound": "Not Found",
     "back": "Back",
+    "previous": "Previous",
+    "next": "Next",
     "by": "by",
     "comingSoon": "Coming Soon",
     "cancel": "Cancel",
@@ -113,7 +115,13 @@
     "language": "Language",
     "notifications": "Notifications",
     "account": "Account",
-    "deleteAccount": "Delete Account"
+    "deleteAccount": "Delete Account",
+    "typography": "Typography",
+    "bodyFont": "Body Font",
+    "bodyTextSize": "Body Text Size",
+    "headingFont": "Heading Font",
+    "headingSize": "Heading Size",
+    "preview": "Preview"
   },
   "reader": {
     "notAvailable": "No readable file available for this book."

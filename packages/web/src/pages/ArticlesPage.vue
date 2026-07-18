@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useCategoriesStore } from '@/stores/categories'
 import ArticlesTable from '@/components/articles/ArticlesTable.vue'
@@ -14,6 +14,14 @@ const {
   isLastPage, totalPages, loading, PAGE_SIZES,
   fetchPage, goToPage, changePageSize, changeCategory, toggleSort,
 } = useArticlesList()
+
+// Some article API responses do not provide a total count.
+// Fallback keeps page numbers visible (books-like pagination UX).
+const paginationTotalPages = computed(() => {
+  if (totalPages.value > 0) return totalPages.value
+  if (isLastPage.value) return Math.max(1, page.value)
+  return page.value + 1
+})
 
 onMounted(async () => {
   await Promise.all([catStore.fetchCategories(), fetchPage()])
@@ -53,7 +61,7 @@ onMounted(async () => {
         :page="page"
         :page-size="pageSize"
         :is-last-page="isLastPage"
-        :total-pages="totalPages"
+        :total-pages="paginationTotalPages"
         :loading="loading"
         :page-sizes="PAGE_SIZES"
         @update:page="goToPage"
