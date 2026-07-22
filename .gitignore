@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-.pnpm-store/
 
 # Build outputs
 dist/
@@ -12,8 +11,7 @@ build/
 packages/web/src/**/*.js
 packages/web/src/**/*.js.map
 
-# Mobile — npm creates this when running `npx expo install` inside a pnpm workspace
-packages/mobile/package-lock.json
+# Mobile — Expo app; its lockfile IS committed, so it is not ignored here.
 
 # Env files
 .env
@@ -23,7 +21,6 @@ packages/mobile/package-lock.json
 # Logs
 *.log
 npm-debug.log*
-pnpm-debug.log*
 
 # OS
 .DS_Store

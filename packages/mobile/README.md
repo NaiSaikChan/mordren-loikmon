@@ -2,8 +2,9 @@
 
 Loikmon eBook & Audio mobile app — **Expo (managed) + React Native + TypeScript**.
 
-> ⚠️ This package is **npm/npx only**. Do **not** run `pnpm` here. It is excluded
-> from the root pnpm workspace on purpose.
+> ⚠️ This package is a **standalone Expo app** with its own `package-lock.json`.
+> It is **not** part of the root npm workspace, on purpose. Run `npm`/`npx`
+> commands from inside this directory.
 
 ## Features
 

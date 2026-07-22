@@ -27,15 +27,15 @@ packages/
 ## Getting Started
 
 ```bash
-pnpm install
-pnpm dev:web     # Start Vue dev server
-pnpm dev:server  # Start Express BFF
+npm install
+npm run dev:web     # Start Vue dev server
+npm run dev:server  # Start Express BFF
 ```
 
-### Mobile (Expo, npm only)
+### Mobile (Expo, standalone)
 
-The mobile app is managed with **npm/npx only** and is excluded from the pnpm
-workspace. See [`packages/mobile/README.md`](packages/mobile/README.md).
+The mobile app has its own `package-lock.json` and is **not** part of the root
+npm workspace. See [`packages/mobile/README.md`](packages/mobile/README.md).
 
 ```bash
 cd packages/mobile

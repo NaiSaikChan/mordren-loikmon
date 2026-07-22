@@ -1,8 +1,0 @@
-packages:
-  - 'packages/*'
-  # The mobile app is managed with npm/npx only (Expo). Exclude it from the
-  # pnpm workspace so `pnpm install` at the root does not try to manage it.
-  - '!packages/mobile'
-
-overrides:
-  pdfjs-dist: 5.4.530
