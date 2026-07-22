@@ -1,5 +1,4 @@
 import '../global.css'
-import { useEffect } from 'react'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -35,10 +34,6 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
-  useEffect(() => {
-    initApiClient()
-  }, [])
-
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

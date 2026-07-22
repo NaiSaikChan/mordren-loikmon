@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { books as booksApi } from '@loikmon/api'
 import type { Book, BookChapter } from '@loikmon/api'
 import { parseBooks, parseBookDetail } from '@/lib/normalize'
+import { stableKey } from '@/lib/stableKey'
 
 /** Paginated book list hook (home / books tab / category screens). */
 export function useBooks(params?: Record<string, unknown>) {
@@ -12,7 +13,7 @@ export function useBooks(params?: Record<string, unknown>) {
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const key = JSON.stringify(params ?? {})
+  const key = stableKey(params)
 
   const load = useCallback(
     async (nextPage: number, replace: boolean) => {

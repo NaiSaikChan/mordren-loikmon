@@ -20,7 +20,7 @@ export default function RegisterScreen() {
   const onSubmit = async () => {
     setError(null)
     if (password !== confirm) {
-      setError(t('auth.passwordConfirmation'))
+      setError(t('auth.passwordMismatch'))
       return
     }
     try {

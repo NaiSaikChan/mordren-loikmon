@@ -1,11 +1,11 @@
-import { translate, resolveKey } from '@/i18n'
+import { translate, resolveTranslationKey } from '@/i18n'
 
-describe('resolveKey', () => {
+describe('resolveTranslationKey', () => {
   it('resolves nested dotted keys', () => {
-    expect(resolveKey({ nav: { home: 'Home' } }, 'nav.home')).toBe('Home')
+    expect(resolveTranslationKey({ nav: { home: 'Home' } }, 'nav.home')).toBe('Home')
   })
   it('returns undefined for missing keys', () => {
-    expect(resolveKey({ nav: {} }, 'nav.missing')).toBeUndefined()
+    expect(resolveTranslationKey({ nav: {} }, 'nav.missing')).toBeUndefined()
   })
 })
 

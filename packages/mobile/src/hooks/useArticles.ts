@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { articles as articlesApi } from '@loikmon/api'
 import type { Article } from '@loikmon/api'
 import { parseArticles, parseArticleDetail } from '@/lib/normalize'
+import { stableKey } from '@/lib/stableKey'
 
 export function useArticles(params?: Record<string, unknown>) {
   const [items, setItems] = useState<Article[]>([])
@@ -11,7 +12,7 @@ export function useArticles(params?: Record<string, unknown>) {
   const [hasMore, setHasMore] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const key = JSON.stringify(params ?? {})
+  const key = stableKey(params)
 
   const load = useCallback(
     async (nextPage: number, replace: boolean) => {

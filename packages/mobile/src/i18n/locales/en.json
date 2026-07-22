@@ -47,6 +47,7 @@
     "name": "Full Name",
     "phone": "Phone Number",
     "passwordConfirmation": "Confirm Password",
+    "passwordMismatch": "Passwords do not match",
     "forgotPassword": "Forgot password?",
     "resetPassword": "Reset Password",
     "noAccount": "Don't have an account?",

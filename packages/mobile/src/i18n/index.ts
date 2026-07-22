@@ -11,7 +11,7 @@ export const AVAILABLE_LOCALES: { id: Locale; label: string }[] = [
 ]
 
 /** Resolve a dotted key path (e.g. "nav.home") from a nested message object. */
-export function resolveKey(obj: unknown, key: string): string | undefined {
+export function resolveTranslationKey(obj: unknown, key: string): string | undefined {
   const parts = key.split('.')
   let cur: unknown = obj
   for (const p of parts) {
@@ -40,7 +40,7 @@ export function translate(
   key: string,
   params?: Record<string, string | number>,
 ): string {
-  const primary = resolveKey(messages[locale], key)
-  const fallback = resolveKey(messages.en, key)
+  const primary = resolveTranslationKey(messages[locale], key)
+  const fallback = resolveTranslationKey(messages.en, key)
   return interpolate(primary ?? fallback ?? key, params)
 }
