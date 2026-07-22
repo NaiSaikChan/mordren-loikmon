@@ -9,9 +9,29 @@
  * `fixUrl` mirrors the logic used by the web app's BookCard component so both
  * clients render the same assets consistently.
  */
-export const API_ORIGIN = 'https://loikmon.org'
+/**
+ * Media asset origin (host without the `/webapis/` API path).
+ *
+ * This is separate from the API *base* URL used for endpoints (configured in
+ * `services/api.ts`): endpoints hit `.../webapis/`, whereas cover/audio assets
+ * are served from the site root. `initApiClient()` calls `setMediaOrigin()` to
+ * keep this aligned with a custom `EXPO_PUBLIC_API_BASE` when one is provided.
+ */
+export const DEFAULT_ORIGIN = 'https://loikmon.org'
 
-export function fixUrl(url: string | undefined | null, base = API_ORIGIN): string {
+let _origin = DEFAULT_ORIGIN
+
+/** Override the media asset origin (e.g. derived from the configured API base). */
+export function setMediaOrigin(origin: string): void {
+  if (origin) _origin = origin.replace(/\/+$/, '')
+}
+
+/** Current media asset origin. */
+export function getMediaOrigin(): string {
+  return _origin
+}
+
+export function fixUrl(url: string | undefined | null, base = _origin): string {
   if (!url) return ''
   let u = String(url).replace(/\\/g, '/')
   // Encode narrow no-break space (U+202F) and regular spaces.

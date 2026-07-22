@@ -6,15 +6,23 @@ import { detectFormat } from '@/lib/format'
 
 export { detectFormat }
 
-/** Minimal epub.js reader page rendered inside a WebView. */
+/**
+ * Minimal epub.js reader page rendered inside a WebView.
+ *
+ * Security note: jszip and epub.js are loaded from jsDelivr at **pinned exact
+ * versions** (immutable URLs). `crossorigin="anonymous"` is set so the browser
+ * treats them as CORS resources. For a hardened build, bundle these libraries
+ * as local assets (or add Subresource Integrity hashes) to remove the runtime
+ * CDN dependency entirely.
+ */
 function epubHtml(url: string): string {
   return `<!doctype html><html><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <style>html,body{margin:0;height:100%;background:#fff}#viewer{height:100vh}
 #bar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px;background:rgba(0,0,0,.05)}
 button{border:0;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px;font-size:16px}</style>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js" crossorigin="anonymous"></script>
 </head><body>
 <div id="viewer"></div>
 <div id="bar"><button onclick="rendition.prev()">‹</button><button onclick="rendition.next()">›</button></div>

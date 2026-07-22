@@ -1,5 +1,6 @@
 import Constants from 'expo-constants'
 import { getClient } from '@loikmon/api'
+import { setMediaOrigin } from '@/lib/url'
 
 /**
  * Configures the shared `@loikmon/api` axios client for React Native.
@@ -23,8 +24,17 @@ let initialised = false
 
 export function initApiClient(): void {
   if (initialised) return
+  const base = resolveApiBase()
   // Instantiates (and memoises) the singleton axios client with our base URL.
-  getClient(resolveApiBase())
+  getClient(base)
+  // Derive the media asset origin (site root) from the API base, so custom
+  // deployments serve covers/audio from the same host as the endpoints.
+  try {
+    const { origin } = new URL(base)
+    setMediaOrigin(origin)
+  } catch {
+    /* keep the default origin when base is not an absolute URL */
+  }
   initialised = true
 }
 

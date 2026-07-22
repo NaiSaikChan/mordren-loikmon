@@ -69,9 +69,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await authApi.login(payload)
         const body = res.data
         if (body.status === 'error' || body.status === 'fail') {
-          throw body.message ?? 'Login failed'
+          throw new Error(String(body.message ?? 'Login failed'))
         }
-        if (!body.user) throw 'No user data received'
+        if (!body.user) throw new Error('No user data received')
 
         const normUser = normaliseUser(body.user as Record<string, unknown>)
         const sessionToken = body.token ?? makeSessionKey(body.user as Record<string, unknown>)
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await authApi.register(payload)
         const body = res.data
         if (body.status === 'error' || body.status === 'fail') {
-          throw body.message ?? 'Registration failed'
+          throw new Error(String(body.message ?? 'Registration failed'))
         }
         if (body.user) {
           const normUser = normaliseUser(body.user as Record<string, unknown>)

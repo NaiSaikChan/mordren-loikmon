@@ -6,6 +6,8 @@ import { useTheme } from '@/context/ThemeContext'
 import { useI18n } from '@/context/I18nContext'
 import { MiniPlayer } from '@/components/MiniPlayer'
 
+// Approximate default react-navigation bottom tab bar height; the safe-area
+// inset is added on top. Used only to float the mini player above the tab bar.
 const TAB_BAR_HEIGHT = 49
 
 type IoniconName = keyof typeof Ionicons.glyphMap

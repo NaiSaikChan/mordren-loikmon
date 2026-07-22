@@ -9,9 +9,16 @@ import { useLibrary } from '@/context/LibraryContext'
 import { useI18n } from '@/context/I18nContext'
 import { fixUrl } from '@/lib/url'
 
-/** Strips HTML tags for a plain-text fallback render of article bodies. */
+/**
+ * Produces a plain-text fallback from an article's HTML body.
+ * Script/style blocks are removed entirely (their contents must never surface),
+ * then remaining tags are stripped. The result is rendered inside a <Text>, so
+ * no markup can execute — this is purely for readability.
+ */
 function stripHtml(html: string): string {
   return html
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<[^>]+>/g, '')

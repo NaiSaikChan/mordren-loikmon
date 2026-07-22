@@ -27,7 +27,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [durationMillis, setDurationMillis] = useState(0)
 
   useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: false }).catch(
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true }).catch(
       () => undefined,
     )
     return () => {
