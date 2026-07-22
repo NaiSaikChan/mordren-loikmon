@@ -21,6 +21,7 @@ packages/
   api/      — Shared TypeScript API client (@loikmon/api)
   server/   — Node.js Express BFF (@loikmon/server)
   web/      — Vue 3 web app (@loikmon/web)
+  mobile/   — Expo React Native app (@loikmon/mobile) — npm/npx only
 ```
 
 ## Getting Started
@@ -29,6 +30,17 @@ packages/
 pnpm install
 pnpm dev:web     # Start Vue dev server
 pnpm dev:server  # Start Express BFF
+```
+
+### Mobile (Expo, npm only)
+
+The mobile app is managed with **npm/npx only** and is excluded from the pnpm
+workspace. See [`packages/mobile/README.md`](packages/mobile/README.md).
+
+```bash
+cd packages/mobile
+npm install
+npx expo start
 ```
 
 ## Features
