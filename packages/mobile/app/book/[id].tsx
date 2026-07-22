@@ -128,7 +128,7 @@ export default function BookDetailScreen() {
               ) : null}
               {book.pages || book.pagecount ? (
                 <Text className="text-sm text-surface-400">
-                  {String(book.pages ?? book.pagecount)} {t('books.pages')}
+                  {t('books.pages', { count: String(book.pages ?? book.pagecount) })}
                 </Text>
               ) : null}
             </View>

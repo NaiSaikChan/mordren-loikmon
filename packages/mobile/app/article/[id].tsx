@@ -12,7 +12,7 @@ import { fixUrl } from '@/lib/url'
 /** Strips HTML tags for a plain-text fallback render of article bodies. */
 function stripHtml(html: string): string {
   return html
-    .replace(/<br\s*\/?>(?=)/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
