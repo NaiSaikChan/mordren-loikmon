@@ -12,22 +12,20 @@ services:
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "200"
       WATCHPACK_POLLING: "true"
-      # Keep PNPM store outside the bind mount for better performance
-      PNPM_HOME: /pnpm
+      # Keep the npm cache outside the bind mount for better performance
+      npm_config_cache: /npm-cache
     ports:
       - "5173:5173" # Vite dev server
       - "4000:4000" # Express BFF
     volumes:
       - ./:/workspace
-      - pnpm-store:/pnpm/store
+      - npm-cache:/npm-cache
     command: >
       bash -lc "
       set -e
-      corepack enable
-      pnpm config set store-dir /pnpm/store
-      pnpm install --frozen-lockfile
-      pnpm dev:server &
-      pnpm --filter @loikmon/web dev --host 0.0.0.0 --port 5173
+      npm ci
+      npm run dev:server &
+      npm run dev -w @loikmon/web -- --host 0.0.0.0 --port 5173
       "
     healthcheck:
       test:
@@ -42,4 +40,4 @@ services:
     restart: unless-stopped
 
 volumes:
-  pnpm-store:
+  npm-cache:

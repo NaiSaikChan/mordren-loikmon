@@ -21,14 +21,26 @@ packages/
   api/      — Shared TypeScript API client (@loikmon/api)
   server/   — Node.js Express BFF (@loikmon/server)
   web/      — Vue 3 web app (@loikmon/web)
+  mobile/   — Expo React Native app (@loikmon/mobile) — npm/npx only
 ```
 
 ## Getting Started
 
 ```bash
-pnpm install
-pnpm dev:web     # Start Vue dev server
-pnpm dev:server  # Start Express BFF
+npm install
+npm run dev:web     # Start Vue dev server
+npm run dev:server  # Start Express BFF
+```
+
+### Mobile (Expo, standalone)
+
+The mobile app has its own `package-lock.json` and is **not** part of the root
+npm workspace. See [`packages/mobile/README.md`](packages/mobile/README.md).
+
+```bash
+cd packages/mobile
+npm install
+npx expo start
 ```
 
 ## Features

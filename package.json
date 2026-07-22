@@ -4,14 +4,22 @@
   "version": "1.0.0",
   "description": "Loikmon eBook & Audio Platform — Vue 3 + Node.js + Expo rebuild",
   "scripts": {
-    "dev:web": "pnpm --filter @loikmon/web dev",
-    "dev:server": "pnpm --filter @loikmon/server dev",
-    "build:web": "pnpm --filter @loikmon/web build",
-    "build:server": "pnpm --filter @loikmon/server build",
-    "build:api": "pnpm --filter @loikmon/api build"
+    "dev:web": "npm run dev -w @loikmon/web",
+    "dev:server": "npm run dev -w @loikmon/server",
+    "build:web": "npm run build -w @loikmon/web",
+    "build:server": "npm run build -w @loikmon/server",
+    "build:api": "npm run build -w @loikmon/api"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "npm@10.9.8",
+  "workspaces": [
+    "packages/api",
+    "packages/server",
+    "packages/web"
+  ],
   "dependencies": {
     "@fontsource/padauk": "^5.2.8"
+  },
+  "overrides": {
+    "pdfjs-dist": "5.4.530"
   }
 }
