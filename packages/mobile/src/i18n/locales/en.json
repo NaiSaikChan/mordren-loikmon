@@ -64,6 +64,7 @@
   },
   "books": {
     "title": "Books",
+    "description": "About",
     "free": "Free",
     "read": "Read Now",
     "purchase": "Purchase",

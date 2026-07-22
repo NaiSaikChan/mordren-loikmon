@@ -140,7 +140,7 @@ describe('@loikmon/api — Endpoint modules (mocked Axios)', () => {
     })
 
     it('handles empty data gracefully with fallback', () => {
-      const axiosResponse = { data: { data: null } }
+      const axiosResponse = { data: { data: null as { books?: unknown[] } | null } }
       const books = axiosResponse.data.data?.books ?? []
       expect(books).toEqual([])
     })

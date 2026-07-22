@@ -138,9 +138,109 @@ export interface RawAuthResponse {
 }
 
 export interface ApiResponse<T = unknown> {
-  status?: string
+  status?: string | number
   message?: string
-  data?: T
+  data: T
+  [key: string]: unknown
+}
+
+export interface Category {
+  id: string | number
+  name: string
+  type?: string
+  [key: string]: unknown
+}
+
+export interface Album {
+  id: string | number
+  title: string
+  artist?: string
+  cover?: string
+  thumbnail?: string
+  tracks?: MediaItem[]
+  [key: string]: unknown
+}
+
+export interface Purchase {
+  id: string | number
+  user_id?: string | number
+  item_id?: string | number
+  item_type?: 'book' | 'article' | 'media' | 'album'
+  amount?: number | string
+  status?: 'pending' | 'approved' | 'rejected'
+  created_at?: string
+  [key: string]: unknown
+}
+
+export interface Coin {
+  id: string | number
+  name: string
+  amount?: number | string
+  price?: number | string
+  [key: string]: unknown
+}
+
+export interface Bank {
+  id: string | number
+  name: string
+  account_number?: string
+  account_name?: string
+  [key: string]: unknown
+}
+
+export interface FaqItem {
+  id: string | number
+  question: string
+  answer: string
+  [key: string]: unknown
+}
+
+export interface InboxMessage {
+  id: string | number
+  title?: string
+  message?: string
+  body?: string
+  read?: boolean
+  created_at?: string
+  [key: string]: unknown
+}
+
+export interface Collection {
+  id: string | number
+  title?: string
+  name?: string
+  items?: unknown[]
+  items_count?: number
+  [key: string]: unknown
+}
+
+export interface SearchResult {
+  books?: Book[]
+  articles?: Article[]
+  authors?: Author[]
+  [key: string]: unknown
+}
+
+export interface AppInitData {
+  user?: User
+  books?: Book[]
+  articles?: Article[]
+  inbox?: InboxMessage[]
+  [key: string]: unknown
+}
+
+export interface Country {
+  id: string | number
+  name: string
+  code?: string
+  [key: string]: unknown
+}
+
+export interface AuthResult {
+  status: string
+  message?: string
+  token?: string
+  user?: User
   [key: string]: unknown
 }
 

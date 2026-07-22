@@ -24,7 +24,7 @@ export default function PurchasesScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
           {/* Balance */}
           <View className="m-4 rounded-2xl bg-brand-600 p-5">
-            <Text className="text-sm text-brand-100">{t('purchases.balance')}</Text>
+            <Text className="text-sm text-brand-100">{t('purchases.balance', { amount: String(coins) })}</Text>
             <View className="mt-1 flex-row items-center">
               <Ionicons name="server" size={22} color="#ffffff" />
               <Text className="ml-2 text-3xl font-bold text-white">{coins}</Text>

@@ -19,4 +19,31 @@ config.resolver.nodeModulesPaths = [
 // Allow importing the `.ts` source of @loikmon/api directly.
 config.resolver.disableHierarchicalLookup = false
 
-module.exports = withNativeWind(config, { input: './global.css' })
+const nativeWindConfig = withNativeWind(config, { input: './global.css' })
+
+// @loikmon/api uses TypeScript ESM-style imports (e.g. `./endpoints/auth.js`)
+// that refer to `.ts` source files. Metro resolves them literally and fails.
+// This custom resolver retries with `.ts` / `.tsx` when `.js` is not found.
+const prevResolveRequest = nativeWindConfig.resolver.resolveRequest
+nativeWindConfig.resolver.resolveRequest = (context, moduleName, platform) => {
+  const resolve = (name) =>
+    prevResolveRequest
+      ? prevResolveRequest(context, name, platform)
+      : context.resolveRequest(context, name, platform)
+
+  if (moduleName.endsWith('.js')) {
+    try {
+      return resolve(moduleName)
+    } catch {
+      for (const ext of ['.ts', '.tsx']) {
+        try {
+          return resolve(moduleName.slice(0, -3) + ext)
+        } catch { /* try next */ }
+      }
+      return resolve(moduleName) // re-throw original error
+    }
+  }
+  return resolve(moduleName)
+}
+
+module.exports = nativeWindConfig

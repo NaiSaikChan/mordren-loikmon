@@ -15,9 +15,9 @@ export function PrimaryButton({
     variant === 'primary' ? 'text-white' : 'text-surface-900 dark:text-surface-50'
   return (
     <Pressable
-      className={`${base} ${styles} ${loading ? 'opacity-70' : ''}`}
-      disabled={loading}
       {...props}
+      className={`${base} ${styles} ${loading ? 'opacity-70' : ''}`}
+      disabled={loading || !!props.disabled}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? '#ffffff' : '#2563eb'} />

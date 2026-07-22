@@ -53,15 +53,13 @@ export default function AuthorDetailScreen() {
           <View className="mt-2 flex-row gap-6">
             <View className="items-center">
               <Text className="font-bold text-surface-900 dark:text-surface-50">
-                {String(author.books_count ?? books.length)}
+                {t('authors.books', { count: author.books_count ?? books.length })}
               </Text>
-              <Text className="text-xs text-surface-400">{t('authors.books')}</Text>
             </View>
             <View className="items-center">
               <Text className="font-bold text-surface-900 dark:text-surface-50">
-                {String(author.followers_count ?? 0)}
+                {t('authors.followers', { count: author.followers_count ?? 0 })}
               </Text>
-              <Text className="text-xs text-surface-400">{t('authors.followers')}</Text>
             </View>
           </View>
           {author.bio ? (
@@ -72,7 +70,7 @@ export default function AuthorDetailScreen() {
         </View>
 
         <Text className="mb-3 mt-6 px-4 text-lg font-bold text-surface-900 dark:text-surface-50">
-          {t('authors.books')}
+          {t('nav.books')}
         </Text>
         <View className="flex-row flex-wrap px-2">
           {books.map((book) => (

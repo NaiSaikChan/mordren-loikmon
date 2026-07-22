@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { View } from 'react-native'
+import { View, type ColorValue } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/context/ThemeContext'
@@ -13,8 +13,8 @@ const TAB_BAR_HEIGHT = 49
 type IoniconName = keyof typeof Ionicons.glyphMap
 
 function tabIcon(name: IoniconName) {
-  return ({ color, size }: { color: string; size: number }) => (
-    <Ionicons name={name} size={size} color={color} />
+  return ({ color, size }: { focused: boolean; color: ColorValue; size: number }) => (
+    <Ionicons name={name} size={size} color={String(color)} />
   )
 }
 
@@ -58,8 +58,7 @@ export default function TabsLayout() {
           />
         </Tabs>
       <View
-        pointerEvents="box-none"
-        style={{ position: 'absolute', left: 0, right: 0, bottom: TAB_BAR_HEIGHT + insets.bottom }}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: TAB_BAR_HEIGHT + insets.bottom, pointerEvents: 'box-none' }}
       >
         <MiniPlayer />
       </View>

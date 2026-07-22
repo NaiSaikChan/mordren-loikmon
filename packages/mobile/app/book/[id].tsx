@@ -155,7 +155,7 @@ export default function BookDetailScreen() {
         {book.description || book.about ? (
           <View className="px-4 pt-6">
             <Text className="mb-2 text-lg font-bold text-surface-900 dark:text-surface-50">
-              {t('books.title')}
+              {t('books.description')}
             </Text>
             <Text className="leading-6 text-surface-600 dark:text-surface-300">
               {String(book.description ?? book.about)}
