@@ -5,6 +5,12 @@ import { Screen } from '@/components/Screen'
 import { useTheme, type ThemePref } from '@/context/ThemeContext'
 import { useI18n } from '@/context/I18nContext'
 import { useAuth } from '@/context/AuthContext'
+import {
+  FONT_OPTIONS,
+  MON_SAFE_FONT_IDS,
+  getFontFamily,
+  useTypography,
+} from '@/context/TypographyContext'
 import type { Locale } from '@/i18n'
 
 function Row({
@@ -12,27 +18,44 @@ function Row({
   options,
   value,
   onChange,
+  compact = false,
+  previewFonts = false,
 }: {
   label: string
   options: { id: string; label: string }[]
   value: string
   onChange: (id: string) => void
+  compact?: boolean
+  previewFonts?: boolean
 }) {
   return (
     <View className="mb-5">
       <Text className="mb-2 px-1 text-sm font-medium text-surface-500 dark:text-surface-400">
         {label}
       </Text>
-      <View className="flex-row rounded-xl bg-surface-200 dark:bg-surface-800 p-1">
+      <View
+        className={
+          compact
+            ? 'flex-row flex-wrap gap-2'
+            : 'flex-row rounded-xl bg-surface-200 dark:bg-surface-800 p-1'
+        }
+      >
         {options.map((opt) => (
           <Pressable
             key={opt.id}
             onPress={() => onChange(opt.id)}
-            className={`flex-1 rounded-lg py-2 ${
-              value === opt.id ? 'bg-white dark:bg-surface-700' : ''
-            }`}
+            className={
+              compact
+                ? `rounded-lg border px-3 py-2 ${
+                    value === opt.id
+                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30'
+                      : 'border-surface-300 bg-surface-200 dark:border-surface-700 dark:bg-surface-800'
+                  }`
+                : `flex-1 rounded-lg py-2 ${value === opt.id ? 'bg-white dark:bg-surface-700' : ''}`
+            }
           >
             <Text
+              style={previewFonts ? { fontFamily: getFontFamily(opt.id) } : undefined}
               className={`text-center text-sm font-medium ${
                 value === opt.id
                   ? 'text-surface-900 dark:text-surface-50'
@@ -52,6 +75,11 @@ export default function SettingsScreen() {
   const { pref, setPref } = useTheme()
   const { t, locale, setLocale, locales } = useI18n()
   const { isLoggedIn, user, logout } = useAuth()
+  const { bodyFont, headerFont, bodyFontFamily, headerFontFamily, setBodyFont, setHeaderFont } =
+    useTypography()
+  const typographyFonts = locale === 'mon'
+    ? FONT_OPTIONS.filter((font) => MON_SAFE_FONT_IDS.has(font.id))
+    : FONT_OPTIONS
 
   return (
     <Screen edges={[]}>
@@ -78,13 +106,50 @@ export default function SettingsScreen() {
           options={locales.map((l) => ({ id: l.id, label: l.label }))}
         />
 
+        <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50">
+          {t('settings.typography')}
+        </Text>
+        <Row
+          label={t('settings.bodyFont')}
+          value={bodyFont}
+          onChange={setBodyFont}
+          options={typographyFonts}
+          compact
+          previewFonts
+        />
+        <Row
+          label={t('settings.headingFont')}
+          value={headerFont}
+          onChange={setHeaderFont}
+          options={typographyFonts}
+          compact
+          previewFonts
+        />
+        <View className="mb-5 rounded-xl bg-white dark:bg-surface-800 p-4">
+          <Text className="mb-2 text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400">
+            {t('settings.preview')}
+          </Text>
+          <Text
+            className="text-lg font-bold text-surface-900 dark:text-surface-50"
+            style={headerFontFamily ? { fontFamily: headerFontFamily } : undefined}
+          >
+            ဒုၚ်တၠုၚ်မုက်လိက် — Loikmon
+          </Text>
+          <Text
+            className="mt-1 text-sm text-surface-600 dark:text-surface-300"
+            style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+          >
+            လိက်ပတ်မန် ညံၚ်ဟွံဂွံကၠေံ၊ ညံၚ်ဂွံမံက်ဂတဝ် အကြာညးလောကမန်။
+          </Text>
+        </View>
+
         {/* Account */}
         <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50">
           {t('settings.account')}
         </Text>
         {isLoggedIn ? (
           <View className="rounded-xl bg-white dark:bg-surface-800 p-4">
-            <Text className="text-base font-semibold text-surface-900 dark:text-surface-50">
+            <Text className="text-base text-surface-900 dark:text-surface-50">
               {user?.name}
             </Text>
             <Text className="text-sm text-surface-500 dark:text-surface-400">{user?.email}</Text>

@@ -89,7 +89,7 @@ function PurchasedTab({ isLoggedIn }: { isLoggedIn: boolean }) {
           onPress={() => router.push('/(auth)/login')}
           className="mt-2 rounded-xl bg-brand-600 px-6 py-3"
         >
-          <Text className="font-semibold text-white">{t('auth.signIn')}</Text>
+          <Text className="text-white">{t('auth.signIn')}</Text>
         </Pressable>
       </View>
     )
@@ -99,7 +99,7 @@ function PurchasedTab({ isLoggedIn }: { isLoggedIn: boolean }) {
       onPress={() => router.push('/purchases')}
       className="m-4 flex-row items-center justify-between rounded-xl bg-white dark:bg-surface-800 p-4"
     >
-      <Text className="font-semibold text-surface-900 dark:text-surface-50">
+      <Text className="text-surface-900 dark:text-surface-50">
         {t('purchases.title')}
       </Text>
       <Ionicons name="chevron-forward" size={20} color="#94a3b8" />

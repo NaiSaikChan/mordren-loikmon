@@ -1,6 +1,7 @@
 import { View, Text, Image, Pressable } from 'react-native'
 import { Link } from 'expo-router'
 import type { Book } from '@loikmon/api'
+import { useTypography } from '@/context/TypographyContext'
 import { pickCover } from '@/lib/url'
 import { PriceBadge } from './PriceBadge'
 
@@ -14,6 +15,7 @@ export function BookCard({
   width?: number
   variant?: 'carousel' | 'grid'
 }) {
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   const cover = pickCover(book as unknown as Record<string, unknown>)
   const author = (book.authorname as string) ?? (book.author as string) ?? ''
   const isGrid = variant === 'grid'
@@ -34,16 +36,17 @@ export function BookCard({
         </View>
         <Text
           numberOfLines={2}
-          className="mt-2 text-sm font-semibold text-surface-900 dark:text-surface-50"
+          className="mt-2 text-sm text-surface-900 dark:text-surface-50 pt-1"
+          style={headerTextStyle}
         >
           {book.title}
         </Text>
         {author ? (
-          <Text numberOfLines={1} className="text-xs text-surface-400">
+          <Text numberOfLines={1} className="text-xs text-surface-400 pt-3" style={bodyTextStyle}>
             {author}
           </Text>
         ) : null}
-        <View className="mt-1">
+        <View className="mt-1 py-2 pt-2">
           <PriceBadge item={book as unknown as Record<string, unknown>} />
         </View>
       </Pressable>

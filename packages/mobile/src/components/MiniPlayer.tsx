@@ -1,10 +1,12 @@
 import { View, Text, Pressable, Image, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useAudio } from '@/context/AudioContext'
+import { useTypography } from '@/context/TypographyContext'
 
 /** Global mini audio player shown above the tab bar while a track is loaded. */
 export function MiniPlayer() {
   const { current, isPlaying, isLoading, positionMillis, durationMillis, toggle, stop } = useAudio()
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   if (!current) return null
 
   const progress = durationMillis > 0 ? positionMillis / durationMillis : 0
@@ -25,11 +27,15 @@ export function MiniPlayer() {
           )}
         </View>
         <View className="ml-3 flex-1">
-          <Text numberOfLines={1} className="text-sm font-semibold text-surface-900 dark:text-surface-50">
+          <Text
+            numberOfLines={1}
+            className="text-sm text-surface-900 dark:text-surface-50"
+            style={headerTextStyle}
+          >
             {current.title}
           </Text>
           {current.artist ? (
-            <Text numberOfLines={1} className="text-xs text-surface-400">
+            <Text numberOfLines={1} className="text-xs text-surface-400" style={bodyTextStyle}>
               {current.artist}
             </Text>
           ) : null}

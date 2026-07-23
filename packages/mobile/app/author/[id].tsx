@@ -6,11 +6,13 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EmptyState } from '@/components/EmptyState'
 import { useAuthorDetail } from '@/hooks/useAuthors'
 import { useI18n } from '@/context/I18nContext'
+import { useTypography } from '@/context/TypographyContext'
 import { fixUrl } from '@/lib/url'
 
 export default function AuthorDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const { t } = useI18n()
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   const { author, books, loading, error } = useAuthorDetail(id)
 
   if (loading) {
@@ -47,29 +49,29 @@ export default function AuthorDetailScreen() {
               </View>
             )}
           </View>
-          <Text className="mt-3 text-xl font-bold text-surface-900 dark:text-surface-50">
+          <Text className="mt-3 text-xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
             {author.name}
           </Text>
           <View className="mt-2 flex-row gap-6">
             <View className="items-center">
-              <Text className="font-bold text-surface-900 dark:text-surface-50">
+              <Text className="font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                 {t('authors.books', { count: author.books_count ?? books.length })}
               </Text>
             </View>
             <View className="items-center">
-              <Text className="font-bold text-surface-900 dark:text-surface-50">
+              <Text className="font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                 {t('authors.followers', { count: author.followers_count ?? 0 })}
               </Text>
             </View>
           </View>
           {author.bio ? (
-            <Text className="mt-4 text-center leading-6 text-surface-600 dark:text-surface-300">
+            <Text className="mt-4 text-center leading-6 text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
               {author.bio}
             </Text>
           ) : null}
         </View>
 
-        <Text className="mb-3 mt-6 px-4 text-lg font-bold text-surface-900 dark:text-surface-50">
+        <Text className="mb-3 mt-6 px-4 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
           {t('nav.books')}
         </Text>
         <View className="flex-row flex-wrap px-2">

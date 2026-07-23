@@ -12,10 +12,13 @@ import { useArticles } from '@/hooks/useArticles'
 import { useAuthors } from '@/hooks/useAuthors'
 import { useI18n } from '@/context/I18nContext'
 import { useAuth } from '@/context/AuthContext'
+import { useTypography } from '@/context/TypographyContext'
+
 
 export default function HomeScreen() {
   const { t } = useI18n()
   const { user, isLoggedIn } = useAuth()
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   const books = useBooks()
   const audiobooks = useBooks({ type: 'audio' })
   const articles = useArticles()
@@ -25,12 +28,12 @@ export default function HomeScreen() {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         {/* Header */}
-        <View className="flex-row items-center justify-between px-4 pt-2">
+        <View className="flex-row items-center justify-between px-4 pt-1">
           <View>
-            <Text className="text-sm text-surface-500 dark:text-surface-400">
+            <Text className="text-sm text-surface-500 dark:text-surface-400 mb-3 px-4 pt-1" style={headerTextStyle}>
               {t('home.greeting')}
             </Text>
-            <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50">
+            <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
               {isLoggedIn ? (user?.name ?? 'Loikmon') : 'Loikmon'}
             </Text>
           </View>
@@ -41,16 +44,21 @@ export default function HomeScreen() {
                 className="flex-row items-center rounded-full bg-brand-50 dark:bg-brand-900/30 px-3 py-1.5"
               >
                 <Ionicons name="server-outline" size={16} color="#2563eb" />
-                <Text className="ml-1 text-sm font-semibold text-brand-600 dark:text-brand-300">
+                <Text className="ml-1 text-sm text-brand-600 dark:text-brand-300">
                   {Number(user?.coins ?? 0)}
                 </Text>
               </Pressable>
             ) : (
               <Pressable
                 onPress={() => router.push('/(auth)/login')}
-                className="rounded-full bg-brand-600 px-4 py-1.5"
+                className="items-center justify-center rounded-full bg-brand-600 px-5 py-2"
               >
-                <Text className="text-sm font-semibold text-white">{t('auth.login')}</Text>
+                <Text
+                  className="text-sm font-normal text-white pt-1"
+                  style={bodyTextStyle}
+                >
+                  {t('auth.login')}
+                </Text>
               </Pressable>
             )}
             <Pressable onPress={() => router.push('/settings')} hitSlop={8}>
@@ -78,7 +86,7 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* Audiobooks */}
+        {/* Audiobooks
         <SectionHeader
           title={t('home.audiobooks')}
           actionLabel={t('home.seeAll')}
@@ -95,7 +103,7 @@ export default function HomeScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16 }}
           />
-        )}
+        )} */}
 
         {/* Latest articles */}
         <SectionHeader

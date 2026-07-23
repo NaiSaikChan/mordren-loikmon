@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Audio, type AVPlaybackStatus } from 'expo-av'
+import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { type AudioTrack, toTrack } from '@/lib/audio'
 
 export { toTrack, type AudioTrack }
@@ -19,7 +19,9 @@ interface AudioContextValue {
 const AudioContext = createContext<AudioContextValue | undefined>(undefined)
 
 export function AudioProvider({ children }: { children: React.ReactNode }) {
-  const soundRef = useRef<Audio.Sound | null>(null)
+  const player = useAudioPlayer(null, { updateInterval: 250 })
+  const status = useAudioPlayerStatus(player)
+  const currentTrackRef = useRef<AudioTrack | null>(null)
   const [current, setCurrent] = useState<AudioTrack | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -27,64 +29,49 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const [durationMillis, setDurationMillis] = useState(0)
 
   useEffect(() => {
-    Audio.setAudioModeAsync({ playsInSilentModeIOS: true, staysActiveInBackground: true }).catch(
-      () => undefined,
-    )
-    return () => {
-      soundRef.current?.unloadAsync().catch(() => undefined)
-    }
+    setAudioModeAsync({
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+    }).catch(() => undefined)
   }, [])
 
-  const onStatus = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded) return
-    setIsPlaying(status.isPlaying)
-    setPositionMillis(status.positionMillis ?? 0)
-    setDurationMillis(status.durationMillis ?? 0)
-  }, [])
+  useEffect(() => {
+    if (!currentTrackRef.current) return
+    setIsPlaying(status.playing)
+    setPositionMillis(Math.max(0, Math.floor(status.currentTime * 1000)))
+    setDurationMillis(Math.max(0, Math.floor(status.duration * 1000)))
+    setIsLoading(!status.isLoaded || status.isBuffering)
+  }, [status])
 
-  const play = useCallback(
-    async (track: AudioTrack) => {
-      try {
-        setIsLoading(true)
-        if (soundRef.current) {
-          await soundRef.current.unloadAsync()
-          soundRef.current = null
-        }
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: track.url },
-          { shouldPlay: true },
-          onStatus,
-        )
-        soundRef.current = sound
-        setCurrent(track)
-      } finally {
-        setIsLoading(false)
-      }
-    },
-    [onStatus],
-  )
+  const play = useCallback(async (track: AudioTrack) => {
+    currentTrackRef.current = track
+    setCurrent(track)
+    setIsLoading(true)
+    player.replace(track.url)
+    player.play()
+  }, [player])
 
   const toggle = useCallback(async () => {
-    const sound = soundRef.current
-    if (!sound) return
-    const status = await sound.getStatusAsync()
-    if (!status.isLoaded) return
-    if (status.isPlaying) await sound.pauseAsync()
-    else await sound.playAsync()
-  }, [])
+    if (!currentTrackRef.current) return
+    if (player.playing) player.pause()
+    else player.play()
+  }, [player])
 
   const seek = useCallback(async (millis: number) => {
-    await soundRef.current?.setPositionAsync(millis)
-  }, [])
+    if (!currentTrackRef.current) return
+    await player.seekTo(Math.max(0, millis / 1000))
+  }, [player])
 
   const stop = useCallback(async () => {
-    await soundRef.current?.unloadAsync()
-    soundRef.current = null
+    player.pause()
+    player.replace(null)
+    currentTrackRef.current = null
     setCurrent(null)
     setIsPlaying(false)
+    setIsLoading(false)
     setPositionMillis(0)
     setDurationMillis(0)
-  }, [])
+  }, [player])
 
   const value = useMemo<AudioContextValue>(
     () => ({

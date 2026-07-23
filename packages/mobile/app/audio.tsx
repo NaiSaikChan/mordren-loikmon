@@ -8,11 +8,13 @@ import { EmptyState } from '@/components/EmptyState'
 import { useBooks } from '@/hooks/useBooks'
 import { useAudio, toTrack } from '@/context/AudioContext'
 import { useI18n } from '@/context/I18nContext'
+import { useTypography } from '@/context/TypographyContext'
 import { pickCover } from '@/lib/url'
 
 function AudioRow({ book }: { book: Book }) {
   const { t } = useI18n()
   const { play, current, isPlaying, toggle } = useAudio()
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   const cover = pickCover(book as unknown as Record<string, unknown>)
   const isCurrent = current && String(current.id) === String(book.id)
 
@@ -44,10 +46,14 @@ function AudioRow({ book }: { book: Book }) {
         )}
       </View>
       <View className="ml-3 flex-1">
-        <Text numberOfLines={1} className="text-sm font-semibold text-surface-900 dark:text-surface-50">
+        <Text
+          numberOfLines={1}
+          className="text-sm text-surface-900 dark:text-surface-50"
+          style={headerTextStyle}
+        >
           {book.title}
         </Text>
-        <Text numberOfLines={1} className="text-xs text-surface-400">
+        <Text numberOfLines={1} className="text-xs text-surface-400" style={bodyTextStyle}>
           {(book.authorname as string) ?? (book.author as string) ?? ''}
         </Text>
       </View>

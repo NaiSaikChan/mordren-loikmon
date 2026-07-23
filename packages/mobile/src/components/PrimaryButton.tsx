@@ -1,11 +1,26 @@
-import { Pressable, Text, ActivityIndicator, type PressableProps } from 'react-native'
+import {
+  Pressable,
+  Text,
+  ActivityIndicator,
+  type PressableProps,
+  type StyleProp,
+  type TextStyle,
+} from 'react-native'
 
 export function PrimaryButton({
   label,
   loading,
   variant = 'primary',
+  labelClassName,
+  labelStyle,
   ...props
-}: PressableProps & { label: string; loading?: boolean; variant?: 'primary' | 'ghost' }) {
+}: PressableProps & {
+  label: string
+  loading?: boolean
+  variant?: 'primary' | 'ghost'
+  labelClassName?: string
+  labelStyle?: StyleProp<TextStyle>
+}) {
   const base = 'flex-row items-center justify-center rounded-xl px-6 py-3.5'
   const styles =
     variant === 'primary'
@@ -22,7 +37,9 @@ export function PrimaryButton({
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? '#ffffff' : '#2563eb'} />
       ) : (
-        <Text className={`text-base font-semibold ${textStyle}`}>{label}</Text>
+        <Text className={`text-base ${textStyle} ${labelClassName ?? ''}`} style={labelStyle}>
+          {label}
+        </Text>
       )}
     </Pressable>
   )

@@ -3,6 +3,7 @@ import { Platform, View, ActivityIndicator } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { fixUrl } from '@/lib/url'
 import { detectFormat } from '@/lib/format'
+import { useTypography } from '@/context/TypographyContext'
 
 export { detectFormat }
 
@@ -15,10 +16,17 @@ export { detectFormat }
  * as local assets (or add Subresource Integrity hashes) to remove the runtime
  * CDN dependency entirely.
  */
-function epubHtml(url: string): string {
+function epubHtml(url: string, fontFamily: string | undefined): string {
+  const selectedFontFamily = fontFamily ?? 'system-ui, -apple-system, sans-serif'
+  const cssFontFamily =
+    selectedFontFamily.includes(',') || selectedFontFamily === 'serif'
+      ? selectedFontFamily
+      : `'${selectedFontFamily}'`
+  const selectedFontFamilyJson = JSON.stringify(selectedFontFamily)
+
   return `<!doctype html><html><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-<style>html,body{margin:0;height:100%;background:#fff}#viewer{height:100vh}
+<style>html,body{margin:0;height:100%;background:#fff;font-family:${cssFontFamily}}#viewer{height:100vh}
 #bar{position:fixed;bottom:0;left:0;right:0;display:flex;justify-content:space-between;padding:10px;background:rgba(0,0,0,.05)}
 button{border:0;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px;font-size:16px}</style>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
@@ -27,8 +35,14 @@ button{border:0;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px
 <div id="viewer"></div>
 <div id="bar"><button onclick="rendition.prev()">‹</button><button onclick="rendition.next()">›</button></div>
 <script>
+  var selectedFontFamily = ${selectedFontFamilyJson};
   var book = ePub("${url}");
   var rendition = book.renderTo("viewer", { width: "100%", height: "100%", flow: "paginated" });
+  rendition.themes.default({
+    body: {
+      "font-family": selectedFontFamily + " !important"
+    }
+  });
   rendition.display();
 </script>
 </body></html>`
@@ -43,6 +57,7 @@ button{border:0;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px
 export function DocumentReader({ source }: { source: string }) {
   const url = fixUrl(source)
   const format = detectFormat(url)
+  const { bodyFontFamily } = useTypography()
 
   const uri = useMemo(() => {
     if (format === 'pdf' && Platform.OS === 'android') {
@@ -60,8 +75,9 @@ export function DocumentReader({ source }: { source: string }) {
   if (format === 'epub') {
     return (
       <WebView
+        key={`epub-${bodyFontFamily ?? 'system'}`}
         originWhitelist={['*']}
-        source={{ html: epubHtml(url) }}
+        source={{ html: epubHtml(url, bodyFontFamily) }}
         startInLoadingState
         renderLoading={renderLoading}
         style={{ flex: 1 }}

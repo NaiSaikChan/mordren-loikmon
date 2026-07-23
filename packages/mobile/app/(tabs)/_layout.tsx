@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTheme } from '@/context/ThemeContext'
 import { useI18n } from '@/context/I18nContext'
 import { MiniPlayer } from '@/components/MiniPlayer'
+import { useTypography } from '@/context/TypographyContext'
 
 // Approximate default react-navigation bottom tab bar height; the safe-area
 // inset is added on top. Used only to float the mini player above the tab bar.
@@ -21,6 +22,7 @@ function tabIcon(name: IoniconName) {
 export default function TabsLayout() {
   const { isDark } = useTheme()
   const { t } = useI18n()
+  const { bodyFontFamily } = useTypography()
   const insets = useSafeAreaInsets()
 
   return (
@@ -30,6 +32,7 @@ export default function TabsLayout() {
             headerShown: false,
             tabBarActiveTintColor: '#2563eb',
             tabBarInactiveTintColor: isDark ? '#64748b' : '#94a3b8',
+            tabBarLabelStyle: { fontFamily: bodyFontFamily },
             tabBarStyle: {
               backgroundColor: isDark ? '#0f172a' : '#ffffff',
               borderTopColor: isDark ? '#1e293b' : '#e2e8f0',

@@ -70,7 +70,7 @@ export default function LoginScreen() {
             <Text className="text-surface-500 dark:text-surface-400">{t('auth.noAccount')} </Text>
             <Link href="/(auth)/register" asChild>
               <Pressable>
-                <Text className="font-semibold text-brand-600 dark:text-brand-400">
+                <Text className="text-brand-600 dark:text-brand-400">
                   {t('auth.signUp')}
                 </Text>
               </Pressable>

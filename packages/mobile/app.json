@@ -13,12 +13,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "org.loikmon.mobile",
       "infoPlist": {
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -27,7 +31,9 @@
         "backgroundColor": "#0f172a"
       },
       "package": "org.loikmon.mobile",
-      "permissions": ["FOREGROUND_SERVICE"]
+      "permissions": [
+        "FOREGROUND_SERVICE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +43,8 @@
     "plugins": [
       "expo-router",
       "expo-localization",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true

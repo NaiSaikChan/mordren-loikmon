@@ -87,7 +87,7 @@ export default function RegisterScreen() {
             <Text className="text-surface-500 dark:text-surface-400">{t('auth.hasAccount')} </Text>
             <Link href="/(auth)/login" asChild>
               <Pressable>
-                <Text className="font-semibold text-brand-600 dark:text-brand-400">
+                <Text className="text-brand-600 dark:text-brand-400">
                   {t('auth.signIn')}
                 </Text>
               </Pressable>

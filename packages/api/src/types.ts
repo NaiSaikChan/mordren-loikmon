@@ -63,6 +63,7 @@ export interface Article {
   title: string
   author?: string
   category?: string
+  categoryname?: string
   cat?: string
   thumbnail?: string
   thumbnail_url?: string
@@ -82,6 +83,7 @@ export interface Author {
   name: string
   bio?: string
   avatar?: string
+  thumbnail?: string
   avatar_url?: string
   books_count?: number | string
   followers_count?: number | string

@@ -8,7 +8,7 @@ export function PriceBadge({ item }: { item: Record<string, unknown> }) {
   if (isFree(item)) {
     return (
       <View className="self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5">
-        <Text className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+        <Text className="text-xs text-emerald-700 dark:text-emerald-300 py-0.5 pt-2">
           {t('books.free')}
         </Text>
       </View>
@@ -16,7 +16,7 @@ export function PriceBadge({ item }: { item: Record<string, unknown> }) {
   }
   const price = item.amount ?? item.price
   return (
-    <Text className="text-xs font-semibold text-brand-600 dark:text-brand-400">
+    <Text className="self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 pt-3 text-xs text-emerald-700 dark:text-emerald-300">
       {String(price)} {t('purchases.coins')}
     </Text>
   )

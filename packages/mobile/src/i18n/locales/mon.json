@@ -54,7 +54,7 @@
     "hasAccount": "စရၚ်နွံ?",
     "loginSuccess": "လုပ်ကျေဝ် ဗွဲမအံၚ်ဇၞး!",
     "logoutSuccess": "နုက်တိတ် ဗွဲမအံၚ်ဇၞး",
-    "welcomeBack": "တၚ်တၠုၚ်",
+    "welcomeBack": "တၚ်တၠုၚ်ရအဴ",
     "createAccount": "ခၞံကောန်တၟိ",
     "signIn": "လုပ်ကျောဝ်",
     "signUp": "ခၞံတၟိ",
@@ -67,7 +67,7 @@
     "description": "ပရောပရာ",
     "free": "သၟးသၟး",
     "read": "ဗှ်",
-    "purchase": "ရာန်",
+    "purchase": "ရာန်ဗှ်",
     "chapters": "အခန်",
     "related": "ဆက်စိုပ်",
     "pages": "{count} မုက်",
@@ -140,7 +140,7 @@
     "preview": "အယောၚ်အလာ မအက္ခရ်",
     "system": "စက်",
     "light": "တၟး",
-    "dark": "လမ်",
+    "dark": "ဂၠု",
     "appearance": "ရုပ်ရဴ",
     "general": "ဗွဲမ္ၚး"
   },
@@ -150,12 +150,12 @@
     "loading": "လဇ…"
   },
   "home": {
-    "greeting": "တၚ်တၠုၚ်",
+    "greeting": "ဒုၚ်တၠုၚ်ရအဴ",
     "featured": "ရုဲစှ်",
     "latestBooks": "လိခ်ကၞပ်တၟိ",
     "latestArticles": "လိခ်ပရေၚ်တၟိ",
     "popularAuthors": "အ္စာကၞေဟ်",
     "audiobooks": "ရမျာၚ်ဗှ်လိက်",
-    "seeAll": "ညာတ်ဖအိုတ်"
+    "seeAll": "ကျောဝ်ဖအိုတ်"
   }
 }

@@ -12,7 +12,7 @@ export function EmptyState({
   return (
     <View className="flex-1 items-center justify-center px-8 py-16">
       <Text className="text-5xl mb-3">{icon}</Text>
-      <Text className="text-base font-semibold text-surface-800 dark:text-surface-100 text-center">
+      <Text className="text-base text-surface-800 dark:text-surface-100 text-center">
         {title}
       </Text>
       {subtitle ? (
