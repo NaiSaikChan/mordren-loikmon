@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { Platform, View, ActivityIndicator } from 'react-native'
 import { WebView } from 'react-native-webview'
+import Pdf from 'react-native-pdf'
 import { fixUrl } from '@/lib/url'
 import { detectFormat } from '@/lib/format'
 import { useTypography } from '@/context/TypographyContext'
@@ -61,12 +62,12 @@ export function DocumentReader({ source }: { source: string }) {
 
   const uri = useMemo(() => {
     if (format === 'pdf' && Platform.OS === 'android') {
-      // Android WebView cannot render inline PDFs; Google Docs viewer is a pragmatic
-      // fallback. For offline/DRM content, use react-native-pdf or expo-pdf-viewer.
       return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
     }
     return url
   }, [url, format])
+
+  const showNativePdf = format === 'pdf' && Platform.OS === 'ios'
 
   const renderLoading = () => (
     <View className="flex-1 items-center justify-center bg-white">
@@ -83,6 +84,17 @@ export function DocumentReader({ source }: { source: string }) {
         startInLoadingState
         renderLoading={renderLoading}
         style={{ flex: 1 }}
+      />
+    )
+  }
+
+  if (showNativePdf) {
+    return (
+      <Pdf
+        source={{ uri }}
+        style={{ flex: 1 }}
+        renderActivityIndicator={() => renderLoading()}
+        onError={(err) => console.error('PDF error', err)}
       />
     )
   }

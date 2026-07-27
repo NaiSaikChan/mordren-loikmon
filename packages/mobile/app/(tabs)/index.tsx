@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, Pressable, FlatList } from 'react-native'
+import { ScrollView, View, Text, Pressable } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
@@ -79,15 +79,15 @@ export default function HomeScreen() {
         {books.loading ? (
           <LoadingSpinner />
         ) : (
-          <FlatList
+          <ScrollView
             horizontal
-            data={books.items.slice(0, 12)}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => <BookCard book={item} />}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
-            nestedScrollEnabled
-          />
+            contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+          >
+            {books.items.slice(0, 12).map((item) => (
+              <BookCard key={String(item.id)} book={item} />
+            ))}
+          </ScrollView>
         )}
 
         {/* Latest articles */}

@@ -22,9 +22,9 @@ import { PrimaryButton } from '@/components/PrimaryButton'
 import { useBookDetail } from '@/hooks/useBooks'
 import { useAuth } from '@/context/AuthContext'
 import { useLibrary } from '@/context/LibraryContext'
-import { usePurchases } from '@/hooks/usePurchases'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
+import { useIsOwned } from '@/hooks/useIsOwned'
 import { pickCover } from '@/lib/url'
 import { isFree } from '@/lib/normalize'
 
@@ -141,7 +141,7 @@ export default function BookDetailScreen() {
   const { user, isLoggedIn, refreshUser } = useAuth()
   const { isBookmarked, toggleBook } = useLibrary()
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const { books: purchasedBooks } = usePurchases()
+  const { owned: canRead } = useIsOwned(id, 'book')
   const { width } = useWindowDimensions()
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState<BookDetailTab>('details')
@@ -163,12 +163,6 @@ export default function BookDetailScreen() {
   const source = book ? (book.pdf as string) ?? (book.pdffile as string) ?? (book.epub as string) ?? '' : ''
   const price = Number(book?.amount ?? book?.price ?? 0)
   const bookmarked = book ? isBookmarked('book', book.id) : false
-
-  const canRead = useMemo(() => {
-    if (free) return true
-    if (!book) return false
-    return purchasedBooks.some((item) => String(item.id) === String(book.id))
-  }, [book, free, purchasedBooks])
 
   const displayedReviews = useMemo(() => {
     const seen = new Set<string>()
@@ -321,7 +315,7 @@ export default function BookDetailScreen() {
       />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           contentContainerStyle={{
