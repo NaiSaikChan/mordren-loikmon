@@ -164,7 +164,12 @@ const toolbarBorder = computed(() => `${effectiveColor.value}26`)
 // ─── URL normalisation ────────────────────────────────────────────────────────
 function fixUrl(url: string): string {
   if (!url) return ''
-  return url
+  let u = url
+  try {
+    const decoded = JSON.parse(`"${u}"`)
+    if (typeof decoded === 'string' && decoded.startsWith('http')) u = decoded
+  } catch { /* ignore */ }
+  return u
     .replace(/\\/g, '/')
     .replace(/\u202f/gi, '%E2%80%AF')
     .replace(/ /g, '%20')

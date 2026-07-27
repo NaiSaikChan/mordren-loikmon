@@ -21,7 +21,14 @@ const accessChecked = ref(false)
 
 function fixUrl(url: string): string {
   if (!url) return ''
-  let u = url.replace(/\\/g, '/')
+  let u = url
+  // Some server responses double-escape URLs as JSON strings (https:\/\/host\/path).
+  // Try to decode once; if it stays the same,continue with the original value.
+  try {
+    const decoded = JSON.parse(`"${u}"`)
+    if (typeof decoded === 'string' && decoded.startsWith('http')) u = decoded
+  } catch { /* ignore */ }
+  u = u.replace(/\\/g, '/')
   u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
   return u
 }

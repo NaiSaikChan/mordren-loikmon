@@ -17,6 +17,7 @@ export function getClient(baseURL?: string): AxiosInstance {
   _instance = axios.create({
     baseURL: baseURL ?? DEFAULT_BASE,
     timeout: 15000,
+    withCredentials: false,
     // No default Content-Type — set per-request below
   })
 
