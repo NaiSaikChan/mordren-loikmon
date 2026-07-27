@@ -62,6 +62,7 @@ export interface Article {
   id: string | number
   title: string
   author?: string
+  authorname?: string
   category?: string
   categoryname?: string
   cat?: string

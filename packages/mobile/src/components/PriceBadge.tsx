@@ -2,7 +2,7 @@ import { View, Text } from 'react-native'
 import { useI18n } from '@/context/I18nContext'
 import { isFree } from '@/lib/normalize'
 
-/** Displays "Free" or the coin price for a book/article/media record. */
+/** Displays "Free" or the coin price for a book/articles/media record. */
 export function PriceBadge({ item }: { item: Record<string, unknown> }) {
   const { t } = useI18n()
   if (isFree(item)) {

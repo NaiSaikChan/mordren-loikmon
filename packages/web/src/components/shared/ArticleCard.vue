@@ -89,7 +89,7 @@ async function shareArticle(e: MouseEvent) {
         
         <!-- Author + Date -->
         <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
-          <span v-if="article.authorname || article.author" class="truncate">✍️ {{ (article.authorname ?? article.author) as string }}</span>
+          <span v-if="article.authorname || article.author || article.username" class="truncate">✍️ {{ (article.authorname ?? article.username ?? article.author) as string }}</span>
           <span v-if="formattedDate">📅 {{ formattedDate }}</span>
         </div>
 

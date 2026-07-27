@@ -148,9 +148,10 @@ function ReviewCard({
 }
 
 export default function ArticleDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>()
+  const articleId = Array.isArray(id) ? id[0] : id
   const { t } = useI18n()
-  const { article, loading, error } = useArticleDetail(id)
+  const { article, loading, error } = useArticleDetail(articleId)
   const { user, isLoggedIn, refreshUser } = useAuth()
   const { isBookmarked, toggleArticle } = useLibrary()
   const { articles: purchasedArticles, reload: reloadPurchases } = usePurchases()
@@ -204,9 +205,15 @@ export default function ArticleDetailScreen() {
   }, [reviews, userReview])
 
   const loadReviews = useCallback(async () => {
+    if (!articleId) {
+      setReviewsLoading(false)
+      setReviews([])
+      setUserReview(null)
+      return
+    }
     setReviewsLoading(true)
     try {
-      const res = await reviewsApi.loadRecentReviews(id, 'article', user?.email)
+      const res = await reviewsApi.loadRecentReviews(articleId, 'article', user?.email)
       const body = res.data as Record<string, unknown>
       setReviews(getReviewList(body.reviews ?? body.data ?? body.list))
       setUserReview(getReview(body.userreview ?? body.userReview ?? body.data))
@@ -216,7 +223,7 @@ export default function ArticleDetailScreen() {
     } finally {
       setReviewsLoading(false)
     }
-  }, [id, user?.email])
+  }, [articleId, user?.email])
 
   useEffect(() => {
     void loadReviews()
@@ -288,20 +295,20 @@ export default function ArticleDetailScreen() {
     }
   }
 
-  if (error || !article) {
-    return (
-      <Screen edges={[]}>
-        <Stack.Screen options={{ title: '' }} />
-        <EmptyState icon="⚠️" title={t('common.error')} />
-      </Screen>
-    )
-  }
-
   if (loading) {
     return (
       <Screen edges={[]}>
         <Stack.Screen options={{ title: '' }} />
         <LoadingSpinner />
+      </Screen>
+    )
+  }
+
+  if (error || !article) {
+    return (
+      <Screen edges={[]}>
+        <Stack.Screen options={{ title: '' }} />
+        <EmptyState icon="⚠️" title={t('common.error')} subtitle={error ?? t('articles.noArticles')} />
       </Screen>
     )
   }
@@ -343,40 +350,50 @@ export default function ArticleDetailScreen() {
             </View>
 
             <View className="flex-row items-start justify-between gap-3">
-              <View className="flex-1">
+              <View className="flex-1 pb-4">
                 <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   {article.title}
                 </Text>
-                <View className="mt-3 flex-row flex-wrap items-center gap-3">
+                <View className="mt-3 flex-row flex-wrap justify-start gap-3">
                   {article.author ? (
-                    <Text className="text-sm text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
-                      {t('common.by')} {String(article.author)}
-                    </Text>
+                    <View className="rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-1 items-center justify-center">
+                      <Text className="text-xs font-medium text-blue-700 dark:text-blue-200 pt-1" style={bodyTextStyle}>
+                        {t('common.by')} {String(article.authorname)}
+                      </Text>
+                    </View>
                   ) : null}
                   {category ? (
-                    <Text className="text-sm text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
-                      {category}
-                    </Text>
+                    <View className="rounded-full bg-purple-100 dark:bg-purple-900 px-3 py-1 items-center justify-center">
+                      <Text className="text-xs font-medium text-purple-700 dark:text-purple-200 pt-1" style={bodyTextStyle}>
+                        {category}
+                      </Text>
+                    </View>
                   ) : null}
                   {article.created_at || article.date ? (
-                    <Text className="text-sm text-surface-400" style={bodyTextStyle}>
-                      {new Date(String(article.created_at ?? article.date ?? '')).toLocaleDateString()}
-                    </Text>
+                    <View className="rounded-full bg-orange-100 dark:bg-orange-900 px-3 py-1 items-center justify-center">
+                      <Text className="text-xs font-medium text-orange-700 dark:text-orange-200 pt-1" style={bodyTextStyle}>
+                        {new Date(String(article.articledate ?? article.date ?? '')).toLocaleDateString()}
+                      </Text>
+                    </View>
                   ) : null}
                   {isPaid ? (
-                    <Text className="text-sm font-semibold text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
-                      🪙 {price} coins
-                    </Text>
+                    <View className="rounded-full bg-amber-100 dark:bg-amber-900 px-3 py-1 items-center justify-center">
+                      <Text className="text-xs font-medium text-amber-700 dark:text-amber-200 pt-1" style={bodyTextStyle}>
+                        🪙 {price} coins
+                      </Text>
+                    </View>
                   ) : (
-                    <Text className="text-sm font-semibold text-emerald-600 dark:text-emerald-400" style={bodyTextStyle}>
-                      Free
-                    </Text>
+                    <View className="rounded-full bg-emerald-100 dark:bg-emerald-900 px-3 py-1 items-center justify-center">
+                      <Text className="text-xs font-medium text-emerald-700 dark:text-emerald-200 pt-1" style={bodyTextStyle}>
+                        Free
+                      </Text>
+                    </View>
                   )}
                 </View>
               </View>
             </View>
 
-            <View className="mt-5 rounded-2xl bg-surface-200 dark:bg-surface-800 p-1">
+            <View className="flex-row rounded-2xl bg-surface-200 dark:bg-surface-800 p-1">
               {([
                 { id: 'content' as const, label: 'Content' },
                 { id: 'reviews' as const, label: `Reviews (${displayedReviews.length})` },
@@ -527,11 +544,13 @@ export default function ArticleDetailScreen() {
                     ))}
                   </View>
                 ) : (
-                  <EmptyState
-                    icon="💬"
-                    title="No reviews yet"
-                    subtitle="Be the first one to share what you think about this article."
-                  />
+                  <View className="items-center mt-6 pt-3 gap-3">
+                    <EmptyState
+                      icon="💬"
+                      title="No reviews yet"
+                      subtitle="Be the first one to share what you think about this article."
+                    />
+                  </View>
                 )}
               </View>
             </View>

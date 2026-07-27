@@ -1,12 +1,12 @@
 import '../global.css'
-import { Stack } from 'expo-router'
+import { Stack, useSegments } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import { useFonts } from 'expo-font'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { initApiClient } from '@/services/api'
 import { ThemeProvider, useTheme } from '@/context/ThemeContext'
-import { I18nProvider } from '@/context/I18nContext'
+import { I18nProvider, useI18n } from '@/context/I18nContext'
 import { AuthProvider } from '@/context/AuthContext'
 import { AudioProvider } from '@/context/AudioContext'
 import { LibraryProvider } from '@/context/LibraryContext'
@@ -18,6 +18,20 @@ initApiClient()
 function RootNavigator() {
   const { isDark } = useTheme()
   const { headerFontFamily } = useTypography()
+  const { t } = useI18n()
+  const segments = useSegments()
+  const lead = segments[0]
+  const currentTabSegment = lead === '(tabs)' ? segments[1] : lead
+  const tabsBackTitle =
+    currentTabSegment === 'books' || currentTabSegment === 'book'
+      ? t('nav.books')
+      : currentTabSegment === 'articles'
+        ? t('nav.articles')
+        : currentTabSegment === 'search'
+          ? t('nav.search')
+          : currentTabSegment === 'library'
+            ? t('nav.library')
+            : t('nav.home')
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -29,7 +43,7 @@ function RootNavigator() {
           contentStyle: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false, title: tabsBackTitle }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="reader" options={{ title: '' }} />
       </Stack>

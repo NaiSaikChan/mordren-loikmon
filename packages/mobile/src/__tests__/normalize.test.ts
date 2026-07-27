@@ -3,6 +3,7 @@ import {
   parseArticles,
   parseAuthors,
   parseBookDetail,
+  parseArticleDetail,
   parseTotal,
   isFree,
 } from '@/lib/normalize'
@@ -37,6 +38,20 @@ describe('parseBookDetail', () => {
     expect(parseBookDetail({ book: { id: 1, title: 'A' } })?.id).toBe(1)
     expect(parseBookDetail({ data: { book: { id: 2, title: 'B' } } })?.id).toBe(2)
     expect(parseBookDetail({})).toBeNull()
+  })
+})
+
+describe('parseArticleDetail', () => {
+  it('reads article from top-level/data wrappers', () => {
+    expect(parseArticleDetail({ article: { id: 1, title: 'A' } })?.id).toBe(1)
+    expect(parseArticleDetail({ data: { article: { id: 2, title: 'B' } } })?.id).toBe(2)
+  })
+
+  it('accepts direct and array payload shapes', () => {
+    expect(parseArticleDetail({ id: 3, title: 'C' })?.id).toBe(3)
+    expect(parseArticleDetail({ data: { id: 4, title: 'D' } })?.id).toBe(4)
+    expect(parseArticleDetail([{ id: 5, title: 'E' }])?.id).toBe(5)
+    expect(parseArticleDetail([])).toBeNull()
   })
 })
 

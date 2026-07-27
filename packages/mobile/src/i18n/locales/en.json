@@ -87,7 +87,16 @@
     "unfollow": "Unfollow",
     "books": "{count} books",
     "followers": "{count} followers",
-    "noAuthors": "No authors found."
+    "noAuthors": "No authors found.",
+    "biography": "Biography",
+    "followLinks": "Follow",
+    "additionalInfo": "Additional Information",
+    "joined": "Joined",
+    "status": "Status",
+    "socialFacebook": "Facebook",
+    "socialInstagram": "Instagram",
+    "socialYouTube": "YouTube",
+    "socialEmail": "Email"
   },
   "music": {
     "title": "Audio Books",

@@ -39,8 +39,24 @@ export function parseBookDetail(body: unknown): Book | null {
 }
 
 export function parseArticleDetail(body: unknown): Article | null {
+  if (Array.isArray(body)) {
+    const first = body[0]
+    if (first && typeof first === 'object') return first as Article
+    return null
+  }
+
   const b = (body ?? {}) as AnyRecord
-  return ((b.article ?? (b.data as AnyRecord)?.article) as Article | undefined) ?? null
+  const fromWrapper = (b.article ?? (b.data as AnyRecord)?.article) as Article | undefined
+  if (fromWrapper && typeof fromWrapper === 'object') return fromWrapper
+
+  if (b.data && typeof b.data === 'object' && !Array.isArray(b.data)) {
+    const data = b.data as AnyRecord
+    if ('id' in data || 'title' in data || 'content' in data) return data as Article
+  }
+
+  if ('id' in b || 'title' in b || 'content' in b) return b as Article
+
+  return null
 }
 
 export function parseTotal(body: unknown): number {

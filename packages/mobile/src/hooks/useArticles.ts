@@ -50,21 +50,43 @@ export function useArticles(params?: Record<string, unknown>) {
   return { items, loading, refreshing, hasMore, error, loadMore, refresh }
 }
 
-export function useArticleDetail(id: string | number) {
+export function useArticleDetail(id: string | number | string[] | undefined) {
   const [article, setArticle] = useState<Article | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    const articleId = Array.isArray(id) ? id[0] : id
     let active = true
     ;(async () => {
       setLoading(true)
       setError(null)
+      setArticle(null)
+      if (articleId == null || String(articleId).trim() === '') {
+        if (active) {
+          setError('Missing article id')
+          setLoading(false)
+        }
+        return
+      }
       try {
-        const res = await articlesApi.getArticle(id)
+        const res = await articlesApi.updateArticleTotalViews(articleId)
         if (!active) return
-        setArticle(parseArticleDetail(res.data))
-        articlesApi.updateArticleTotalViews(id).catch(() => undefined)
+        const parsed = parseArticleDetail(res.data)
+        if (parsed) {
+          setArticle(parsed)
+        } else {
+          const listRes = await articlesApi.fetchArticles()
+          if (!active) return
+          const fallback = parseArticles(listRes.data).find(
+            (item) => String(item.id) === String(articleId),
+          )
+          if (!fallback) {
+            throw new Error('Article not found')
+          }
+          setArticle(fallback)
+        }
+        articlesApi.updateArticleTotalViews(articleId).catch(() => undefined)
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Failed to load article')
       } finally {

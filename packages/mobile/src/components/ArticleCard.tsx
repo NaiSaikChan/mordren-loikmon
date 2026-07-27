@@ -12,7 +12,7 @@ export function ArticleCard({ article }: { article: Article }) {
     (article.thumbnail_url as string) ?? (article.thumbnail as string) ?? '',
   )
   const category = (article.categoryname as string) ?? (article.cat as string) ?? ''
-  const articleHref = { pathname: '/article/[id]', params: { id: String(article.id) } }
+  const articleHref = { pathname: '/articles/[id]', params: { id: String(article.id) } }
   return (
     <Link href={articleHref} asChild>
       <Pressable className="mb-3 flex-row rounded-xl bg-white dark:bg-surface-800 p-3">

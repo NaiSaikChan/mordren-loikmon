@@ -87,7 +87,16 @@
     "unfollow": "ဟွံသ္ပ ပုရိသာဒ်",
     "books": "{count} ကၞပ်",
     "followers": "{count} ပုရိသာဒ်",
-    "noAuthors": "အ္စာကၞေဟ် ဟၟဲ"
+    "noAuthors": "အ္စာကၞေဟ် ဟၟဲ",
+    "biography": "ပရူပရာ",
+    "followLinks": "ပုရိသာဒ်",
+    "additionalInfo": "အချက်အလက် ထပ်မံ",
+    "joined": "လုပ်ဝင်",
+    "status": "အခြေအနေ",
+    "socialFacebook": "Facebook",
+    "socialInstagram": "Instagram",
+    "socialYouTube": "YouTube",
+    "socialEmail": "Email"
   },
   "music": {
     "title": "ရမျာၚ်ဗှ်လိက်ဂမၠိုၚ်",
