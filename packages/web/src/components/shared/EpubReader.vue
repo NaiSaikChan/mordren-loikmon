@@ -292,7 +292,14 @@ async function render(url: string) {
   errorMsg.value = null
 
   try {
-    book      = ePub(fixUrl(url))
+    // Fetch the EPUB as an ArrayBuffer. This avoids any URL escaping/CORS issues
+    // when epubjs internally re-fetches the archive.
+    const fixedUrl = fixUrl(url)
+    const blobRes  = await fetch(fixedUrl, { mode: 'cors', credentials: 'omit' })
+    if (!blobRes.ok) throw new Error(`Failed to download EPUB: ${blobRes.status} ${blobRes.statusText}`)
+    const buffer = await blobRes.arrayBuffer()
+
+    book      = ePub(buffer)
     rendition = book.renderTo(container.value, {
       width:                '100%',
       height:               '100%',

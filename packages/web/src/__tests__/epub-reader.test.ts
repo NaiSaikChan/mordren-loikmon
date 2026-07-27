@@ -18,12 +18,24 @@ const mockRenderTo   = vi.fn().mockReturnValue({
   prev:    mockPrev,
 })
 const mockBookDestroy = vi.fn()
+const mockReady       = Promise.resolve()
+const mockLocations   = { generate: vi.fn().mockResolvedValue(undefined) }
 
 vi.mock('epubjs', () => ({
   default: vi.fn(() => ({
-    renderTo: mockRenderTo,
-    destroy:  mockBookDestroy,
+    renderTo:  mockRenderTo,
+    destroy:   mockBookDestroy,
+    ready:     mockReady,
+    locations: mockLocations,
   })),
+}))
+
+// Mock fetch so buffer-based loading does not fail in jsdom
+vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+  ok: true,
+  status: 200,
+  statusText: 'OK',
+  arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
 }))
 
 describe('EpubReader', () => {

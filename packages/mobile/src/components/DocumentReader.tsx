@@ -1,6 +1,7 @@
-import { useMemo, useRef, useState, useCallback } from 'react'
+import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
 import { Platform, View, ActivityIndicator, Text } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
+import * as FileSystem from 'expo-file-system/legacy'
 import { fixUrl } from '@/lib/url'
 import { detectFormat } from '@/lib/format'
 import { useTypography } from '@/context/TypographyContext'
@@ -10,7 +11,7 @@ export { detectFormat }
 /**
  * More complete epub.js reader page rendered inside a WebView.
  *
- * This mirrors the web EpubReader.vue features:
+ * Mirrors the web EpubReader.vue features:
  *  - paginated flow
  *  - theme / font / font-size / line-spacing controls
  *  - table of contents
@@ -19,9 +20,8 @@ export { detectFormat }
  *
  * Security note: jszip and epub.js are loaded from jsDelivr at **pinned exact
  * versions** (immutable URLs). `crossorigin="anonymous"` is set so the browser
- * treats them as CORS resources. For a hardened build, bundle these libraries
- * as local assets (or add Subresource Integrity hashes) to remove the runtime
- * CDN dependency entirely.
+ * treats them as CORS resources. For a hardened offline build, bundle these
+ * libraries as local assets.
  */
 function epubHtml(url: string, fontFamily: string | undefined): string {
   const selectedFontFamily = fontFamily ?? 'system-ui, -apple-system, sans-serif'
@@ -85,11 +85,15 @@ function epubHtml(url: string, fontFamily: string | undefined): string {
       black: { bg: '#000000', fg: '#cccccc' },
     };
 
+    function post(msg) {
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+    }
+
     function showError(text) {
       var el = document.getElementById('msg');
       el.textContent = text;
       el.style.display = 'block';
-      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: text }));
+      post({ type: 'error', message: text });
     }
 
     function applyTheme(themeId) {
@@ -119,19 +123,24 @@ function epubHtml(url: string, fontFamily: string | undefined): string {
     }
 
     function updateProgress(loc) {
-      if (!loc || !loc.start || !book || !book.locations) return;
+      if (!loc || !loc.start) return;
       try {
-        var pct = book.locations.percentageFromCfi(loc.start.cfi);
-        document.querySelector('#progress > div').style.width = Math.round(pct * 100) + '%';
+        var pct = loc.percentage;
+        if (pct == null && book && book.locations && book.locations.percentageFromCfi) {
+          pct = book.locations.percentageFromCfi(loc.start.cfi);
+        }
+        if (pct != null) document.querySelector('#progress > div').style.width = Math.round(pct * 100) + '%';
       } catch(e) {}
     }
 
     function loadBook() {
-      if (!bookUrl || !bookUrl.startsWith('http')) {
+      if (!bookUrl) { showError('No EPUB URL provided'); return; }
+      if (!bookUrl.startsWith('http') && !bookUrl.startsWith('file://')) {
         showError('Invalid EPUB URL: ' + bookUrl);
         return;
       }
       try {
+        post({ type: 'debug', step: 'opening', url: bookUrl });
         book = ePub(bookUrl);
         rendition = book.renderTo('viewer', {
           width: '100%',
@@ -142,7 +151,10 @@ function epubHtml(url: string, fontFamily: string | undefined): string {
         });
 
         var saved = localStorage.getItem('epub-cfi-' + bookUrl);
-        rendition.display(saved).catch(function() { return rendition.display(); });
+        rendition.display(saved).catch(function(err) {
+          post({ type: 'debug', step: 'display-saved-failed', error: err?.message });
+          return rendition.display();
+        });
 
         applyTheme(document.getElementById('theme').value);
         applyFont('');
@@ -150,14 +162,13 @@ function epubHtml(url: string, fontFamily: string | undefined): string {
 
         rendition.on('relocated', function(loc) {
           updateProgress(loc);
-          if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'progress', value: Math.round(loc.percentage * 100) }));
+          post({ type: 'progress', value: Math.round((loc.percentage || 0) * 100) });
         });
 
         rendition.on('rendered', function(section) {
-          document.getElementById('chapter').textContent = section ? section.label : '';
+          document.getElementById('chapter').textContent = (section && section.label) || '';
         });
 
-        // swipe handling via touch events on the viewer div
         var viewer = document.getElementById('viewer');
         var startX = null;
         viewer.addEventListener('touchstart', function(e) { startX = e.changedTouches[0].clientX; });
@@ -169,14 +180,15 @@ function epubHtml(url: string, fontFamily: string | undefined): string {
         });
 
         book.ready.then(function() {
+          post({ type: 'debug', step: 'ready' });
           return book.locations.generate(1024);
         }).catch(function(err) {
-          if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'locations-error', message: err.message }));
+          post({ type: 'debug', step: 'locations-error', error: err?.message });
         });
 
-        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'loaded' }));
+        post({ type: 'loaded' });
       } catch (err) {
-        showError('Failed to open EPUB: ' + err.message);
+        showError('Failed to open EPUB: ' + (err && err.message ? err.message : String(err)));
       }
     }
 
@@ -198,32 +210,70 @@ function epubHtml(url: string, fontFamily: string | undefined): string {
 </html>`
 }
 
+async function downloadEpub(remoteUrl: string): Promise<string> {
+  const filename = remoteUrl.split('/').pop()?.split('?')[0] || 'book.epub'
+  const dir = FileSystem.cacheDirectory + 'epubs/'
+  const localUri = dir + filename
+  const dirInfo = await FileSystem.getInfoAsync(dir)
+  if (!dirInfo.exists) {
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
+  }
+  const fileInfo = await FileSystem.getInfoAsync(localUri)
+  if (fileInfo.exists) {
+    return localUri
+  }
+  const download = await FileSystem.downloadAsync(remoteUrl, localUri)
+  if (download.status !== 200) {
+    throw new Error(`EPUB download failed: ${download.status} ${download.uri}`)
+  }
+  return download.uri
+}
+
 /**
  * Cross-platform document reader for Loikmon eBooks.
  *  - PDF: rendered natively by the platform WebView (iOS) / Google Docs viewer
- *    fallback (Android, which cannot render PDFs inline).
- *  - EPUB: rendered with epub.js inside the WebView, matching the web reader.
+ *    fallback (Android).
+ *  - EPUB: downloaded locally and rendered with epub.js inside the WebView.
  */
 export function DocumentReader({ source }: { source: string }) {
   const url = fixUrl(source)
   const format = detectFormat(url)
   const { bodyFontFamily } = useTypography()
   const [error, setError] = useState<string | null>(null)
+  const [localEpub, setLocalEpub] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const webViewRef = useRef<WebView>(null)
 
   const uri = useMemo(() => {
-    // Android WebView cannot render inline PDFs; use Google Docs viewer there.
-    // iOS WebView renders PDFs natively.
     if (format === 'pdf' && Platform.OS === 'android') {
       return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
     }
     return url
   }, [url, format])
 
+  useEffect(() => {
+    if (format !== 'epub' || !url) return
+    let cancelled = false
+    setDownloading(true)
+    downloadEpub(url)
+      .then((localUri) => {
+        if (!cancelled) setLocalEpub(localUri)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Download failed')
+      })
+      .finally(() => {
+        if (!cancelled) setDownloading(false)
+      })
+    return () => { cancelled = true }
+  }, [url, format])
+
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data)
       if (data.type === 'error') setError(data.message)
+      // eslint-disable-next-line no-console
+      if (data.type === 'debug') console.log('[EpubReader]', data)
     } catch {
       // ignore non-JSON messages
     }
@@ -239,18 +289,21 @@ export function DocumentReader({ source }: { source: string }) {
     return (
       <View className="flex-1 items-center justify-center bg-white dark:bg-surface-900 p-6">
         <Text className="text-center text-red-500">{error}</Text>
-        <Text className="mt-2 text-center text-surface-500 text-sm">{url}</Text>
+        <Text className="mt-2 text-center text-surface-500 text-sm" selectable>{url}</Text>
       </View>
     )
   }
 
   if (format === 'epub') {
+    if (downloading || !localEpub) {
+      return renderLoading()
+    }
     return (
       <WebView
         ref={webViewRef}
-        key={`epub-${bodyFontFamily ?? 'system'}-${url}`}
+        key={`epub-${bodyFontFamily ?? 'system'}-${localEpub}`}
         originWhitelist={['*']}
-        source={{ html: epubHtml(url, bodyFontFamily) }}
+        source={{ html: epubHtml(localEpub, bodyFontFamily) }}
         startInLoadingState
         renderLoading={renderLoading}
         onMessage={handleMessage}
