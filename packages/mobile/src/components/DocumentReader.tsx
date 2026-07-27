@@ -36,7 +36,7 @@ button{border:0;background:#2563eb;color:#fff;padding:8px 16px;border-radius:8px
 <div id="bar"><button onclick="rendition.prev()">‹</button><button onclick="rendition.next()">›</button></div>
 <script>
   var selectedFontFamily = ${selectedFontFamilyJson};
-  var book = ePub("${url}");
+  var book = ePub(${JSON.stringify(url)});
   var rendition = book.renderTo("viewer", { width: "100%", height: "100%", flow: "paginated" });
   rendition.themes.default({
     body: {
@@ -61,6 +61,8 @@ export function DocumentReader({ source }: { source: string }) {
 
   const uri = useMemo(() => {
     if (format === 'pdf' && Platform.OS === 'android') {
+      // Android WebView cannot render inline PDFs; Google Docs viewer is a pragmatic
+      // fallback. For offline/DRM content, use react-native-pdf or expo-pdf-viewer.
       return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
     }
     return url
@@ -91,6 +93,8 @@ export function DocumentReader({ source }: { source: string }) {
       startInLoadingState
       renderLoading={renderLoading}
       allowFileAccess
+      allowUniversalAccessFromFileURLs
+      mixedContentMode="always"
       style={{ flex: 1 }}
     />
   )

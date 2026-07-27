@@ -1,4 +1,4 @@
-import { normaliseUser, makeSessionKey } from '@/lib/user'
+import { normaliseUser } from '@/lib/user'
 
 describe('normaliseUser', () => {
   it('computes a display name from firstname + lastname', () => {
@@ -24,8 +24,4 @@ describe('normaliseUser', () => {
   })
 })
 
-describe('makeSessionKey', () => {
-  it('derives a stable key from the user id', () => {
-    expect(makeSessionKey({ id: 42 })).toBe('user_42')
-  })
-})
+

@@ -33,7 +33,10 @@ export function getMediaOrigin(): string {
 
 export function fixUrl(url: string | undefined | null, base = _origin): string {
   if (!url) return ''
-  let u = String(url).replace(/\\/g, '/')
+
+  // Decode escaped slashes (`\/`) first, regardless of escaped protocol.
+  let u = String(url).replace(/\\\//g, '/')
+
   // Encode narrow no-break space (U+202F) and regular spaces.
   u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
   if (u.startsWith('http://') || u.startsWith('https://')) return u

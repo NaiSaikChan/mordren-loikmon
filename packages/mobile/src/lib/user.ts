@@ -20,7 +20,3 @@ export function normaliseUser(raw: Record<string, unknown>): User {
   } as User
 }
 
-/** Server issues no JWT — derive a stable local session key from the user id. */
-export function makeSessionKey(user: Record<string, unknown>): string {
-  return `user_${user.id}`
-}

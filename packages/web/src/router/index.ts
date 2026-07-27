@@ -1,3 +1,4 @@
+import { useAuthStore } from '@/stores/auth'
 import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
@@ -27,8 +28,8 @@ const router = createRouter({
         { path: 'music',      name: 'music',             component: () => import('@/pages/MusicPage.vue') },
         { path: 'music/albums/:id', name: 'album-detail', component: () => import('@/pages/AlbumDetailPage.vue'), props: true },
         { path: 'search',     name: 'search',            component: () => import('@/pages/SearchPage.vue') },
-        { path: 'library',    name: 'library',           component: () => import('@/pages/LibraryPage.vue') },
-        { path: 'purchases',  name: 'purchases',         component: () => import('@/pages/PurchasesPage.vue') },
+        { path: 'library',    name: 'library',           component: () => import('@/pages/LibraryPage.vue'), meta: { requiresAuth: true } },
+        { path: 'purchases',  name: 'purchases',         component: () => import('@/pages/PurchasesPage.vue'), meta: { requiresAuth: true } },
         { path: 'categories', name: 'categories',        component: () => import('@/pages/CategoriesPage.vue') },
         { path: 'categories/:id', name: 'category-detail', component: () => import('@/pages/CategoryDetailPage.vue'), props: true },
         { path: 'collections', name: 'collections',      component: () => import('@/pages/CollectionsPage.vue') },
@@ -45,4 +46,13 @@ const router = createRouter({
   ],
 })
 
+
+router.beforeEach((to) => {
+  const auth = useAuthStore()
+  if (to.meta?.requiresAuth && !auth.isLoggedIn) {
+    return { name: 'auth', query: { redirect: to.fullPath } }
+  }
+})
+
 export default router
+

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { auth as authApi } from '@loikmon/api'
+import { auth as authApi, getClient } from '@loikmon/api'
 import type { User, LoginPayload, RegisterPayload } from '@loikmon/api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -20,11 +20,6 @@ function normaliseUser(raw: Record<string, unknown>): User {
   } as User
 }
 
-/** Session key stored in localStorage (server has no token — use user id) */
-function makeSessionKey(user: Record<string, unknown>): string {
-  return `user_${user.id}`
-}
-
 // ── Store ─────────────────────────────────────────────────────────────────────
 export const useAuthStore = defineStore('auth', () => {
   // ── State ─────────────────────────────────────────
@@ -32,6 +27,23 @@ export const useAuthStore = defineStore('auth', () => {
   const token   = ref<string | null>(localStorage.getItem('token'))
   const loading = ref(false)
   const error   = ref<string | null>(null)
+
+  /** Attach axios interceptors so token and 401 handling are always applied. */
+  const client = getClient()
+  client.interceptors.request.use((config) => {
+    const current = token.value
+    if (current) config.headers.Authorization = `Bearer ${current}`
+    return config
+  })
+  client.interceptors.response.use(
+    (res) => res,
+    (err) => {
+      if (err.response?.status === 401) {
+        void logout()
+      }
+      return Promise.reject(err)
+    },
+  )
 
   // ── Getters ───────────────────────────────────────
   const isLoggedIn    = computed(() => !!token.value && !!user.value)
@@ -62,7 +74,11 @@ export const useAuthStore = defineStore('auth', () => {
       user.value  = normUser
 
       // Server doesn't issue a JWT — create a local session token from user id
-      const sessionToken = body.token ?? makeSessionKey(body.user as Record<string, unknown>)
+      const sessionToken = body.token
+      if (!sessionToken) {
+        error.value = 'Server did not issue a session token'
+        throw error.value
+      }
       token.value = sessionToken
 
       // Persist session
@@ -94,7 +110,11 @@ export const useAuthStore = defineStore('auth', () => {
       if (body.user) {
         const normUser = normaliseUser(body.user as Record<string, unknown>)
         user.value  = normUser
-        const sessionToken = body.token ?? makeSessionKey(body.user as Record<string, unknown>)
+        const sessionToken = body.token
+        if (!sessionToken) {
+          error.value = 'Server did not issue a session token'
+          throw error.value
+        }
         token.value = sessionToken
         localStorage.setItem('token', sessionToken)
         localStorage.setItem('user',  JSON.stringify(normUser))

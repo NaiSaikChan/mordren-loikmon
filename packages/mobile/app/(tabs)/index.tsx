@@ -20,13 +20,16 @@ export default function HomeScreen() {
   const { user, isLoggedIn } = useAuth()
   const { bodyTextStyle, headerTextStyle } = useTypography()
   const books = useBooks()
-  const audiobooks = useBooks({ type: 'audio' })
   const articles = useArticles()
   const authors = useAuthors()
 
   return (
-    <Screen>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+    <Screen edges={['top']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        nestedScrollEnabled
+      >
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 pt-1">
           <View>
@@ -83,27 +86,9 @@ export default function HomeScreen() {
             renderItem={({ item }) => <BookCard book={item} />}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: 16 }}
+            nestedScrollEnabled
           />
         )}
-
-        {/* Audiobooks
-        <SectionHeader
-          title={t('home.audiobooks')}
-          actionLabel={t('home.seeAll')}
-          onAction={() => router.push('/audio')}
-        />
-        {audiobooks.loading ? (
-          <LoadingSpinner />
-        ) : (
-          <FlatList
-            horizontal
-            data={audiobooks.items.slice(0, 12)}
-            keyExtractor={(item) => String(item.id)}
-            renderItem={({ item }) => <BookCard book={item} />}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16 }}
-          />
-        )} */}
 
         {/* Latest articles */}
         <SectionHeader

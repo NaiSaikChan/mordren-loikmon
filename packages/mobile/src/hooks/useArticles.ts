@@ -86,7 +86,6 @@ export function useArticleDetail(id: string | number | string[] | undefined) {
           }
           setArticle(fallback)
         }
-        articlesApi.updateArticleTotalViews(articleId).catch(() => undefined)
       } catch (err) {
         if (active) setError(err instanceof Error ? err.message : 'Failed to load article')
       } finally {

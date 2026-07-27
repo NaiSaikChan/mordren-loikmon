@@ -211,7 +211,7 @@ export default function BookDetailScreen() {
 
   if (loading) {
     return (
-      <Screen edges={[]}>
+      <Screen edges={['top']}>
         <Stack.Screen options={{ title: '' }} />
         <LoadingSpinner />
       </Screen>
@@ -220,7 +220,7 @@ export default function BookDetailScreen() {
 
   if (error || !book) {
     return (
-      <Screen edges={[]}>
+      <Screen edges={['top']}>
         <Stack.Screen options={{ title: '' }} />
         <EmptyState icon="⚠️" title={t('common.error')} />
       </Screen>
@@ -304,7 +304,7 @@ export default function BookDetailScreen() {
   const reviewCount = displayedReviews.length
 
   return (
-    <Screen edges={[]}>
+    <Screen edges={['top']}>
       <Stack.Screen
         options={{
           title: '',

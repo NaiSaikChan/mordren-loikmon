@@ -43,11 +43,9 @@ router.get('/pdf-proxy', async (req, res) => {
 	}
 
 	try {
-		const upstream = await axios.get<ArrayBuffer>(parsed.toString(), {
-			responseType: 'arraybuffer',
-			headers: {
-				Accept: 'application/pdf,*/*',
-			},
+		const upstream = await axios.get(parsed.toString(), {
+			responseType: 'stream',
+			headers: { Accept: 'application/pdf,*/*' },
 		})
 
 		const contentType = String(upstream.headers['content-type'] ?? 'application/pdf')
@@ -59,7 +57,7 @@ router.get('/pdf-proxy', async (req, res) => {
 		}
 		res.setHeader('Cache-Control', 'public, max-age=3600')
 
-		res.send(Buffer.from(upstream.data))
+		upstream.data.pipe(res)
 	} catch (error: unknown) {
 		const e = error as { response?: { status: number; data?: unknown }; message?: string }
 		res.status(e.response?.status ?? 502).json(

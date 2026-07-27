@@ -13,6 +13,13 @@ const mockFetchCoinPackages      = vi.fn()
 const mockRedeemCoupon           = vi.fn()
 const mockProofOfPayment         = vi.fn()
 
+const mockClient = {
+  interceptors: {
+    request: { use: () => 0, eject: () => {} },
+    response: { use: () => 0, eject: () => {} },
+  },
+}
+
 vi.mock('@loikmon/api', () => ({
   purchases: {
     fetchPurchasedBooks:    (...args: unknown[]) => mockFetchPurchasedBooks(...args),
@@ -27,6 +34,7 @@ vi.mock('@loikmon/api', () => ({
     register:      vi.fn(),
     updateProfile: vi.fn(),
   },
+  getClient: () => mockClient,
 }))
 
 import { usePurchasesStore } from '../stores/purchases'

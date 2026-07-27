@@ -10,12 +10,20 @@ const mockLogin    = vi.fn()
 const mockRegister = vi.fn()
 const mockUpdateProfile = vi.fn()
 
+const mockClient = {
+  interceptors: {
+    request: { use: () => 0, eject: () => {} },
+    response: { use: () => 0, eject: () => {} },
+  },
+}
+
 vi.mock('@loikmon/api', () => ({
   auth: {
     login:         (...args: unknown[]) => mockLogin(...args),
     register:      (...args: unknown[]) => mockRegister(...args),
     updateProfile: (...args: unknown[]) => mockUpdateProfile(...args),
   },
+  getClient: () => mockClient,
 }))
 
 import { useAuthStore } from '../stores/auth'
@@ -26,6 +34,7 @@ function makeLoginResponse(overrides: Record<string, unknown> = {}) {
     data: {
       status: 'ok',
       message: 'User Authenticated',
+      token: 'jwt-api-token',
       user: {
         id: '196',
         seller: '0',
@@ -127,7 +136,7 @@ describe('auth store', () => {
       const store = useAuthStore()
       await store.login({ email: 'maraohnonpon@gmail.com', password: 'pass' })
       expect(store.user).not.toBeNull()
-      expect(store.token).toBe('user_196')   // generated from id when no JWT
+      expect(store.token).toBe('jwt-api-token')   // generated from id when no JWT
       expect(store.isLoggedIn).toBe(true)
     })
 
@@ -135,7 +144,7 @@ describe('auth store', () => {
       mockLogin.mockResolvedValueOnce(makeLoginResponse())
       const store = useAuthStore()
       await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(localStorage.getItem('token')).toBe('user_196')
+      expect(localStorage.getItem('token')).toBe('jwt-api-token')
       expect(JSON.parse(localStorage.getItem('user')!).email).toBe('maraohnonpon@gmail.com')
     })
 
@@ -197,13 +206,13 @@ describe('auth store', () => {
   describe('restore()', () => {
     it('restores token + user from localStorage', () => {
       const savedUser = { id: '10', name: 'Test', email: 'test@test.com', avatar: '', coins: 0 }
-      localStorage.setItem('token', 'user_10')
+      localStorage.setItem('token', 'jwt-restored')
       localStorage.setItem('user', JSON.stringify(savedUser))
 
       const store = useAuthStore()
       store.restore()
 
-      expect(store.token).toBe('user_10')
+      expect(store.token).toBe('jwt-restored')
       expect(store.user!.email).toBe('test@test.com')
       expect(store.isLoggedIn).toBe(true)
     })

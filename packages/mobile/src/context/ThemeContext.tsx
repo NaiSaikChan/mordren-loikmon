@@ -19,7 +19,8 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useRNColorScheme() ?? 'light'
+  const rawScheme = useRNColorScheme()
+  const systemScheme: 'light' | 'dark' = rawScheme === 'dark' ? 'dark' : 'light'
   const [pref, setPrefState] = useState<ThemePref>('system')
 
   useEffect(() => {

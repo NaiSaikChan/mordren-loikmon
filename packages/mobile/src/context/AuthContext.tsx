@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react'
-import { auth as authApi } from '@loikmon/api'
+import { auth as authApi, getClient } from '@loikmon/api'
 import type { User, LoginPayload, RegisterPayload } from '@loikmon/api'
-import { normaliseUser, makeSessionKey } from '@/lib/user'
+import { normaliseUser } from '@/lib/user'
 import { secureStorage } from '@/services/storage'
 
 const TOKEN_KEY = 'token'
@@ -74,7 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!body.user) throw new Error('No user data received')
 
         const normUser = normaliseUser(body.user as Record<string, unknown>)
-        const sessionToken = body.token ?? makeSessionKey(body.user as Record<string, unknown>)
+        const sessionToken = body.token
+        if (!sessionToken) throw new Error('Server did not issue a session token')
         setUser(normUser)
         setToken(sessionToken)
         await persist(normUser, sessionToken)
@@ -101,7 +102,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (body.user) {
           const normUser = normaliseUser(body.user as Record<string, unknown>)
-          const sessionToken = body.token ?? makeSessionKey(body.user as Record<string, unknown>)
+          const sessionToken = body.token
+          if (!sessionToken) throw new Error('Server did not issue a session token')
           setUser(normUser)
           setToken(sessionToken)
           await persist(normUser, sessionToken)

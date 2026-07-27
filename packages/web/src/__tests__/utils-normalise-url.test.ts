@@ -7,14 +7,15 @@ import { describe, it, expect } from 'vitest'
 // ── inline the utility under test so no import resolution issues ──────────────
 function normaliseUrl(url: string | undefined | null, base = 'https://loikmon.org'): string {
   if (!url) return ''
-  // Already absolute
-  if (url.startsWith('http://') || url.startsWith('https://')) {
-    // Encode narrow no-break space (U+202F) and regular space
-    return url.replace(/\u202f/g, '%20').replace(/ /g, '%20').replace(/\\\//g, '/')
-  }
-  // Relative — prepend base
-  const clean = url.replace(/\\\//g, '/').replace(/\u202f/g, '%20').replace(/ /g, '%20')
-  return `${base}${clean.startsWith('/') ? '' : '/'}${clean}`
+
+  // Decode escaped slashes (`\/`) first, regardless of escaped protocol.
+  let u = String(url).replace(/\\\//g, '/')
+
+  // Encode narrow no-break space (U+202F) and regular space
+  u = u.replace(/\u202f/gi, '%20').replace(/ /g, '%20')
+
+  if (u.startsWith('http://') || u.startsWith('https://')) return u
+  return `${base}${u.startsWith('/') ? '' : '/'}${u}`
 }
 
 describe('normaliseUrl()', () => {
@@ -69,5 +70,9 @@ describe('normaliseUrl()', () => {
   it('uses custom base when provided', () => {
     expect(normaliseUrl('/img/a.png', 'https://cdn.example.com'))
       .toBe('https://cdn.example.com/img/a.png')
+  })
+
+  it("escaped backslashes don't corrupt protocol", () => {
+    expect(normaliseUrl('https:\/\/loikmon.org\/a.jpg')).toBe('https://loikmon.org/a.jpg')
   })
 })

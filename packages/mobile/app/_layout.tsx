@@ -19,9 +19,9 @@ function RootNavigator() {
   const { isDark } = useTheme()
   const { headerFontFamily } = useTypography()
   const { t } = useI18n()
-  const segments = useSegments()
-  const lead = segments[0]
-  const currentTabSegment = lead === '(tabs)' ? segments[1] : lead
+  const segments = useSegments() as string[]
+  const lead = segments[0] ?? ''
+  const currentTabSegment = lead === '(tabs)' ? (segments[1] ?? '') : lead
   const tabsBackTitle =
     currentTabSegment === 'books' || currentTabSegment === 'book'
       ? t('nav.books')
