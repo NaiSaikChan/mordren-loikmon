@@ -28,13 +28,8 @@ export const useAuthStore = defineStore('auth', () => {
   const loading = ref(false)
   const error   = ref<string | null>(null)
 
-  /** Attach axios interceptors so token and 401 handling are always applied. */
+  /** Attach axios response interceptor to log the user out on 401s. */
   const client = getClient()
-  client.interceptors.request.use((config) => {
-    const current = token.value
-    if (current) config.headers.Authorization = `Bearer ${current}`
-    return config
-  })
   client.interceptors.response.use(
     (res) => res,
     (err) => {
