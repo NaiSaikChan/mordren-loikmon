@@ -30,10 +30,14 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['vue', 'vue-router', 'pinia'],
-          i18n: ['vue-i18n'],
-          http: ['axios'],
+        // Rolldown in Vite 6+/7 expects manualChunks to be a function when
+        // running the experimental rolldown bundler. Object form is not accepted.
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (['vue', 'vue-router', 'pinia'].some((m) => id.includes(m))) return 'vendor'
+            if (id.includes('vue-i18n')) return 'i18n'
+            if (id.includes('axios')) return 'http'
+          }
         },
       },
     },
