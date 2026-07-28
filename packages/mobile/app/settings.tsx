@@ -99,12 +99,14 @@ export default function SettingsScreen() {
             { id: 'system', label: t('settings.system') },
           ]}
         />
-        <Row
-          label={t('settings.language')}
-          value={locale}
-          onChange={(id) => setLocale(id as Locale)}
-          options={locales.map((l) => ({ id: l.id, label: l.label }))}
-        />
+        <View className="pt-6">
+          <Row
+            label={t('settings.language')}
+            value={locale}
+            onChange={(id) => setLocale(id as Locale)}
+            options={locales.map((l) => ({ id: l.id, label: l.label }))}
+          />
+        </View>
 
         <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50">
           {t('settings.typography')}

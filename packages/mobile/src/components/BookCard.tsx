@@ -36,18 +36,24 @@ export function BookCard({
         </View>
         <Text
           numberOfLines={2}
-          className="mt-2 text-sm text-surface-900 dark:text-surface-50 pt-1"
-          style={headerTextStyle}
+          className="mt-2 text-xs text-surface-900 dark:text-surface-50 pt-2 leading-tight"
+          style={[headerTextStyle, { letterSpacing: -0.2 }]}
+          allowFontScaling={false}
         >
           {book.title}
         </Text>
         {author ? (
-          <Text numberOfLines={1} className="text-xs text-surface-400 pt-3" style={bodyTextStyle}>
+          <Text
+            numberOfLines={1}
+            className="text-xs text-surface-400 pt-1.5 leading-tight"
+            style={[bodyTextStyle, { letterSpacing: -0.1 }]}
+            allowFontScaling={false}
+          >
             {author}
           </Text>
         ) : null}
-        <View className="mt-1 py-2 pt-2">
-          <PriceBadge item={book as unknown as Record<string, unknown>} />
+        <View className="mt-2 flex-row items-center justify-between">
+          <PriceBadge item={book as unknown as Record<string, unknown>}/>
         </View>
       </Pressable>
     </Link>

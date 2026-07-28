@@ -14,6 +14,7 @@ import {
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { purchases as purchasesApi, reviews as reviewsApi, type Review } from '@loikmon/api'
+import { books as booksApi } from '@loikmon/api'
 import { Screen } from '@/components/Screen'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EmptyState } from '@/components/EmptyState'
@@ -160,7 +161,8 @@ export default function BookDetailScreen() {
   const cover = book ? pickCover(book as unknown as Record<string, unknown>) : ''
   const author = book ? (book.authorname as string) ?? (book.author as string) ?? '' : ''
   const free = book ? isFree(book as unknown as Record<string, unknown>) : false
-  const source = book ? (book.pdf as string) ?? (book.pdffile as string) ?? (book.epub as string) ?? '' : ''
+  const epubSource = book ? ((book.epub as string) ?? '') : ''
+  const pdfSource = book ? ((book.pdf as string) ?? (book.pdffile as string) ?? '') : ''
   const price = Number(book?.amount ?? book?.price ?? 0)
   const bookmarked = book ? isBookmarked('book', book.id) : false
 
@@ -221,14 +223,26 @@ export default function BookDetailScreen() {
     )
   }
 
-  const openReader = () => {
+  const openReader = async (source: string, format?: 'epub' | 'pdf') => {
     if (!source) {
       Alert.alert(t('reader.notAvailable'))
       return
     }
+
+    try {
+      await booksApi.updateTotalViews(id)
+    } catch {
+      // Keep reader usable even if tracking endpoint fails.
+    }
+
     router.push({
       pathname: '/reader',
-      params: { url: source, title: book.title },
+      params: {
+        url: source,
+        title: book.title,
+        id: String(book.id),
+        format: format ?? undefined,
+      },
     })
   }
 
@@ -248,7 +262,8 @@ export default function BookDetailScreen() {
         const coins = Number((coinRes.data as Record<string, unknown>).coins ?? user.coins ?? 0)
         await refreshUser({ ...user, coins })
         Alert.alert(t('purchases.approved'))
-        openReader()
+        const preferred = epubSource || pdfSource
+        void openReader(preferred, epubSource ? 'epub' : 'pdf')
       }
     } catch {
       Alert.alert(t('common.error'))
@@ -368,12 +383,28 @@ export default function BookDetailScreen() {
 
                 <View className={`mt-5 items-center justify-center ${isTablet ? 'items-start' : 'items-stretch'}`}>
                   {free || canRead ? (
-                    <PrimaryButton
-                      label={t('books.read')}
-                      onPress={openReader}
-                      labelClassName="text-xl font-bold"
-                      labelStyle={headerTextStyle}
-                    />
+                    <View className="w-full gap-2">
+                      {epubSource ? (
+                        <PrimaryButton
+                          label="📖 Read EPUB"
+                          onPress={() => {
+                            void openReader(epubSource, 'epub')
+                          }}
+                          labelClassName="text-xl font-bold"
+                          labelStyle={headerTextStyle}
+                        />
+                      ) : null}
+                      {pdfSource ? (
+                        <PrimaryButton
+                          label="📄 Read PDF"
+                          onPress={() => {
+                            void openReader(pdfSource, 'pdf')
+                          }}
+                          labelClassName="text-xl font-bold"
+                          labelStyle={headerTextStyle}
+                        />
+                      ) : null}
+                    </View>
                   ) : isLoggedIn ? (
                     <PrimaryButton
                       label={`${t('books.purchase')} ${price} ${t('purchases.coins')}`}

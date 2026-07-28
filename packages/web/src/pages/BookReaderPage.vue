@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
 import { useBooksStore } from '@/stores/books'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePurchasesStore } from '@/stores/purchases'
+import { books as booksApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EpubReader from '@/components/shared/EpubReader.vue'
 import VuePdfApp from 'vue3-pdf-app'
@@ -77,12 +78,29 @@ const pdfConfig = {
   },
 }
 
-onMounted(async () => {
+async function loadReaderPage() {
   const bookFetch = (!store.detail || String(store.detail.id) !== String(props.id))
     ? store.fetchDetail(props.id)
     : Promise.resolve()
+
   await Promise.all([bookFetch, auth.isLoggedIn ? purchasesStore.fetchAll() : Promise.resolve()])
+
+  // Ensure this backend hook runs before mounting the reader view.
+  try {
+    await booksApi.updateTotalViews(props.id)
+  } catch {
+    // Keep the page usable even if tracking call fails.
+  }
+
   accessChecked.value = true
+}
+
+onMounted(loadReaderPage)
+
+// Vue Router same-component param navigation: reload when id changes.
+watch(() => props.id, () => {
+  accessChecked.value = false
+  void loadReaderPage()
 })
 </script>
 

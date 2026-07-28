@@ -5,10 +5,23 @@ import { isFree } from '@/lib/normalize'
 /** Displays "Free" or the coin price for a book/articles/media record. */
 export function PriceBadge({ item }: { item: Record<string, unknown> }) {
   const { t } = useI18n()
+  const badgeContainerClass = 'self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 min-h-6 justify-center'
+  const badgeTextClass = 'text-emerald-700 dark:text-emerald-300'
+
   if (isFree(item)) {
     return (
-      <View className="self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5">
-        <Text className="text-xs text-emerald-700 dark:text-emerald-300 py-0.5 pt-2">
+      <View className={badgeContainerClass}>
+        <Text
+          className={badgeTextClass}
+          style={{
+            fontSize: 10.5,
+            lineHeight: 14,
+            paddingTop: 0,
+            paddingBottom: 0,
+            includeFontPadding: false,
+            textAlignVertical: 'center',
+          }}
+        >
           {t('books.free')}
         </Text>
       </View>
@@ -16,8 +29,20 @@ export function PriceBadge({ item }: { item: Record<string, unknown> }) {
   }
   const price = item.amount ?? item.price
   return (
-    <Text className="self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 pt-3 text-xs text-emerald-700 dark:text-emerald-300">
-      {String(price)} {t('purchases.coins')}
-    </Text>
+    <View className={badgeContainerClass}>
+      <Text
+        className={badgeTextClass}
+        style={{
+          fontSize: 10.5,
+          lineHeight: 14,
+          paddingTop: 0,
+          paddingBottom: 0,
+          includeFontPadding: false,
+          textAlignVertical: 'center',
+        }}
+      >
+        {String(price)} {t('purchases.coins')}
+      </Text>
+    </View>
   )
 }

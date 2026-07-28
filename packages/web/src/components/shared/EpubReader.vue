@@ -1,6 +1,72 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import ePub from 'epubjs'
+
+type EpubFactory = (input: string | ArrayBuffer, options?: Record<string, unknown>) => any
+
+let _epubRuntimePromise: Promise<EpubFactory> | null = null
+
+function loadScriptOnce(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      reject(new Error(`Timed out loading script: ${src}`))
+    }, 15000)
+
+    const existing = document.querySelector(`script[data-epub-runtime-src="${src}"]`) as HTMLScriptElement | null
+    if (existing) {
+      if ((existing as any).__loaded) {
+        window.clearTimeout(timeout)
+        return resolve()
+      }
+      existing.addEventListener('load', () => {
+        window.clearTimeout(timeout)
+        resolve()
+      }, { once: true })
+      existing.addEventListener('error', () => {
+        window.clearTimeout(timeout)
+        reject(new Error(`Failed to load script: ${src}`))
+      }, { once: true })
+      return
+    }
+
+    const s = document.createElement('script')
+    s.src = src
+    s.async = true
+    s.crossOrigin = 'anonymous'
+    s.setAttribute('data-epub-runtime-src', src)
+    s.addEventListener('load', () => {
+      window.clearTimeout(timeout)
+      ;(s as any).__loaded = true
+      resolve()
+    }, { once: true })
+    s.addEventListener('error', () => {
+      window.clearTimeout(timeout)
+      reject(new Error(`Failed to load script: ${src}`))
+    }, { once: true })
+    document.head.appendChild(s)
+  })
+}
+
+async function getEpubFactory(): Promise<EpubFactory> {
+  const globalEpub = (window as any).ePub as EpubFactory | undefined
+  if (typeof globalEpub === 'function') return globalEpub
+
+  if (!_epubRuntimePromise) {
+    _epubRuntimePromise = (async () => {
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js')
+      await loadScriptOnce('https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js')
+      const runtime = (window as any).ePub as EpubFactory | undefined
+      if (typeof runtime !== 'function') {
+        throw new Error('EPUB runtime failed to initialize')
+      }
+      return runtime
+    })().catch((err) => {
+      _epubRuntimePromise = null
+      throw err
+    })
+  }
+
+  return _epubRuntimePromise
+}
 
 // ─── Auto-load all font files from assets/fonts ───────────────────────────────
 // Drop a new .ttf/.otf/.woff/.woff2 into that folder and it appears here.
@@ -65,11 +131,13 @@ const isFullscreen   = ref(false)
 const chapters       = ref<{ id: string; href: string; label: string; depth: number }[]>([])
 const currentChapter = ref('')
 const progress       = ref(0)
+const usingIsolatedFallback = ref(false)
 
 // ─── epubjs instances (non-reactive) ─────────────────────────────────────────
 let book: any = null
 let rendition: any = null
 let resizeObserver: ResizeObserver | null = null
+let isolatedFrame: HTMLIFrameElement | null = null
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const THEMES = [
@@ -269,6 +337,157 @@ function triggerResize() {
   }
 }
 
+function postToIsolatedFrame(message: { type: 'next' | 'prev' }) {
+  isolatedFrame?.contentWindow?.postMessage(
+    { source: 'loikmon-epub-host', ...message },
+    '*',
+  )
+}
+
+function onFallbackMessage(event: MessageEvent) {
+  const data = event.data as {
+    source?: string
+    type?: string
+    cfi?: string
+    message?: string
+  }
+  if (!data || data.source !== 'loikmon-epub-fallback') return
+
+  if (data.type === 'ready') {
+    loading.value = false
+    errorMsg.value = null
+    return
+  }
+
+  if (data.type === 'relocated' && data.cfi) {
+    try { localStorage.setItem(bookKey(), data.cfi) } catch { /* ignore */ }
+    return
+  }
+
+  if (data.type === 'error') {
+    errorMsg.value = data.message || 'Failed to load EPUB'
+    loading.value = false
+  }
+}
+
+async function mountIsolatedFallback(url: string, savedCfi: string | null) {
+  if (!container.value) return
+
+  usingIsolatedFallback.value = true
+  loading.value = true
+  errorMsg.value = null
+
+  try { rendition?.destroy() } catch { /* ignore */ }
+  try { book?.destroy() } catch { /* ignore */ }
+  rendition = null
+  book = null
+
+  container.value.innerHTML = ''
+  isolatedFrame = document.createElement('iframe')
+  isolatedFrame.setAttribute('title', 'EPUB Reader Frame')
+  isolatedFrame.setAttribute('sandbox', 'allow-scripts allow-same-origin')
+  isolatedFrame.style.width = '100%'
+  isolatedFrame.style.height = '100%'
+  isolatedFrame.style.border = '0'
+
+  const payload = JSON.stringify({
+    url: fixUrl(url),
+    cfi: savedCfi ?? '',
+  })
+
+  isolatedFrame.srcdoc = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      html, body, #host { width: 100%; height: 100%; margin: 0; padding: 0; }
+      body { background: #fff; overflow: hidden; }
+      #status {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        font: 14px/1.2 system-ui, -apple-system, Segoe UI, sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="host"></div>
+    <div id="status">Loading book…</div>
+    <script>
+      const payload = ${payload};
+      let rendition = null;
+
+      function loadScript(src) {
+        return new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.onload = () => resolve();
+          s.onerror = () => reject(new Error('Failed to load script: ' + src));
+          document.head.appendChild(s);
+        });
+      }
+
+      function notify(type, data) {
+        parent.postMessage({ source: 'loikmon-epub-fallback', type, ...data }, '*');
+      }
+
+      async function start() {
+        try {
+          await loadScript('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+          await loadScript('https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js');
+
+          const book = window.ePub(payload.url);
+          rendition = book.renderTo('host', {
+            width: '100%',
+            height: '100%',
+            flow: 'paginated',
+            spread: 'none',
+            allowScriptedContent: false,
+          });
+
+          rendition.on('relocated', (loc) => {
+            const cfi = loc && loc.start && loc.start.cfi;
+            if (cfi) notify('relocated', { cfi });
+          });
+
+          const first = payload.cfi ? rendition.display(payload.cfi) : rendition.display();
+          if (first && typeof first.catch === 'function') {
+            first.catch(() => rendition.display()).catch(() => {});
+          }
+
+          const status = document.getElementById('status');
+          if (status) status.remove();
+          notify('ready', {});
+        } catch (e) {
+          const msg = e && e.message ? e.message : String(e);
+          const status = document.getElementById('status');
+          if (status) status.textContent = msg;
+          notify('error', { message: msg });
+        }
+      }
+
+      window.addEventListener('message', (event) => {
+        const data = event.data || {};
+        if (data.source !== 'loikmon-epub-host' || !rendition) return;
+        try {
+          if (data.type === 'next') rendition.next();
+          if (data.type === 'prev') rendition.prev();
+        } catch {}
+      });
+
+      start();
+    <\/script>
+  </body>
+</html>`
+
+  container.value.appendChild(isolatedFrame)
+}
+
 // ─── Chapter navigation ───────────────────────────────────────────────────────
 function goToChapter(href: string) {
   try { rendition?.display(href) } catch { /* ignore */ }
@@ -288,6 +507,8 @@ async function render(url: string) {
   chapters.value = []
   currentChapter.value = ''
   progress.value = 0
+  usingIsolatedFallback.value = false
+  isolatedFrame = null
   loading.value  = true
   errorMsg.value = null
 
@@ -299,7 +520,12 @@ async function render(url: string) {
     if (!blobRes.ok) throw new Error(`Failed to download EPUB: ${blobRes.status} ${blobRes.statusText}`)
     const buffer = await blobRes.arrayBuffer()
 
-    book      = ePub(buffer)
+    const epubFactory = await getEpubFactory()
+    const maybeBook = epubFactory(buffer)
+    book = (maybeBook && typeof maybeBook.then === 'function')
+      ? await maybeBook
+      : maybeBook
+
     rendition = book.renderTo(container.value, {
       width:                '100%',
       height:               '100%',
@@ -309,7 +535,16 @@ async function render(url: string) {
     })
 
     const savedCfi = localStorage.getItem(bookKey())
-    await rendition.display(savedCfi || undefined)
+    // Do not block the whole reader on display promise (can hang on some books).
+    // Try saved position first, then fall back to default start.
+    const firstDisplay = savedCfi
+      ? rendition.display(savedCfi)
+      : rendition.display()
+    if (firstDisplay && typeof (firstDisplay as Promise<unknown>).catch === 'function') {
+      ;(firstDisplay as Promise<unknown>)
+        .catch(() => rendition.display())
+        .catch(() => {})
+    }
 
     applyReaderStyles()
 
@@ -343,16 +578,18 @@ async function render(url: string) {
       } catch { /* ignore */ }
     })
 
-    // Load table of contents
-    try {
-      const nav = await book.loaded.navigation
-      const flatten = (items: any[], depth = 0): typeof chapters.value =>
-        items.flatMap((item: any) => [
-          { id: String(item.id ?? item.href), href: item.href ?? '', label: (item.label ?? '').trim(), depth },
-          ...(item.subitems?.length ? flatten(item.subitems, depth + 1) : []),
-        ])
-      chapters.value = flatten(nav?.toc ?? [])
-    } catch { /* ignore nav errors */ }
+    // Load table of contents in background (avoid blocking initial paint)
+    void (async () => {
+      try {
+        const nav = await book.loaded.navigation
+        const flatten = (items: any[], depth = 0): typeof chapters.value =>
+          items.flatMap((item: any) => [
+            { id: String(item.id ?? item.href), href: item.href ?? '', label: (item.label ?? '').trim(), depth },
+            ...(item.subitems?.length ? flatten(item.subitems, depth + 1) : []),
+          ])
+        chapters.value = flatten(nav?.toc ?? [])
+      } catch { /* ignore nav errors */ }
+    })()
 
     // Inject custom @font-face declarations into each rendered iframe section
     const fontFaceCSS = buildFontFaceCSS()
@@ -386,23 +623,49 @@ async function render(url: string) {
     }
 
     // Generate locations for progress tracking in the background
-    book.ready
-      .then(() => book.locations.generate(1024).catch(() => {}))
-      .catch(() => {})
+    if (typeof book?.generateLocations === 'function') {
+      void book.generateLocations(1024).catch(() => {})
+    } else if (book?.ready && typeof book.ready.then === 'function') {
+      void book.ready
+        .then(() => book.locations.generate(1024).catch(() => {}))
+        .catch(() => {})
+    }
 
     // Responsive resize observer
     resizeObserver = new ResizeObserver(() => triggerResize())
     resizeObserver.observe(container.value)
 
+    const candidateCfi = savedCfi
+    window.setTimeout(() => {
+      if (!container.value || usingIsolatedFallback.value || errorMsg.value) return
+      const hasChildren = container.value.childElementCount > 0
+      if (!hasChildren) {
+        void mountIsolatedFallback(fixedUrl, candidateCfi)
+      }
+    }, 3500)
+
   } catch (e: any) {
     errorMsg.value = e?.message ?? 'Failed to load EPUB'
   } finally {
-    loading.value = false
+    if (!usingIsolatedFallback.value) loading.value = false
   }
 }
 
-function goPrev() { rendition?.prev() }
-function goNext() { rendition?.next() }
+function goPrev() {
+  if (usingIsolatedFallback.value) {
+    postToIsolatedFrame({ type: 'prev' })
+    return
+  }
+  rendition?.prev()
+}
+
+function goNext() {
+  if (usingIsolatedFallback.value) {
+    postToIsolatedFrame({ type: 'next' })
+    return
+  }
+  rendition?.next()
+}
 
 // ─── Watch settings → persist + re-apply ─────────────────────────────────────
 watch(
@@ -424,6 +687,7 @@ onMounted(() => {
 
   render(props.url)
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('message', onFallbackMessage)
   document.addEventListener('fullscreenchange', onFullscreenChange)
 })
 
@@ -432,6 +696,7 @@ onBeforeUnmount(() => {
   try { rendition?.destroy() } catch { /* ignore */ }
   try { book?.destroy() }      catch { /* ignore */ }
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('message', onFallbackMessage)
   document.removeEventListener('fullscreenchange', onFullscreenChange)
 })
 
@@ -540,20 +805,18 @@ watch(() => props.url, url => render(url))
       />
 
       <!-- Loading overlay -->
-      <Transition name="er-fade">
-        <div
-          v-if="loading"
-          class="absolute inset-0 flex items-center justify-center z-10 transition-colors duration-300"
-          :style="{ background: effectiveBg }"
-          aria-live="polite"
-          aria-label="Loading book"
-        >
-          <div class="flex flex-col items-center gap-3" :style="{ color: effectiveColor, opacity: '0.5' }">
-            <div class="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
-            <span class="text-sm">Loading book&hellip;</span>
-          </div>
+      <div
+        v-if="loading"
+        class="absolute inset-0 flex items-center justify-center z-10 transition-colors duration-300"
+        :style="{ background: effectiveBg }"
+        aria-live="polite"
+        aria-label="Loading book"
+      >
+        <div class="flex flex-col items-center gap-3" :style="{ color: effectiveColor, opacity: '0.5' }">
+          <div class="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin" aria-hidden="true" />
+          <span class="text-sm">Loading book&hellip;</span>
         </div>
-      </Transition>
+      </div>
 
       <!-- Error overlay -->
       <div
@@ -570,7 +833,7 @@ watch(() => props.url, url => render(url))
 
       <!-- Previous page button (hidden on mobile — swipe handles navigation) -->
       <button
-        v-if="!loading && !errorMsg"
+        v-if="!loading && !errorMsg && !usingIsolatedFallback"
         @click="goPrev"
         class="absolute left-0 top-1/2 -translate-y-1/2 z-10 sm:flex items-center justify-center w-12 h-24 rounded-r-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :style="{ background: `${effectiveBg}d0`, color: effectiveColor }"
@@ -584,7 +847,7 @@ watch(() => props.url, url => render(url))
 
       <!-- Next page button (hidden on mobile — swipe handles navigation) -->
       <button
-        v-if="!loading && !errorMsg"
+        v-if="!loading && !errorMsg && !usingIsolatedFallback"
         @click="goNext"
         class="absolute right-0 top-1/2 -translate-y-1/2 z-10 sm:flex items-center justify-center w-12 h-24 rounded-l-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
         :style="{ background: `${effectiveBg}d0`, color: effectiveColor }"
