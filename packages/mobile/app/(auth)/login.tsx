@@ -6,10 +6,14 @@ import { FormField } from '@/components/FormField'
 import { PrimaryButton } from '@/components/PrimaryButton'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
+import { useTypography } from '@/context/TypographyContext'
+
 
 export default function LoginScreen() {
   const { t } = useI18n()
   const { login, loading } = useAuth()
+  const { headerTextStyle } = useTypography()
+  const { bodyTextStyle } = useTypography()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -31,10 +35,10 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1, justifyContent: 'center' }}>
-          <Text className="text-3xl font-bold text-surface-900 dark:text-surface-50">
+          <Text className="text-3xl mt-1 text-surface-900 dark:text-surface-50 pt-safe" style={headerTextStyle}>
             {t('auth.welcomeBack')}
           </Text>
-          <Text className="mb-8 mt-1 text-surface-500 dark:text-surface-400">
+          <Text className="mb-8 mt-1 text-surface-500 dark:text-surface-400 text-base pt-2" style={bodyTextStyle}>
             {t('auth.signIn')}
           </Text>
 
@@ -57,20 +61,20 @@ export default function LoginScreen() {
           {error ? <Text className="mb-3 text-sm text-red-500">{error}</Text> : null}
 
           <Link href="/(auth)/forgot-password" asChild>
-            <Pressable className="mb-6 self-end">
-              <Text className="text-sm font-medium text-brand-600 dark:text-brand-400">
+            <Pressable className="mb-6 self-end pt-2">
+              <Text className="text-sm font-medium text-brand-600 dark:text-brand-400 pt-1" style={bodyTextStyle}>
                 {t('auth.forgotPassword')}
               </Text>
             </Pressable>
           </Link>
 
-          <PrimaryButton label={t('auth.signIn')} loading={loading} onPress={onSubmit} />
+          <PrimaryButton label={t('auth.signIn')} loading={loading} onPress={onSubmit} labelStyle={bodyTextStyle} />
 
           <View className="mt-6 flex-row justify-center">
-            <Text className="text-surface-500 dark:text-surface-400">{t('auth.noAccount')} </Text>
+            <Text className="text-surface-500 dark:text-surface-400" style={bodyTextStyle}>{t('auth.noAccount')} </Text>
             <Link href="/(auth)/register" asChild>
               <Pressable>
-                <Text className="text-brand-600 dark:text-brand-400">
+                <Text className="text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
                   {t('auth.signUp')}
                 </Text>
               </Pressable>

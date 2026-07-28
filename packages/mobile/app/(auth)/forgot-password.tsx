@@ -6,6 +6,8 @@ import { FormField } from '@/components/FormField'
 import { PrimaryButton } from '@/components/PrimaryButton'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
+import { useTypography } from '@/context/TypographyContext'
+
 
 export default function ForgotPasswordScreen() {
   const { t } = useI18n()
@@ -25,13 +27,16 @@ export default function ForgotPasswordScreen() {
     }
   }
 
+  const { bodyTextStyle } = useTypography()
+  const { headerTextStyle } = useTypography()
+
   return (
     <Screen edges={['top', 'bottom']}>
       <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1, justifyContent: 'center' }}>
-        <Text className="text-3xl font-bold text-surface-900 dark:text-surface-50">
+        <Text className="text-3xl text-surface-900 dark:text-surface-50 pt-safe" style={headerTextStyle}>
           {t('auth.resetPassword')}
         </Text>
-        <Text className="mb-8 mt-1 text-surface-500 dark:text-surface-400">
+        <Text className="mb-8 mt-1 text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
           {t('auth.resetInstructions')}
         </Text>
 
@@ -44,15 +49,16 @@ export default function ForgotPasswordScreen() {
           autoComplete="email"
         />
 
-        {message ? <Text className="mb-3 text-sm text-emerald-600">{message}</Text> : null}
-        {error ? <Text className="mb-3 text-sm text-red-500">{error}</Text> : null}
+        {message ? <Text className="mb-3 text-sm text-emerald-600" style={bodyTextStyle}>{message}</Text> : null}
+        {error ? <Text className="mb-3 text-sm text-red-500" style={bodyTextStyle}>{error}</Text> : null}
 
-        <PrimaryButton label={t('auth.sendResetLink')} loading={loading} onPress={onSubmit} />
+        <PrimaryButton label={t('auth.sendResetLink')} loading={loading} onPress={onSubmit} labelStyle={bodyTextStyle} />
         <View className="h-3" />
         <PrimaryButton
           label={t('auth.backToLogin')}
           variant="ghost"
           onPress={() => router.back()}
+          labelStyle={bodyTextStyle}
         />
       </ScrollView>
     </Screen>

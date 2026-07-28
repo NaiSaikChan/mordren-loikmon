@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, Pressable } from 'react-native'
+import { ScrollView, View, Text, Pressable, type StyleProp, type TextStyle } from 'react-native'
 import { Stack, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
@@ -9,6 +9,7 @@ import {
   FONT_OPTIONS,
   MON_SAFE_FONT_IDS,
   getFontFamily,
+  resolveFontIdForLocale,
   useTypography,
 } from '@/context/TypographyContext'
 import type { Locale } from '@/i18n'
@@ -18,6 +19,8 @@ function Row({
   options,
   value,
   onChange,
+  labelStyle,
+  textStyle,
   compact = false,
   previewFonts = false,
 }: {
@@ -25,12 +28,17 @@ function Row({
   options: { id: string; label: string }[]
   value: string
   onChange: (id: string) => void
+  labelStyle?: StyleProp<TextStyle>
+  textStyle?: StyleProp<TextStyle>
   compact?: boolean
   previewFonts?: boolean
 }) {
   return (
     <View className="mb-5">
-      <Text className="mb-2 px-1 text-sm font-medium text-surface-500 dark:text-surface-400">
+      <Text
+        className="mb-2 px-1 text-sm font-medium text-surface-500 dark:text-surface-400"
+        style={labelStyle}
+      >
         {label}
       </Text>
       <View
@@ -55,7 +63,7 @@ function Row({
             }
           >
             <Text
-              style={previewFonts ? { fontFamily: getFontFamily(opt.id) } : undefined}
+              style={previewFonts ? { fontFamily: getFontFamily(opt.id) } : textStyle}
               className={`text-center text-sm font-medium ${
                 value === opt.id
                   ? 'text-surface-900 dark:text-surface-50'
@@ -80,17 +88,21 @@ export default function SettingsScreen() {
   const typographyFonts = locale === 'mon'
     ? FONT_OPTIONS.filter((font) => MON_SAFE_FONT_IDS.has(font.id))
     : FONT_OPTIONS
+  const displayedBodyFont = resolveFontIdForLocale(bodyFont, locale)
+  const displayedHeaderFont = resolveFontIdForLocale(headerFont, locale)
 
   return (
     <Screen edges={[]}>
       <Stack.Screen options={{ title: t('nav.settings') }} />
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
         {/* Appearance */}
-        <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50">
+        <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}>
           {t('settings.appearance')}
         </Text>
         <Row
           label={t('settings.theme')}
+          labelStyle={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+          textStyle={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
           value={pref}
           onChange={(id) => setPref(id as ThemePref)}
           options={[
@@ -102,18 +114,21 @@ export default function SettingsScreen() {
         <View className="pt-6">
           <Row
             label={t('settings.language')}
+            labelStyle={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+            textStyle={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
             value={locale}
             onChange={(id) => setLocale(id as Locale)}
             options={locales.map((l) => ({ id: l.id, label: l.label }))}
           />
         </View>
 
-        <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50">
+        <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50" style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}>
           {t('settings.typography')}
         </Text>
         <Row
           label={t('settings.bodyFont')}
-          value={bodyFont}
+          labelStyle={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+          value={displayedBodyFont}
           onChange={setBodyFont}
           options={typographyFonts}
           compact
@@ -121,14 +136,18 @@ export default function SettingsScreen() {
         />
         <Row
           label={t('settings.headingFont')}
-          value={headerFont}
+          labelStyle={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+          value={displayedHeaderFont}
           onChange={setHeaderFont}
           options={typographyFonts}
           compact
           previewFonts
         />
         <View className="mb-5 rounded-xl bg-white dark:bg-surface-800 p-4">
-          <Text className="mb-2 text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400">
+          <Text
+            className="mb-2 text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400"
+            style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+          >
             {t('settings.preview')}
           </Text>
           <Text
@@ -146,15 +165,23 @@ export default function SettingsScreen() {
         </View>
 
         {/* Account */}
-        <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50">
+        <Text className="mb-3 mt-2 text-lg font-bold text-surface-900 dark:text-surface-50" style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}>
           {t('settings.account')}
         </Text>
         {isLoggedIn ? (
           <View className="rounded-xl bg-white dark:bg-surface-800 p-4">
-            <Text className="text-base text-surface-900 dark:text-surface-50">
+            <Text
+              className="text-base text-surface-900 dark:text-surface-50"
+              style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+            >
               {user?.name}
             </Text>
-            <Text className="text-sm text-surface-500 dark:text-surface-400">{user?.email}</Text>
+            <Text
+              className="text-sm text-surface-500 dark:text-surface-400"
+              style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+            >
+              {user?.email}
+            </Text>
             <Pressable
               onPress={() => {
                 void logout()
@@ -163,7 +190,12 @@ export default function SettingsScreen() {
               className="mt-4 flex-row items-center"
             >
               <Ionicons name="log-out-outline" size={18} color="#ef4444" />
-              <Text className="ml-2 font-medium text-red-500">{t('nav.logout')}</Text>
+              <Text
+                className="ml-2 font-medium text-red-500"
+                style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+              >
+                {t('nav.logout')}
+              </Text>
             </Pressable>
           </View>
         ) : (
@@ -171,7 +203,10 @@ export default function SettingsScreen() {
             onPress={() => router.push('/(auth)/login')}
             className="flex-row items-center justify-between rounded-xl bg-white dark:bg-surface-800 p-4"
           >
-            <Text className="font-medium text-surface-900 dark:text-surface-50">
+            <Text
+              className="font-medium text-surface-900 dark:text-surface-50"
+              style={bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined}
+            >
               {t('auth.signIn')}
             </Text>
             <Ionicons name="chevron-forward" size={20} color="#94a3b8" />

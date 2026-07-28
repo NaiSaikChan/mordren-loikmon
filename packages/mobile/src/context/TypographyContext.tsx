@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { type TextStyle } from 'react-native'
 import { useI18n } from '@/context/I18nContext'
+import type { Locale } from '@/i18n'
 import { storage } from '@/services/storage'
 
 const BODY_FONT_KEY = 'ui-body-font'
@@ -30,8 +31,6 @@ export const FONT_OPTIONS: FontOption[] = [
 ]
 
 export const MON_SAFE_FONT_IDS = new Set<string>([
-  'system',
-  'serif',
   'Padauk',
   'Noto Sans Myanmar',
   'Noto Serif Myanmar',
@@ -41,10 +40,17 @@ export const MON_SAFE_FONT_IDS = new Set<string>([
   'PyidaungsuNumbers',
 ])
 
+export const MON_LOCALE_FALLBACK_FONT_ID = 'Padauk'
+
 export function getFontFamily(id: string): string | undefined {
   if (id === 'system') return undefined
   if (id === 'serif') return 'serif'
   return FONT_OPTIONS.find((font) => font.id === id)?.family
+}
+
+export function resolveFontIdForLocale(id: string, locale: Locale): string {
+  if (locale !== 'mon') return id
+  return MON_SAFE_FONT_IDS.has(id) ? id : MON_LOCALE_FALLBACK_FONT_ID
 }
 
 interface TypographyContextValue {
@@ -80,10 +86,8 @@ export function TypographyProvider({ children }: { children: React.ReactNode }) 
     })()
   }, [])
 
-  const resolvedBodyFontId =
-    locale === 'mon' && !MON_SAFE_FONT_IDS.has(bodyFont) ? 'Mon3Anonta1' : bodyFont
-  const resolvedHeaderFontId =
-    locale === 'mon' && !MON_SAFE_FONT_IDS.has(headerFont) ? 'Mon3Anonta1' : headerFont
+  const resolvedBodyFontId = resolveFontIdForLocale(bodyFont, locale)
+  const resolvedHeaderFontId = resolveFontIdForLocale(headerFont, locale)
   const bodyFontFamily = getFontFamily(resolvedBodyFontId)
   const headerFontFamily = getFontFamily(resolvedHeaderFontId)
   const bodyTextStyle = useMemo<TextStyle | undefined>(

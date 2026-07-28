@@ -31,16 +31,16 @@ export default function HomeScreen() {
         nestedScrollEnabled
       >
         {/* Header */}
-        <View className="flex-row items-center justify-between px-4 pt-1">
+        <View className="flex-row items-center justify-between px-4 pb-1">
           <View>
-            <Text className="text-sm text-surface-500 dark:text-surface-400 mb-3 px-4 pt-1" style={headerTextStyle}>
+            <Text className="text-xl text-surface-500 dark:text-surface-400 pt-safe" style={headerTextStyle}>
               {t('home.greeting')}
             </Text>
             <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
               {isLoggedIn ? (user?.name ?? 'Loikmon') : 'Loikmon'}
             </Text>
           </View>
-          <View className="flex-row items-center gap-3">
+          <View className="flex-row items-center gap-3 pt-safe">
             {isLoggedIn ? (
               <Pressable
                 onPress={() => router.push('/purchases')}
