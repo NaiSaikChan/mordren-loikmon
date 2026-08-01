@@ -525,8 +525,11 @@ function EpubReaderView({
   const settingsRef = useRef(settings)
   settingsRef.current = settings
 
-  const { width, height } = Dimensions.get('window')
-  const readerHeight = height - TOOLBAR_H - PROGRESS_H
+  // Use onLayout to get the exact available dimensions for the Reader container.
+  // Dimensions.get('window') does NOT subtract the navigation header height,
+  // so using it directly causes epub.js to format pages that overflow the visible
+  // area — leaving content cut off at the bottom of every page.
+  const [readerLayout, setReaderLayout] = useState({ width: 0, height: 0 })
 
   // Stable initial theme — captured ONCE at mount so Reader's useEffect dep never
   // changes between renders, preventing the "Maximum update depth exceeded" loop.
@@ -591,21 +594,29 @@ function EpubReaderView({
         <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
       </View>
 
-      {/* Reader */}
-      <View style={{ flex: 1 }}>
-        <Reader
-          src={localUri}
-          width={width}
-          height={readerHeight}
-          fileSystem={useEpubFileSystem}
-          defaultTheme={initialEpubTheme}
-          enableSwipe
-          injectedJavascript={fontHookScript}
-          onReady={handleReady}
-        />
+      {/* Reader — onLayout provides the exact available dimensions */}
+      <View
+        style={{ flex: 1 }}
+        onLayout={(e) => {
+          const { width: w, height: h } = e.nativeEvent.layout
+          if (w > 0 && h > 0) setReaderLayout({ width: w, height: h })
+        }}
+      >
+        {readerLayout.height > 0 && (
+          <Reader
+            src={localUri}
+            width={readerLayout.width}
+            height={readerLayout.height}
+            fileSystem={useEpubFileSystem}
+            defaultTheme={initialEpubTheme}
+            enableSwipe
+            injectedJavascript={fontHookScript}
+            onReady={handleReady}
+          />
+        )}
 
-        {/* Loading overlay */}
-        {isLoading && (
+        {/* Loading overlay — shown while epub.js initialises or container isn't measured yet */}
+        {(isLoading || readerLayout.height === 0) && (
           <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
             <ActivityIndicator size="large" color="#4f46e5" />
           </View>
