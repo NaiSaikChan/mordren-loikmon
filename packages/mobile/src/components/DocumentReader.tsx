@@ -1,691 +1,730 @@
-import { useMemo, useRef, useState, useCallback, useEffect } from 'react'
-import { Platform, View, ActivityIndicator, Text } from 'react-native'
-import { WebView, type WebViewMessageEvent } from 'react-native-webview'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  FlatList,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
+import { Reader, ReaderProvider, useReader } from '@epubjs-react-native/core'
+import { useFileSystem } from '@epubjs-react-native/expo-file-system'
 import * as FileSystem from 'expo-file-system/legacy'
+import { Asset } from 'expo-asset'
+import { WebView } from 'react-native-webview'
 import { fixUrl } from '@/lib/url'
 import { detectFormat } from '@/lib/format'
-import { useTypography } from '@/context/TypographyContext'
+import { FONT_OPTIONS, useTypography } from '@/context/TypographyContext'
+import { storage } from '@/services/storage'
+import { buildFontFacesCss, buildRenditionFontHookScript } from '@/lib/readerUtils'
 
 export { detectFormat }
 
-/**
- * More complete epub.js reader page rendered inside a WebView.
- *
- * Mirrors the web EpubReader.vue features:
- *  - paginated flow
- *  - theme / font / font-size / line-spacing controls
- *  - table of contents
- *  - progress
- *  - swipe/keyboard navigation
- *
- * Security note: jszip and epub.js are loaded from jsDelivr at **pinned exact
- * versions** (immutable URLs). `crossorigin="anonymous"` is set so the browser
- * treats them as CORS resources. For a hardened offline build, bundle these
- * libraries as local assets.
- */
-function epubHtml(epub: { uri: string; base64: string }, fontFamily: string | undefined): string {
-  const selectedFontFamily = fontFamily ?? 'system-ui, -apple-system, sans-serif'
-  const cssFontFamily =
-    selectedFontFamily.includes(',') || selectedFontFamily === 'serif'
-      ? selectedFontFamily
-      : `\'${selectedFontFamily}\'`
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; overflow: hidden; }
-    #viewer { position: fixed; top: 52px; left: 0; right: 0; bottom: 0; }
-    #toolbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 0 10px;
-      background: #ffffff;
-      border-bottom: 1px solid #e5e7eb;
-      box-sizing: border-box;
-      z-index: 60;
-    }
-    #toolbar button { border: 0; background: none; color: #374151; font-size: 20px; padding: 6px 8px; }
-    #toolbar select, #toolbar input[type=range] { margin-left: 6px; }
-    #toolbar .muted { font-size: 12px; color: #6b7280; max-width: 36%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    #msg {
-      position: fixed;
-      top: 58px;
-      left: 12px;
-      right: 12px;
-      padding: 10px;
-      background: #fee2e2;
-      color: #991b1b;
-      border-radius: 8px;
-      font-size: 13px;
-      display: none;
-      z-index: 100;
-    }
-    #progress { position: fixed; top: 52px; left: 0; right: 0; height: 3px; background: #e5e7eb; z-index: 70; }
-    #progress > div { height: 100%; background: #4f46e5; width: 0%; transition: width 0.3s; }
-    #toc-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.25);
-      display: none;
-      z-index: 79;
-    }
-    #toc-panel {
-      position: fixed;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: min(320px, 86vw);
-      background: #ffffff;
-      border-right: 1px solid #e5e7eb;
-      transform: translateX(-100%);
-      transition: transform .22s ease;
-      z-index: 80;
-      display: flex;
-      flex-direction: column;
-    }
-    #toc-panel.open { transform: translateX(0); }
-    #toc-head {
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 12px;
-      border-bottom: 1px solid #e5e7eb;
-      font: 600 14px/1.2 system-ui, -apple-system, Segoe UI, sans-serif;
-    }
-    #toc-list {
-      margin: 0;
-      padding: 6px 0;
-      list-style: none;
-      overflow: auto;
-      flex: 1;
-    }
-    #toc-list button {
-      width: 100%;
-      border: 0;
-      background: none;
-      text-align: left;
-      padding: 10px 12px;
-      font: 400 13px/1.35 system-ui, -apple-system, Segoe UI, sans-serif;
-      color: #374151;
-    }
-    #toc-list button.active {
-      color: #4338ca;
-      font-weight: 600;
-      background: rgba(79,70,229,.08);
-    }
-    #settings-menu {
-      display: none;
-      position: fixed;
-      right: 8px;
-      top: 56px;
-      width: min(300px, 88vw);
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      box-shadow: 0 8px 30px rgba(0,0,0,.15);
-      z-index: 90;
-      padding: 10px;
-      box-sizing: border-box;
-      font: 12px/1.2 system-ui, -apple-system, Segoe UI, sans-serif;
-      color: #111827;
-    }
-    #settings-menu .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-    #settings-menu .row:last-child { margin-bottom: 0; }
-    #settings-menu select, #settings-menu input[type=range] { width: 62%; }
-    #btn-settings { font-size: 18px; }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js" crossorigin="anonymous"></script>
-</head>
-<body>
-  <div id="toolbar">
-    <button id="btn-toc" title="Contents">☰</button>
-    <span id="chapter" class="muted"></span>
-    <div>
-      <button id="btn-prev" title="Previous">‹</button>
-      <button id="btn-next" title="Next">›</button>
-      <button id="btn-settings" title="Reader settings">⚙</button>
-    </div>
-  </div>
-  <div id="progress"><div></div></div>
-  <div id="msg"></div>
-  <div id="toc-backdrop"></div>
-  <aside id="toc-panel" aria-label="Table of contents">
-    <div id="toc-head">
-      <span>Contents</span>
-      <button id="btn-close-toc" title="Close">✕</button>
-    </div>
-    <ul id="toc-list"></ul>
-  </aside>
-  <div id="settings-menu" aria-label="Reader settings">
-    <div class="row">
-      <label for="theme">Theme</label>
-      <select id="theme">
-        <option value="light">Light</option>
-        <option value="sepia">Sepia</option>
-        <option value="gray">Gray</option>
-        <option value="dark">Dark</option>
-        <option value="black">Black</option>
-      </select>
-    </div>
-    <div class="row">
-      <label for="font">Font</label>
-      <select id="font">
-        <option value="">Default</option>
-        <option value="Georgia, serif">Georgia</option>
-        <option value="Arial, sans-serif">Arial</option>
-        <option value="Verdana, Geneva, sans-serif">Verdana</option>
-        <option value="system-ui, -apple-system, sans-serif">System</option>
-      </select>
-    </div>
-    <div class="row">
-      <label for="size">Font size</label>
-      <input id="size" type="range" min="60" max="200" value="100" />
-    </div>
-    <div class="row">
-      <label for="spacing">Line spacing</label>
-      <select id="spacing">
-        <option value="1.2">Compact</option>
-        <option value="1.5">Normal</option>
-        <option value="1.8">Comfortable</option>
-        <option value="2.1">Wide</option>
-      </select>
-    </div>
-  </div>
-  <div id="viewer"></div>
-  <script>
-    var epubPayload = ${JSON.stringify(epub)};
-    var bookUrl = epubPayload && epubPayload.uri ? String(epubPayload.uri) : '';
-    var selectedFontFamily = ${JSON.stringify(cssFontFamily)};
-    var book, rendition;
-    var renderedOnce = false;
-    var tocItems = [];
-    var currentHref = '';
-    var cfiKey = 'epub-cfi-' + bookUrl;
-    var settingsKey = 'epub-reader-settings';
-    var themes = {
-      light: { bg: '#ffffff', fg: '#111827' },
-      sepia: { bg: '#f8f0e3', fg: '#3d2b1f' },
-      gray:  { bg: '#e8e8e8', fg: '#1a1a1a' },
-      dark:  { bg: '#1a1a2e', fg: '#d0d0e0' },
-      black: { bg: '#000000', fg: '#cccccc' },
-    };
+const READER_CUSTOM_FONT_ASSETS = [
+  { id: 'Mon3Anonta1', module: require('../../assets/fonts/Mon3Anonta1.ttf') },
+  { id: 'MUA_Office_adobe', module: require('../../assets/fonts/MUA_Office_adobe.ttf') },
+  { id: 'Pyidaungsu', module: require('../../assets/fonts/Pyidaungsu-2.5.4_Regular.ttf') },
+  { id: 'PyidaungsuNumbers', module: require('../../assets/fonts/PyidaungsuNumbers-Regular.ttf') },
+  { id: 'Style1', module: require('../../assets/fonts/Style1.ttf') },
+  { id: 'Style2', module: require('../../assets/fonts/Style2.ttf') },
+  { id: 'Style3', module: require('../../assets/fonts/Style3.ttf') },
+  { id: 'Style4', module: require('../../assets/fonts/Style4.ttf') },
+  { id: 'Style5', module: require('../../assets/fonts/Style5.ttf') },
+] as const
 
-    var defaultSettings = {
-      theme: 'light',
-      font: '',
-      size: 100,
-      spacing: '1.5',
-    };
-    var memoryStore = {};
+const READER_THEMES = {
+  light: { label: 'Light', bg: '#ffffff', fg: '#111827' },
+  sepia: { label: 'Sepia', bg: '#f8f0e3', fg: '#3d2b1f' },
+  dark:  { label: 'Dark',  bg: '#1a1a2e', fg: '#d0d0e0' },
+  black: { label: 'Black', bg: '#000000', fg: '#cccccc' },
+} as const
 
-    function getEl(id) { return document.getElementById(id); }
+type ThemeId = keyof typeof READER_THEMES
 
-    function safeGetStorage(key) {
-      try {
-        return localStorage.getItem(key);
-      } catch (_) {
-        return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
-      }
-    }
+const FONT_SIZE_OPTIONS = [80, 90, 100, 110, 120, 140, 160]
 
-    function safeSetStorage(key, value) {
-      try {
-        localStorage.setItem(key, value);
-        return;
-      } catch (_) {
-        memoryStore[key] = value;
-      }
-    }
+const LINE_SPACING_OPTIONS = [
+  { label: 'Compact',     value: 1.2 },
+  { label: 'Normal',      value: 1.5 },
+  { label: 'Comfortable', value: 1.8 },
+  { label: 'Wide',        value: 2.1 },
+]
 
-    function loadSettings() {
-      try {
-        var raw = safeGetStorage(settingsKey);
-        if (!raw) return Object.assign({}, defaultSettings);
-        var parsed = JSON.parse(raw);
-        return Object.assign({}, defaultSettings, parsed || {});
-      } catch (_) {
-        return Object.assign({}, defaultSettings);
-      }
-    }
+const READER_SETTINGS_KEY = 'epub-reader-settings'
+const TOOLBAR_H = 52
+const PROGRESS_H = 3
 
-    function saveSettings(next) {
-      try { safeSetStorage(settingsKey, JSON.stringify(next)); } catch (_) {}
-    }
-
-    var settings = loadSettings();
-
-    function post(msg) {
-      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify(msg));
-    }
-
-    function showError(text) {
-      var el = document.getElementById('msg');
-      el.textContent = text;
-      el.style.display = 'block';
-      post({ type: 'error', message: text });
-    }
-
-    function applyTheme(themeId) {
-      var t = themes[themeId] || themes.light;
-      document.body.style.background = t.bg;
-      var toolbar = getEl('toolbar');
-      toolbar.style.background = t.bg;
-      toolbar.style.borderBottomColor = t.fg + '22';
-      toolbar.style.color = t.fg;
-      var toc = getEl('toc-panel');
-      toc.style.background = t.bg;
-      toc.style.borderRightColor = t.fg + '22';
-      var head = getEl('toc-head');
-      head.style.borderBottomColor = t.fg + '22';
-      var settingsMenu = getEl('settings-menu');
-      settingsMenu.style.background = t.bg;
-      settingsMenu.style.borderColor = t.fg + '22';
-      settingsMenu.style.color = t.fg;
-
-      if (!rendition || !rendition.themes) return;
-      rendition.themes.register('reader-theme', {
-        'html': { 'background': t.bg + ' !important', 'background-color': t.bg + ' !important' },
-        'body': {
-          'background': t.bg + ' !important',
-          'background-color': t.bg + ' !important',
-          'color': t.fg + ' !important'
-        }
-      });
-      rendition.themes.select('reader-theme');
-    }
-
-    function applyFont(font) {
-      if (!rendition || !rendition.themes) return;
-      rendition.themes.register('reader-font', { 'body': { 'font-family': (font || selectedFontFamily) + ' !important' } });
-      rendition.themes.select('reader-font');
-    }
-
-    function applySize(size) {
-      if (!rendition || !rendition.themes) return;
-      rendition.themes.fontSize(size + '%');
-    }
-
-    function applySpacing(value) {
-      if (!rendition || !rendition.themes) return;
-      rendition.themes.register('reader-spacing', {
-        'body': { 'line-height': String(value) + ' !important' },
-        'p': { 'line-height': String(value) + ' !important' },
-        'li': { 'line-height': String(value) + ' !important' },
-        'div': { 'line-height': String(value) + ' !important' }
-      });
-      rendition.themes.select('reader-spacing');
-    }
-
-    function toggleSettings(open) {
-      var menu = getEl('settings-menu');
-      var next = typeof open === 'boolean' ? open : menu.style.display !== 'block';
-      menu.style.display = next ? 'block' : 'none';
-    }
-
-    function closeToc() {
-      getEl('toc-panel').classList.remove('open');
-      getEl('toc-backdrop').style.display = 'none';
-    }
-
-    function openToc() {
-      getEl('toc-panel').classList.add('open');
-      getEl('toc-backdrop').style.display = 'block';
-      toggleSettings(false);
-    }
-
-    function flattenToc(items, depth) {
-      depth = depth || 0;
-      var out = [];
-      if (!Array.isArray(items)) return out;
-      for (var i = 0; i < items.length; i++) {
-        var item = items[i] || {};
-        out.push({
-          href: item.href || '',
-          label: (item.label || '').trim(),
-          depth: depth,
-        });
-        if (Array.isArray(item.subitems) && item.subitems.length) {
-          out = out.concat(flattenToc(item.subitems, depth + 1));
-        }
-      }
-      return out;
-    }
-
-    function renderToc() {
-      var list = getEl('toc-list');
-      list.innerHTML = '';
-      if (!tocItems.length) {
-        var empty = document.createElement('li');
-        empty.style.padding = '14px 12px';
-        empty.style.fontSize = '12px';
-        empty.style.opacity = '.6';
-        empty.textContent = 'No chapters found';
-        list.appendChild(empty);
-        return;
-      }
-      tocItems.forEach(function(item) {
-        var li = document.createElement('li');
-        var btn = document.createElement('button');
-        btn.textContent = item.label || item.href || 'Untitled';
-        btn.style.paddingLeft = (12 + item.depth * 12) + 'px';
-        btn.className = currentHref && item.href && currentHref.indexOf(item.href.split('#')[0]) >= 0 ? 'active' : '';
-        btn.addEventListener('click', function() {
-          if (rendition && item.href) {
-            rendition.display(item.href).catch(function(){});
-          }
-          closeToc();
-        });
-        li.appendChild(btn);
-        list.appendChild(li);
-      });
-    }
-
-    function updateProgress(loc) {
-      if (!loc || !loc.start) return;
-      try {
-        var pct = loc.percentage;
-        if (pct == null && book && book.locations && book.locations.percentageFromCfi) {
-          pct = book.locations.percentageFromCfi(loc.start.cfi);
-        }
-        if (pct != null) document.querySelector('#progress > div').style.width = Math.round(pct * 100) + '%';
-      } catch(e) {}
-    }
-
-    function base64ToArrayBuffer(base64) {
-      var binary = atob(base64 || '');
-      var len = binary.length;
-      var bytes = new Uint8Array(len);
-      for (var i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes.buffer;
-    }
-
-    function loadBook() {
-      if (!epubPayload || (!epubPayload.base64 && !bookUrl)) {
-        showError('No EPUB source provided');
-        return;
-      }
-      try {
-        var input = epubPayload.base64 ? base64ToArrayBuffer(epubPayload.base64) : bookUrl;
-        post({ type: 'debug', step: 'opening', url: bookUrl, mode: epubPayload.base64 ? 'buffer' : 'url' });
-        book = ePub(input);
-        rendition = book.renderTo('viewer', {
-          width: '100%',
-          height: '100%',
-          flow: 'paginated',
-          allowScriptedContent: false,
-          spread: 'none'
-        });
-
-        var saved = null;
-        try { saved = safeGetStorage(cfiKey); } catch (_) { saved = null; }
-        var first = saved ? rendition.display(saved) : rendition.display();
-        if (first && typeof first.catch === 'function') {
-          first.catch(function(err) {
-            post({ type: 'debug', step: 'display-saved-failed', error: err && err.message ? err.message : String(err) });
-            return rendition.display();
-          }).catch(function(){});
-        }
-
-        applyTheme(settings.theme);
-        applyFont(settings.font);
-        applySize(settings.size);
-        applySpacing(settings.spacing);
-
-        rendition.on('relocated', function(loc) {
-          try {
-            if (loc && loc.start && loc.start.cfi) {
-              safeSetStorage(cfiKey, loc.start.cfi);
-            }
-            currentHref = (loc && loc.start && loc.start.href) || '';
-            renderToc();
-          } catch(_) {}
-          updateProgress(loc);
-          post({ type: 'progress', value: Math.round((loc && loc.percentage ? loc.percentage : 0) * 100) });
-        });
-
-        rendition.on('rendered', function(section) {
-          renderedOnce = true;
-          getEl('chapter').textContent = (section && section.label) || '';
-        });
-
-        var viewer = getEl('viewer');
-        var startX = null;
-        viewer.addEventListener('touchstart', function(e) { startX = e.changedTouches[0].clientX; });
-        viewer.addEventListener('touchend', function(e) {
-          if (startX == null) return;
-          var dx = startX - e.changedTouches[0].clientX;
-          if (Math.abs(dx) > 40) dx > 0 ? rendition.next() : rendition.prev();
-          startX = null;
-        });
-
-        Promise.resolve(book.loaded && book.loaded.navigation)
-          .then(function(nav) {
-            tocItems = flattenToc(nav && nav.toc ? nav.toc : [], 0);
-            renderToc();
-          })
-          .catch(function() {
-            tocItems = [];
-            renderToc();
-          });
-
-        book.ready.then(function() {
-          post({ type: 'debug', step: 'ready' });
-          return book.locations.generate(1024);
-        }).catch(function(err) {
-          post({ type: 'debug', step: 'locations-error', error: err && err.message ? err.message : String(err) });
-        });
-
-        window.setTimeout(function() {
-          if (renderedOnce || !rendition) return;
-          post({ type: 'debug', step: 'render-timeout-retry' });
-          try {
-            var retry = rendition.display();
-            if (retry && typeof retry.catch === 'function') {
-              retry.catch(function(){});
-            }
-          } catch (_) {}
-
-          window.setTimeout(function() {
-            if (!renderedOnce) {
-              showError('EPUB loaded but no content could be rendered. Please try reopening the book.');
-            }
-          }, 3000);
-        }, 7000);
-
-        post({ type: 'loaded' });
-      } catch (err) {
-        showError('Failed to open EPUB: ' + (err && err.message ? err.message : String(err)));
-      }
-    }
-
-    getEl('btn-prev').addEventListener('click', function() { rendition && rendition.prev(); });
-    getEl('btn-next').addEventListener('click', function() { rendition && rendition.next(); });
-    getEl('btn-toc').addEventListener('click', function() { openToc(); });
-    getEl('btn-close-toc').addEventListener('click', function() { closeToc(); });
-    getEl('toc-backdrop').addEventListener('click', function() { closeToc(); });
-    getEl('btn-settings').addEventListener('click', function() { toggleSettings(); });
-
-    getEl('theme').value = settings.theme;
-    getEl('font').value = settings.font;
-    getEl('size').value = String(settings.size);
-    getEl('spacing').value = settings.spacing;
-
-    getEl('theme').addEventListener('change', function(e) {
-      settings.theme = e.target.value;
-      saveSettings(settings);
-      applyTheme(settings.theme);
-    });
-    getEl('font').addEventListener('change', function(e) {
-      settings.font = e.target.value;
-      saveSettings(settings);
-      applyFont(settings.font);
-    });
-    getEl('size').addEventListener('input', function(e) {
-      settings.size = Number(e.target.value || 100);
-      saveSettings(settings);
-      applySize(settings.size);
-    });
-    getEl('spacing').addEventListener('change', function(e) {
-      settings.spacing = e.target.value;
-      saveSettings(settings);
-      applySpacing(settings.spacing);
-    });
-
-    window.addEventListener('keydown', function(e) {
-      if (!rendition) return;
-      if (e.key === 'ArrowRight' || e.key === ' ') rendition.next();
-      if (e.key === 'ArrowLeft') rendition.prev();
-      if (e.key === 'Escape') {
-        toggleSettings(false);
-        closeToc();
-      }
-    });
-
-    loadBook();
-  </script>
-</body>
-</html>`
+interface ReaderSettings {
+  fontId: string
+  fontSize: number
+  themeId: ThemeId
+  lineSpacing: number
 }
 
+const DEFAULT_SETTINGS: ReaderSettings = {
+  fontId: 'system',
+  fontSize: 100,
+  themeId: 'light',
+  lineSpacing: 1.5,
+}
+
+// ---------------------------------------------------------------------------
+// Theme helper
+// ---------------------------------------------------------------------------
+
+function buildEpubTheme(themeId: ThemeId) {
+  const { bg, fg } = READER_THEMES[themeId]
+  return {
+    body:  { background: bg, color: `${fg} !important` },
+    p:     { color: `${fg} !important` },
+    li:    { color: `${fg} !important` },
+    h1:    { color: `${fg} !important` },
+    h2:    { color: `${fg} !important` },
+    h3:    { color: `${fg} !important` },
+    span:  { color: `${fg} !important` },
+    a:     { color: `${fg} !important`, 'pointer-events': 'auto', cursor: 'pointer' },
+    '::selection': { background: 'lightskyblue' },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Font application helper
+// Bypasses the library's changeFontFamily() which adds an extra layer of
+// CSS quoting that breaks generic keywords like "serif" and font stacks.
+// ---------------------------------------------------------------------------
+
+function applyFont(
+  injectJavascript: (code: string) => void,
+  fontId: string,
+) {
+  let cssValue: string
+  if (fontId === 'system') {
+    cssValue = 'system-ui, -apple-system, sans-serif'
+  } else if (fontId === 'serif') {
+    cssValue = 'serif'
+  } else {
+    const opt = FONT_OPTIONS.find((f) => f.id === fontId)
+    cssValue = opt?.family ?? 'system-ui, -apple-system, sans-serif'
+  }
+  const escaped = cssValue.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+  injectJavascript(
+    `try{rendition.themes.override('font-family','${escaped}');` +
+    `rendition.views().forEach(function(v){v.pane&&v.pane.render();});}catch(e){}true;`,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Download helper
+// ---------------------------------------------------------------------------
+
 async function downloadEpub(remoteUrl: string): Promise<string> {
-  const filename = remoteUrl.split('/').pop()?.split('?')[0] || 'book.epub'
-  const dir = FileSystem.cacheDirectory + 'epubs/'
+  const filename = remoteUrl.split('/').pop()?.split('?')[0] ?? 'book.epub'
+  const dir = (FileSystem.cacheDirectory ?? '') + 'epubs/'
   const localUri = dir + filename
   const dirInfo = await FileSystem.getInfoAsync(dir)
   if (!dirInfo.exists) {
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
   }
   const fileInfo = await FileSystem.getInfoAsync(localUri)
-  if (fileInfo.exists) {
-    return localUri
+  if (fileInfo.exists) return localUri
+  const result = await FileSystem.downloadAsync(remoteUrl, localUri)
+  if (result.status !== 200) {
+    throw new Error(`EPUB download failed: HTTP ${result.status}`)
   }
-  const download = await FileSystem.downloadAsync(remoteUrl, localUri)
-  if (download.status !== 200) {
-    throw new Error(`EPUB download failed: ${download.status} ${download.uri}`)
-  }
-  return download.uri
+  return result.uri
 }
 
-/**
- * Cross-platform document reader for Loikmon eBooks.
- *  - PDF: rendered natively by the platform WebView (iOS) / Google Docs viewer
- *    fallback (Android).
- *  - EPUB: downloaded locally and rendered with epub.js inside the WebView.
- */
-export function DocumentReader({ source }: { source: string }) {
-  const url = fixUrl(source)
-  const format = detectFormat(url)
-  const { bodyFontFamily } = useTypography()
-  const [error, setError] = useState<string | null>(null)
-  const [epubPayload, setEpubPayload] = useState<{ uri: string; base64: string } | null>(null)
-  const [downloading, setDownloading] = useState(false)
-  const webViewRef = useRef<WebView>(null)
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
 
-  const uri = useMemo(() => {
-    if (format === 'pdf' && Platform.OS === 'android') {
-      return `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
-    }
-    return url
-  }, [url, format])
+function useCustomFontUris(): { uris: Record<string, string>; loading: boolean } {
+  const [uris, setUris] = useState<Record<string, string>>({})
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (format !== 'epub' || !url) return
     let cancelled = false
-    setError(null)
-    setEpubPayload(null)
-    setDownloading(true)
-    downloadEpub(url)
-      .then(async (localUri) => {
-        const base64 = await FileSystem.readAsStringAsync(localUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        })
-        if (!cancelled) setEpubPayload({ uri: localUri, base64 })
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Download failed')
+    ;(async () => {
+      const entries: Array<[string, string]> = []
+      for (const font of READER_CUSTOM_FONT_ASSETS) {
+        const asset = Asset.fromModule(font.module)
+        await asset.downloadAsync()
+        const uri = asset.localUri ?? asset.uri
+        if (uri) entries.push([font.id, uri])
+      }
+      if (!cancelled) setUris(Object.fromEntries(entries))
+    })()
+      .catch((err: unknown) => {
+        console.warn('[DocumentReader] font load error:', err)
       })
       .finally(() => {
-        if (!cancelled) setDownloading(false)
+        if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [url, format])
-
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data)
-      if (data.type === 'error') setError(data.message)
-      // eslint-disable-next-line no-console
-      if (data.type === 'debug') console.log('[EpubReader]', data)
-    } catch {
-      // ignore non-JSON messages
-    }
   }, [])
 
+  return { uris, loading }
+}
+
+function useEpubDownload(url: string): {
+  localUri: string | null
+  downloading: boolean
+  error: string | null
+} {
+  const [localUri, setLocalUri] = useState<string | null>(null)
+  const [downloading, setDownloading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLocalUri(null)
+    setError(null)
+    setDownloading(true)
+    downloadEpub(url)
+      .then((uri) => { if (!cancelled) setLocalUri(uri) })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Download failed')
+      })
+      .finally(() => { if (!cancelled) setDownloading(false) })
+    return () => { cancelled = true }
+  }, [url])
+
+  return { localUri, downloading, error }
+}
+
+function useReaderSettings(): {
+  settings: ReaderSettings
+  update: (patch: Partial<ReaderSettings>) => void
+  loaded: boolean
+} {
+  const [settings, setSettings] = useState<ReaderSettings>(DEFAULT_SETTINGS)
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    storage
+      .get(READER_SETTINGS_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw) as Partial<ReaderSettings>
+            setSettings((prev) => ({ ...prev, ...parsed }))
+          } catch { /* use defaults */ }
+        }
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(true))
+  }, [])
+
+  const update = useCallback((patch: Partial<ReaderSettings>) => {
+    setSettings((prev) => {
+      const next = { ...prev, ...patch }
+      void storage.set(READER_SETTINGS_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [])
+
+  return { settings, update, loaded }
+}
+
+// ---------------------------------------------------------------------------
+// ToC Modal
+// ---------------------------------------------------------------------------
+
+interface TocItem {
+  href: string
+  label: string
+  subitems?: TocItem[]
+}
+
+interface FlatTocItem {
+  href: string
+  label: string
+  depth: number
+}
+
+function flattenToc(items: TocItem[], depth = 0): FlatTocItem[] {
+  const out: FlatTocItem[] = []
+  for (const item of items) {
+    out.push({ href: item.href, label: item.label.trim(), depth })
+    if (item.subitems?.length) {
+      out.push(...flattenToc(item.subitems, depth + 1))
+    }
+  }
+  return out
+}
+
+function TocModal({
+  visible,
+  toc,
+  onClose,
+  onNavigate,
+  themeId,
+}: {
+  visible: boolean
+  toc: TocItem[]
+  onClose: () => void
+  onNavigate: (href: string) => void
+  themeId: ThemeId
+}) {
+  const { bg, fg } = READER_THEMES[themeId]
+  const items = useMemo(() => flattenToc(toc), [toc])
+  const slideAnim = useRef(new Animated.Value(-300)).current
+
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: visible ? 0 : -300,
+      duration: 220,
+      useNativeDriver: true,
+    }).start()
+  }, [visible, slideAnim])
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="none"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.tocBackdrop} onPress={onClose} />
+      <Animated.View
+        style={[styles.tocPanel, { backgroundColor: bg, transform: [{ translateX: slideAnim }] }]}
+      >
+        <View style={[styles.tocHeader, { borderBottomColor: fg + '22' }]}>
+          <Text style={[styles.tocTitle, { color: fg }]}>Contents</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Text style={{ color: fg, fontSize: 18 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+        {items.length === 0 ? (
+          <Text style={[styles.tocEmpty, { color: fg }]}>No chapters found</Text>
+        ) : (
+          <FlatList
+            data={items}
+            keyExtractor={(item, i) => `${item.href}-${i}`}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => { onNavigate(item.href); onClose() }}
+                style={[styles.tocItem, { paddingLeft: 12 + item.depth * 16 }]}
+              >
+                <Text style={[styles.tocItemText, { color: fg }]} numberOfLines={2}>
+                  {item.label || item.href || 'Untitled'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        )}
+      </Animated.View>
+    </Modal>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Settings Modal
+// ---------------------------------------------------------------------------
+
+function SettingsModal({
+  visible,
+  settings,
+  onUpdate,
+  onClose,
+  customFontUris,
+}: {
+  visible: boolean
+  settings: ReaderSettings
+  onUpdate: (patch: Partial<ReaderSettings>) => void
+  onClose: () => void
+  customFontUris: Record<string, string>
+}) {
+  const { bg, fg } = READER_THEMES[settings.themeId]
+
+  const availableFonts = useMemo(
+    () =>
+      FONT_OPTIONS.filter((opt) => {
+        if (opt.id === 'system' || opt.id === 'serif') return true
+        return Boolean(customFontUris[opt.id])
+      }),
+    [customFontUris],
+  )
+
+  const currentSizeIndex = FONT_SIZE_OPTIONS.indexOf(settings.fontSize)
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.settingsBackdrop} onPress={onClose} />
+      <View style={[styles.settingsSheet, { backgroundColor: bg }]}>
+        {/* Header */}
+        <View style={[styles.settingsHeader, { borderBottomColor: fg + '22' }]}>
+          <Text style={[styles.settingsTitle, { color: fg }]}>Reader Settings</Text>
+          <TouchableOpacity onPress={onClose} hitSlop={12}>
+            <Text style={{ color: fg, fontSize: 18 }}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Theme */}
+        <View style={styles.settingsRow}>
+          <Text style={[styles.settingsLabel, { color: fg }]}>Theme</Text>
+          <View style={styles.themeRow}>
+            {(Object.entries(READER_THEMES) as Array<[ThemeId, typeof READER_THEMES[ThemeId]]>).map(
+              ([id, theme]) => (
+                <TouchableOpacity
+                  key={id}
+                  onPress={() => onUpdate({ themeId: id })}
+                  style={[
+                    styles.themeCircle,
+                    { backgroundColor: theme.bg, borderColor: settings.themeId === id ? '#4f46e5' : theme.fg + '44' },
+                    settings.themeId === id && styles.themeCircleActive,
+                  ]}
+                >
+                  <Text style={{ color: theme.fg, fontSize: 9, fontWeight: '600' }}>
+                    {theme.label}
+                  </Text>
+                </TouchableOpacity>
+              ),
+            )}
+          </View>
+        </View>
+
+        {/* Font */}
+        <View style={styles.settingsRow}>
+          <Text style={[styles.settingsLabel, { color: fg }]}>Font</Text>
+          <FlatList
+            horizontal
+            data={availableFonts}
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            style={styles.fontList}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => onUpdate({ fontId: item.id })}
+                style={[
+                  styles.fontChip,
+                  {
+                    backgroundColor: settings.fontId === item.id ? '#4f46e5' : fg + '11',
+                    borderColor: settings.fontId === item.id ? '#4f46e5' : fg + '33',
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: settings.fontId === item.id ? '#fff' : fg,
+                    fontSize: 12,
+                    fontFamily: item.family,
+                  }}
+                  numberOfLines={1}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            )}
+          />
+        </View>
+
+        {/* Font size */}
+        <View style={styles.settingsRow}>
+          <Text style={[styles.settingsLabel, { color: fg }]}>Font Size</Text>
+          <View style={styles.sizeRow}>
+            <TouchableOpacity
+              onPress={() => {
+                const idx = Math.max(0, (currentSizeIndex < 0 ? 2 : currentSizeIndex) - 1)
+                onUpdate({ fontSize: FONT_SIZE_OPTIONS[idx] })
+              }}
+              style={[styles.sizeBtn, { borderColor: fg + '44' }]}
+            >
+              <Text style={{ color: fg, fontSize: 18 }}>−</Text>
+            </TouchableOpacity>
+            <Text style={[styles.sizeLbl, { color: fg }]}>{settings.fontSize}%</Text>
+            <TouchableOpacity
+              onPress={() => {
+                const idx = Math.min(
+                  FONT_SIZE_OPTIONS.length - 1,
+                  (currentSizeIndex < 0 ? 2 : currentSizeIndex) + 1,
+                )
+                onUpdate({ fontSize: FONT_SIZE_OPTIONS[idx] })
+              }}
+              style={[styles.sizeBtn, { borderColor: fg + '44' }]}
+            >
+              <Text style={{ color: fg, fontSize: 18 }}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Line spacing */}
+        <View style={[styles.settingsRow, { marginBottom: 0 }]}>
+          <Text style={[styles.settingsLabel, { color: fg }]}>Line Spacing</Text>
+          <View style={styles.spacingRow}>
+            {LINE_SPACING_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.value}
+                onPress={() => onUpdate({ lineSpacing: opt.value })}
+                style={[
+                  styles.spacingChip,
+                  {
+                    backgroundColor: settings.lineSpacing === opt.value ? '#4f46e5' : fg + '11',
+                    borderColor: settings.lineSpacing === opt.value ? '#4f46e5' : fg + '33',
+                  },
+                ]}
+              >
+                <Text style={{ color: settings.lineSpacing === opt.value ? '#fff' : fg, fontSize: 11 }}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Inner EPUB reader view — must be inside ReaderProvider to use useReader
+// ---------------------------------------------------------------------------
+
+function EpubReaderView({
+  localUri,
+  fontHookScript,
+  customFontUris,
+  initialFontId,
+  settings,
+  onSettingsUpdate,
+}: {
+  localUri: string
+  fontHookScript: string
+  customFontUris: Record<string, string>
+  initialFontId: string
+  settings: ReaderSettings
+  onSettingsUpdate: (patch: Partial<ReaderSettings>) => void
+}) {
+  const {
+    goToLocation,
+    toc,
+    section,
+    progress,
+    isLoading,
+    changeFontSize,
+    changeTheme,
+    injectJavascript,
+  } = useReader()
+
+  const [showToC, setShowToC] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+
+  const { width, height } = Dimensions.get('window')
+  const readerHeight = height - TOOLBAR_H - PROGRESS_H
+
+  // Stable initial theme — captured ONCE at mount so Reader's useEffect dep never
+  // changes between renders, preventing the "Maximum update depth exceeded" loop.
+  // Settings are guaranteed loaded by the parent before this component mounts.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const initialEpubTheme = useMemo(() => buildEpubTheme(settings.themeId), [])
+
+  // Apply all reader settings after the book is ready
+  const handleReady = useCallback(() => {
+    const s = settingsRef.current
+    changeTheme(buildEpubTheme(s.themeId))
+    changeFontSize(`${s.fontSize}%`)
+    applyFont(injectJavascript, s.fontId !== 'system' ? s.fontId : initialFontId)
+    const lsEscaped = String(s.lineSpacing).replace(/'/g, "\\'")
+    injectJavascript(
+      `try{rendition.themes.override('line-height','${lsEscaped}');}catch(e){}true;`,
+    )
+  }, [changeTheme, changeFontSize, injectJavascript, initialFontId])
+
+  // Sync settings changes to epub.js live (only when values actually change)
+  const prevSettings = useRef(settings)
+  useEffect(() => {
+    const prev = prevSettings.current
+    prevSettings.current = settings
+
+    if (settings.themeId !== prev.themeId) {
+      changeTheme(buildEpubTheme(settings.themeId))
+    }
+    if (settings.fontSize !== prev.fontSize) {
+      changeFontSize(`${settings.fontSize}%`)
+    }
+    if (settings.fontId !== prev.fontId) {
+      applyFont(injectJavascript, settings.fontId)
+    }
+    if (settings.lineSpacing !== prev.lineSpacing) {
+      const ls = String(settings.lineSpacing).replace(/'/g, "\\'")
+      injectJavascript(
+        `try{rendition.themes.override('line-height','${ls}');}catch(e){}true;`,
+      )
+    }
+  }, [settings, changeTheme, changeFontSize, injectJavascript])
+
+  const { bg, fg } = READER_THEMES[settings.themeId]
+
+  return (
+    <View style={[styles.container, { backgroundColor: bg }]}>
+      {/* Toolbar */}
+      <View style={[styles.toolbar, { backgroundColor: bg, borderBottomColor: fg + '22' }]}>
+        <TouchableOpacity onPress={() => setShowToC(true)} hitSlop={8} style={styles.toolbarBtn}>
+          <Text style={[styles.toolbarIcon, { color: fg }]}>☰</Text>
+        </TouchableOpacity>
+        <Text style={[styles.chapterTitle, { color: fg }]} numberOfLines={1}>
+          {section?.label ?? ''}
+        </Text>
+        <TouchableOpacity onPress={() => setShowSettings(true)} hitSlop={8} style={styles.toolbarBtn}>
+          <Text style={[styles.toolbarIcon, { color: fg }]}>⚙</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Progress bar */}
+      <View style={[styles.progressBar, { backgroundColor: fg + '22' }]}>
+        <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+      </View>
+
+      {/* Reader */}
+      <View style={{ flex: 1 }}>
+        <Reader
+          src={localUri}
+          width={width}
+          height={readerHeight}
+          fileSystem={useFileSystem}
+          defaultTheme={initialEpubTheme}
+          enableSwipe
+          injectedJavascript={fontHookScript}
+          onReady={handleReady}
+        />
+
+        {/* Loading overlay */}
+        {isLoading && (
+          <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+            <ActivityIndicator size="large" color="#4f46e5" />
+          </View>
+        )}
+      </View>
+
+      {/* ToC */}
+      <TocModal
+        visible={showToC}
+        toc={toc as TocItem[]}
+        onClose={() => setShowToC(false)}
+        onNavigate={(href) => goToLocation(href)}
+        themeId={settings.themeId}
+      />
+
+      {/* Settings */}
+      <SettingsModal
+        visible={showSettings}
+        settings={settings}
+        onUpdate={onSettingsUpdate}
+        onClose={() => setShowSettings(false)}
+        customFontUris={customFontUris}
+      />
+    </View>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Outer EPUB component — provides fonts + download, then renders ReaderProvider
+// ---------------------------------------------------------------------------
+
+function EpubDocumentReader({ url }: { url: string }) {
+  const { bodyFontFamily } = useTypography()
+  const { uris: customFontUris, loading: fontLoading } = useCustomFontUris()
+  const { localUri, downloading, error } = useEpubDownload(url)
+  // Settings are owned here so they're loaded before EpubReaderView mounts.
+  // This ensures the initial theme passed to <Reader defaultTheme={}> is correct
+  // and prevents the render-loop caused by a stale default vs loaded settings.
+  const { settings, update, loaded: settingsLoaded } = useReaderSettings()
+
+  const fontFacesCss = useMemo(() => buildFontFacesCss(customFontUris), [customFontUris])
+  const fontHookScript = useMemo(
+    () => buildRenditionFontHookScript(fontFacesCss),
+    [fontFacesCss],
+  )
+
+  // Derive the initial font ID from the app's body font setting
+  const initialFontId = useMemo(() => {
+    if (!bodyFontFamily) return 'system'
+    const opt = FONT_OPTIONS.find((f) => f.family === bodyFontFamily)
+    return opt?.id ?? 'system'
+  }, [bodyFontFamily])
+
   const renderLoading = () => (
-    <View className="flex-1 items-center justify-center bg-white dark:bg-surface-900">
-      <ActivityIndicator size="large" color="#2563eb" />
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color="#4f46e5" />
     </View>
   )
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center bg-white dark:bg-surface-900 p-6">
-        <Text className="text-center text-red-500">{error}</Text>
-        <Text className="mt-2 text-center text-surface-500 text-sm" selectable>{url}</Text>
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
       </View>
     )
   }
 
-  if (format === 'epub') {
-    if (downloading || !epubPayload) {
-      return renderLoading()
-    }
-    return (
-      <WebView
-        ref={webViewRef}
-        key={`epub-${bodyFontFamily ?? 'system'}-${epubPayload.uri}`}
-        originWhitelist={['*']}
-        source={{ html: epubHtml(epubPayload, bodyFontFamily) }}
-        startInLoadingState
-        renderLoading={renderLoading}
-        onMessage={handleMessage}
-        onHttpError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent
-          setError(`HTTP ${nativeEvent.statusCode}: ${nativeEvent.url}`)
-        }}
-        onError={(syntheticEvent) => {
-          setError(syntheticEvent.nativeEvent.description)
-        }}
-        allowFileAccess
-        allowUniversalAccessFromFileURLs
-        mixedContentMode="always"
-        mediaPlaybackRequiresUserAction={false}
-        style={{ flex: 1 }}
+  if (downloading || fontLoading || !localUri || !settingsLoaded) {
+    return renderLoading()
+  }
+
+  return (
+    <ReaderProvider>
+      <EpubReaderView
+        localUri={localUri}
+        fontHookScript={fontHookScript}
+        customFontUris={customFontUris}
+        initialFontId={initialFontId}
+        settings={settings}
+        onSettingsUpdate={update}
       />
+    </ReaderProvider>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// PDF reader (unchanged — WebView-based)
+// ---------------------------------------------------------------------------
+
+function PdfDocumentReader({ url }: { url: string }) {
+  const [error, setError] = useState<string | null>(null)
+  const uri = useMemo(
+    () =>
+      Platform.OS === 'android'
+        ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
+        : url,
+    [url],
+  )
+
+  const renderLoading = () => (
+    <View style={styles.centered}>
+      <ActivityIndicator size="large" color="#4f46e5" />
+    </View>
+  )
+
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
     )
   }
 
   return (
     <WebView
-      ref={webViewRef}
       source={{ uri }}
       startInLoadingState
       renderLoading={renderLoading}
-      onError={(syntheticEvent) => setError(syntheticEvent.nativeEvent.description)}
+      onError={(e) => setError(e.nativeEvent.description)}
       allowFileAccess
       allowUniversalAccessFromFileURLs
       mixedContentMode="always"
@@ -693,3 +732,205 @@ export function DocumentReader({ source }: { source: string }) {
     />
   )
 }
+
+// ---------------------------------------------------------------------------
+// Public DocumentReader — dispatches by format
+// ---------------------------------------------------------------------------
+
+export function DocumentReader({ source }: { source: string }) {
+  const url = fixUrl(source)
+  const format = detectFormat(url)
+
+  if (format === 'epub') return <EpubDocumentReader url={url} />
+  return <PdfDocumentReader url={url} />
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  errorText: {
+    color: '#ef4444',
+    textAlign: 'center',
+  },
+  // Toolbar
+  toolbar: {
+    height: TOOLBAR_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  toolbarBtn: {
+    padding: 6,
+  },
+  toolbarIcon: {
+    fontSize: 22,
+  },
+  chapterTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 13,
+    marginHorizontal: 8,
+  },
+  // Progress
+  progressBar: {
+    height: PROGRESS_H,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4f46e5',
+  },
+  // Loading overlay
+  loadingOverlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
+  // ToC
+  tocBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  tocPanel: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: Math.min(300, Dimensions.get('window').width * 0.82),
+  },
+  tocHeader: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  tocTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  tocEmpty: {
+    padding: 16,
+    fontSize: 13,
+    opacity: 0.6,
+  },
+  tocItem: {
+    paddingVertical: 12,
+    paddingRight: 12,
+  },
+  tocItemText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  // Settings
+  settingsBackdrop: {
+    flex: 1,
+  },
+  settingsSheet: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 32,
+    paddingHorizontal: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  settingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginBottom: 12,
+  },
+  settingsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  settingsRow: {
+    marginBottom: 16,
+  },
+  settingsLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    opacity: 0.7,
+  },
+  // Theme circles
+  themeRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  themeCircle: {
+    width: 54,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeCircleActive: {
+    borderWidth: 2.5,
+  },
+  // Font chips
+  fontList: {
+    flexGrow: 0,
+  },
+  fontChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
+    alignSelf: 'flex-start',
+  },
+  // Font size
+  sizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  sizeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sizeLbl: {
+    fontSize: 15,
+    fontWeight: '600',
+    minWidth: 48,
+    textAlign: 'center',
+  },
+  // Line spacing
+  spacingRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  spacingChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+})
