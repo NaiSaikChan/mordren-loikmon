@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native'
 import { Reader, ReaderProvider, useReader } from '@epubjs-react-native/core'
-import { useFileSystem } from '@epubjs-react-native/expo-file-system'
+import { useEpubFileSystem } from '@/lib/useEpubFileSystem'
 import * as FileSystem from 'expo-file-system/legacy'
 import { Asset } from 'expo-asset'
 import { WebView } from 'react-native-webview'
@@ -597,7 +597,7 @@ function EpubReaderView({
           src={localUri}
           width={width}
           height={readerHeight}
-          fileSystem={useFileSystem}
+          fileSystem={useEpubFileSystem}
           defaultTheme={initialEpubTheme}
           enableSwipe
           injectedJavascript={fontHookScript}
