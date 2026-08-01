@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { useLibrary } from '@/context/LibraryContext'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
+import { useTypography } from '@/context/TypographyContext'
 
 type Tab = 'bookmarks' | 'purchased'
 
@@ -17,13 +18,14 @@ export default function LibraryScreen() {
   const { books, articles } = useLibrary()
   const { isLoggedIn } = useAuth()
   const [tab, setTab] = useState<Tab>('bookmarks')
+  const { headerTextStyle, bodyTextStyle } = useTypography()
 
   const empty = books.length === 0 && articles.length === 0
 
   return (
     <Screen>
       <View className="px-4 pt-2">
-        <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50">
+        <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-5" style={headerTextStyle}>
           {t('nav.library')}
         </Text>
       </View>
@@ -44,6 +46,7 @@ export default function LibraryScreen() {
                   ? 'text-surface-900 dark:text-surface-50'
                   : 'text-surface-500 dark:text-surface-400'
               }`}
+              style={bodyTextStyle}
             >
               {t(key === 'bookmarks' ? 'library.bookmarks' : 'library.purchased')}
             </Text>
@@ -81,6 +84,7 @@ export default function LibraryScreen() {
 
 function PurchasedTab({ isLoggedIn }: { isLoggedIn: boolean }) {
   const { t } = useI18n()
+  const { bodyTextStyle } = useTypography()
   if (!isLoggedIn) {
     return (
       <View className="flex-1 items-center justify-center px-8">
@@ -99,7 +103,7 @@ function PurchasedTab({ isLoggedIn }: { isLoggedIn: boolean }) {
       onPress={() => router.push('/purchases')}
       className="m-4 flex-row items-center justify-between rounded-xl bg-white dark:bg-surface-800 p-4"
     >
-      <Text className="text-surface-900 dark:text-surface-50">
+      <Text className="text-surface-900 dark:text-surface-50" style={bodyTextStyle}>
         {t('purchases.title')}
       </Text>
       <Ionicons name="chevron-forward" size={20} color="#94a3b8" />

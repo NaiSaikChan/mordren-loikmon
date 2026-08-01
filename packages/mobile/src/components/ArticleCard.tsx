@@ -34,7 +34,7 @@ export function ArticleCard({ article }: { article: Article }) {
           </Text>
 
           {category ? (
-            <Text className="text-[11px] font-medium uppercase text-brand-500">{category}</Text>
+            <Text className="text-[11px] font-medium uppercase text-brand-500" style={headerTextStyle}>{category}</Text>
           ) : null}
           
           <View className="mt-1">

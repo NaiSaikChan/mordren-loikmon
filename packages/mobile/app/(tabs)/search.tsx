@@ -8,16 +8,22 @@ import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EmptyState } from '@/components/EmptyState'
 import { useSearch } from '@/hooks/useSearch'
 import { useI18n } from '@/context/I18nContext'
-
+import { useTypography } from '@/context/TypographyContext'
 export default function SearchScreen() {
   const { t } = useI18n()
   const { books, articles, loading, searched, run } = useSearch()
   const [text, setText] = useState('')
+  const { headerTextStyle, bodyTextStyle } = useTypography()
 
   const hasResults = books.length > 0 || articles.length > 0
 
   return (
     <Screen>
+      <View className="px-4 pt-2">
+        <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}>
+          {t('nav.search')}
+        </Text>
+      </View>
       <View className="px-4 pt-2">
         <SearchBar
           value={text}
@@ -37,7 +43,7 @@ export default function SearchScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
           {books.length > 0 ? (
             <>
-              <Text className="px-4 pt-4 pb-2 text-base font-bold text-surface-900 dark:text-surface-50">
+              <Text className="px-4 pt-4 pb-2 text-base font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                 {t('nav.books')}
               </Text>
               <FlatList
@@ -46,14 +52,14 @@ export default function SearchScreen() {
                 keyExtractor={(item) => `b-${item.id}`}
                 renderItem={({ item }) => <BookCard book={item} />}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16 }}
+                contentContainerStyle={{ paddingLeft: 16, paddingRight: 4, alignItems: 'flex-start' }}
               />
             </>
           ) : null}
 
           {articles.length > 0 ? (
             <>
-              <Text className="px-4 pt-4 pb-2 text-base font-bold text-surface-900 dark:text-surface-50">
+              <Text className="px-4 pt-4 pb-2 text-base font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                 {t('nav.articles')}
               </Text>
               <View className="px-4">

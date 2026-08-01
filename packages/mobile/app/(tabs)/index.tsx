@@ -24,10 +24,10 @@ export default function HomeScreen() {
   const authors = useAuthors()
 
   return (
-    <Screen edges={['top']}>
+    <Screen>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: 12 }}
         nestedScrollEnabled
       >
         {/* Header */}
@@ -82,7 +82,7 @@ export default function HomeScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+            contentContainerStyle={{ paddingLeft: 16, paddingRight: 4, alignItems: 'flex-start' }}
           >
             {books.items.slice(0, 12).map((item) => (
               <BookCard key={String(item.id)} book={item} />
