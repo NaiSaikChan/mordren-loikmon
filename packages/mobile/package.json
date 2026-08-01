@@ -15,6 +15,8 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@epubjs-react-native/core": "^1.4.7",
+    "@epubjs-react-native/expo-file-system": "^1.1.4",
     "@expo/vector-icons": "^14.0.0",
     "@loikmon/api": "file:../api",
     "@react-native-async-storage/async-storage": "2.2.0",

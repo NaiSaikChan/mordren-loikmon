@@ -277,6 +277,7 @@ function TocModal({
   themeId: ThemeId
 }) {
   const { bg, fg } = READER_THEMES[themeId]
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   const insets = useSafeAreaInsets()
   const items = useMemo(() => flattenToc(toc), [toc])
   const slideAnim = useRef(new Animated.Value(-300)).current
@@ -306,13 +307,13 @@ function TocModal({
         {/* Spacer pushes panel content below the notch / Dynamic Island */}
         <View style={{ height: insets.top }} />
         <View style={[styles.tocHeader, { borderBottomColor: fg + '22' }]}>
-          <Text style={[styles.tocTitle, { color: fg }]}>Contents</Text>
+          <Text style={[styles.tocTitle, headerTextStyle, { color: fg }]}>Contents</Text>
           <TouchableOpacity onPress={onClose} hitSlop={12}>
             <Text style={{ color: fg, fontSize: 18 }}>✕</Text>
           </TouchableOpacity>
         </View>
         {items.length === 0 ? (
-          <Text style={[styles.tocEmpty, { color: fg }]}>No chapters found</Text>
+          <Text style={[styles.tocEmpty, bodyTextStyle, { color: fg }]}>No chapters found</Text>
         ) : (
           <FlatList
             data={items}
@@ -323,7 +324,7 @@ function TocModal({
                 onPress={() => { onNavigate(item.href); onClose() }}
                 style={[styles.tocItem, { paddingLeft: 12 + item.depth * 16 }]}
               >
-                <Text style={[styles.tocItemText, { color: fg }]} numberOfLines={2}>
+                <Text style={[styles.tocItemText, bodyTextStyle, { color: fg }, { paddingTop: 1 }]} numberOfLines={2}>
                   {item.label || item.href || 'Untitled'}
                 </Text>
               </TouchableOpacity>
