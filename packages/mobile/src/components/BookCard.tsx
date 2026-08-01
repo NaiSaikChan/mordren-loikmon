@@ -75,7 +75,7 @@ export function BookCard({
             </Text>
             <Text
               numberOfLines={1}
-              className="text-brand-500"
+              className="text-brand-500 pt-2"
               style={{
                 fontFamily: headerTextStyle?.fontFamily,
                 fontSize: CATEGORY_FONT_SIZE,
@@ -87,24 +87,23 @@ export function BookCard({
             >
               {category}
             </Text>
+            <Text
+              numberOfLines={1}
+              className="text-surface-500 dark:text-surface-400"
+              style={[
+                bodyTextStyle,
+                {
+                  fontSize: AUTHOR_FONT_SIZE,
+                  lineHeight: AUTHOR_LINE_HEIGHT,
+                  minHeight: AUTHOR_LINE_HEIGHT,
+                  letterSpacing: -0.1,
+                },
+              ]}
+              allowFontScaling={false}
+            >
+              {author}
+            </Text>
           </View>
-
-          <Text
-            numberOfLines={1}
-            className="text-surface-500 dark:text-surface-400"
-            style={[
-              bodyTextStyle,
-              {
-                fontSize: AUTHOR_FONT_SIZE,
-                lineHeight: AUTHOR_LINE_HEIGHT,
-                minHeight: AUTHOR_LINE_HEIGHT,
-                letterSpacing: -0.1,
-              },
-            ]}
-            allowFontScaling={false}
-          >
-            {author}
-          </Text>
 
           <View style={styles.badgeRow}>
             <PriceBadge item={book as unknown as Record<string, unknown>} />
