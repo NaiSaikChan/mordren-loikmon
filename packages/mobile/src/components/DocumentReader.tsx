@@ -17,6 +17,7 @@ import { useEpubFileSystem } from '@/lib/useEpubFileSystem'
 import * as FileSystem from 'expo-file-system/legacy'
 import { Asset } from 'expo-asset'
 import { WebView } from 'react-native-webview'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fixUrl } from '@/lib/url'
 import { detectFormat } from '@/lib/format'
 import { FONT_OPTIONS, useTypography } from '@/context/TypographyContext'
@@ -276,6 +277,7 @@ function TocModal({
   themeId: ThemeId
 }) {
   const { bg, fg } = READER_THEMES[themeId]
+  const insets = useSafeAreaInsets()
   const items = useMemo(() => flattenToc(toc), [toc])
   const slideAnim = useRef(new Animated.Value(-300)).current
 
@@ -296,8 +298,13 @@ function TocModal({
     >
       <Pressable style={styles.tocBackdrop} onPress={onClose} />
       <Animated.View
-        style={[styles.tocPanel, { backgroundColor: bg, transform: [{ translateX: slideAnim }] }]}
+        style={[
+          styles.tocPanel,
+          { backgroundColor: bg, transform: [{ translateX: slideAnim }] },
+        ]}
       >
+        {/* Spacer pushes panel content below the notch / Dynamic Island */}
+        <View style={{ height: insets.top }} />
         <View style={[styles.tocHeader, { borderBottomColor: fg + '22' }]}>
           <Text style={[styles.tocTitle, { color: fg }]}>Contents</Text>
           <TouchableOpacity onPress={onClose} hitSlop={12}>
@@ -310,6 +317,7 @@ function TocModal({
           <FlatList
             data={items}
             keyExtractor={(item, i) => `${item.href}-${i}`}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
             renderItem={({ item }) => (
               <TouchableOpacity
                 onPress={() => { onNavigate(item.href); onClose() }}
@@ -345,6 +353,7 @@ function SettingsModal({
   customFontUris: Record<string, string>
 }) {
   const { bg, fg } = READER_THEMES[settings.themeId]
+  const insets = useSafeAreaInsets()
 
   const availableFonts = useMemo(
     () =>
@@ -365,7 +374,7 @@ function SettingsModal({
       onRequestClose={onClose}
     >
       <Pressable style={styles.settingsBackdrop} onPress={onClose} />
-      <View style={[styles.settingsSheet, { backgroundColor: bg }]}>
+      <View style={[styles.settingsSheet, { backgroundColor: bg, paddingBottom: Math.max(32, insets.bottom + 16) }]}>
         {/* Header */}
         <View style={[styles.settingsHeader, { borderBottomColor: fg + '22' }]}>
           <Text style={[styles.settingsTitle, { color: fg }]}>Reader Settings</Text>
@@ -853,7 +862,6 @@ const styles = StyleSheet.create({
   settingsSheet: {
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
-    paddingBottom: 32,
     paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
