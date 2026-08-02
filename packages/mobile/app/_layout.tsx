@@ -46,6 +46,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: tabsBackTitle }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="reader" options={{ title: '' }} />
+        <Stack.Screen name="audio" options={{ title: '' }} />
       </Stack>
     </>
   )
