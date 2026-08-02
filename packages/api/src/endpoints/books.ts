@@ -17,9 +17,9 @@ export const books = {
   getAudioChapters: (bookId: string | number) =>
     getClient().post<any>('getBookChapters', { book_id: bookId }),
 
-  // Flutter: { bookid }
+  // Flutter: { book_id }
   getChapters: (bookId: string | number) =>
-    getClient().post<any>('getBookChapters', { bookid: bookId }),
+    getClient().post<any>('getBookChapters', { book_id: bookId }),
 
   // Flutter: { bookid, email? }
   relatedBooks: (bookId: string | number, email?: string) =>

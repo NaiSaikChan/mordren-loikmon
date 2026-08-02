@@ -22,4 +22,13 @@ router.post('/deleteproofrequest',        (req, res) => proxyPost(req, res, 'del
 router.post('/approveBankPaymentsApp',    (req, res) => proxyPost(req, res, 'approveBankPaymentsApp'))
 router.post('/deleteBankPaymentsApp',     (req, res) => proxyPost(req, res, 'deleteBankPaymentsApp'))
 
+router.post('/fetchuserpurchases',              (req, res) => proxyPost(req, res, 'fetchuserpurchases'))
+router.post('/fetchuserpurchasedbooks',         (req, res) => proxyPost(req, res, 'fetchuserpurchasedbooks'))
+router.post('/fetchuserpurchasedarticles',      (req, res) => proxyPost(req, res, 'fetchuserpurchasedarticles'))
+router.post('/getusercoins',                    (req, res) => proxyPost(req, res, 'getusercoins'))
+router.post('/fetchcoins',                      (req, res) => proxyPost(req, res, 'fetchcoins'))
+router.post('/purchasebook',                    (req, res) => proxyPost(req, res, 'purchasebook'))
+router.post('/purchasearticle',                 (req, res) => proxyPost(req, res, 'purchasearticle'))
+router.post('/loadbanks',                       (req, res) => proxyPost(req, res, 'loadbanks'))
+router.post('/subscribeBookCoupon',             (req, res) => proxyPost(req, res, 'subscribeBookCoupon'))
 export default router
