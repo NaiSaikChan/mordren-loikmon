@@ -61,4 +61,17 @@ describe('useBookAudioStore', () => {
     expect(store.tracks).toHaveLength(0)
     expect(store.error).toBe('network')
   })
+
+  it('dispatches loikmon:playAudioTrack CustomEvent with track data', () => {
+    const track = { title: 'Book – Ch 1', url: 'https://loikmon.org/c1.mp3' }
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+
+    const event = new CustomEvent('loikmon:playAudioTrack', { detail: track })
+    window.dispatchEvent(event)
+
+    expect(dispatchSpy).toHaveBeenCalledTimes(1)
+    const dispatched = dispatchSpy.mock.calls[0][0] as CustomEvent
+    expect(dispatched.type).toBe('loikmon:playAudioTrack')
+    expect((dispatched as CustomEvent).detail).toEqual(track)
+  })
 })

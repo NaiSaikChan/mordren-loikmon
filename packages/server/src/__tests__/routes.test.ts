@@ -53,6 +53,17 @@ async function handleInitApp(req: Request, res: Response) {
   await proxyGet(req, res, 'initapp')
 }
 
+
+async function handlePostSearch(req: any, res: any) {
+  await proxyPost(req, res, 'search')
+}
+async function handlePurchaseBook(req: any, res: any) {
+  await proxyPost(req, res, 'purchasebook')
+}
+async function handleFetchUserPurchasedBooks(req: any, res: any) {
+  await proxyPost(req, res, 'fetchuserpurchasedbooks')
+}
+
 describe('BFF — route handlers', () => {
 
   beforeEach(() => vi.clearAllMocks())
@@ -142,6 +153,30 @@ describe('BFF — route handlers', () => {
       const { req, res } = makeReqRes()
       await handleInitApp(req, res)
       expect(proxyGet).toHaveBeenCalledWith(req, res, 'initapp')
+    })
+  })
+
+  describe('POST /api/search', () => {
+    it('calls proxyPost with "search"', async () => {
+      const { req, res } = makeReqRes({ q: 'test' })
+      await handlePostSearch(req, res)
+      expect(proxyPost).toHaveBeenCalledWith(req, res, 'search')
+    })
+  })
+
+  describe('POST /api/purchases/purchasebook', () => {
+    it('calls proxyPost with "purchasebook"', async () => {
+      const { req, res } = makeReqRes({ book_id: 1, amount: 100 })
+      await handlePurchaseBook(req, res)
+      expect(proxyPost).toHaveBeenCalledWith(req, res, 'purchasebook')
+    })
+  })
+
+  describe('POST /api/purchases/fetchuserpurchasedbooks', () => {
+    it('calls proxyPost with "fetchuserpurchasedbooks"', async () => {
+      const { req, res } = makeReqRes({ email: 'a@b.com' })
+      await handleFetchUserPurchasedBooks(req, res)
+      expect(proxyPost).toHaveBeenCalledWith(req, res, 'fetchuserpurchasedbooks')
     })
   })
 })
