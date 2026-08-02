@@ -36,7 +36,7 @@ describe('AudioPlayer', () => {
     Object.defineProperty(globalThis, 'Audio', {
       writable: true,
       configurable: true,
-      value: vi.fn(() => audioEl),
+      value: vi.fn(function() { return audioEl }),
     })
 
     const wrapper = mount(AudioPlayer)

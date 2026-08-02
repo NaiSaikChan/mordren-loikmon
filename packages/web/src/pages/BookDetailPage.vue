@@ -164,6 +164,12 @@ watch(() => props.id, loadBook)
                 <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/read`" class="btn-secondary">
                   📑 Chapters ({{ store.chapters.length }})
                 </RouterLink>
+                <button
+                  v-if="audioStore.tracks.length"
+                  class="btn-primary"
+                  @click="startAudioPlayer">
+                  🎧 Listen ({{ audioStore.tracks.length }} chapters)
+                </button>
               </template>
               <!-- Paid & not purchased: show buy / login prompt -->
               <template v-else-if="isPaid">
