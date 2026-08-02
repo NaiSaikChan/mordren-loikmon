@@ -63,14 +63,19 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const playAtIndex = useCallback(
-    (index: number) => {
+    async (index: number) => {
       const track = queueRef.current[index]
       if (!track) return
       indexRef.current = index
       currentTrackRef.current = track
       syncMeta()
-      player.replace(track.url)
-      player.play()
+      setIsLoading(true)
+      try {
+        await player.replace(track.url)
+        player.play()
+      } catch {
+        setIsLoading(false)
+      }
     },
     [player, syncMeta],
   )
@@ -87,8 +92,13 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       }
       currentTrackRef.current = track
       syncMeta()
-      player.replace(track.url)
-      player.play()
+      setIsLoading(true)
+      try {
+        await player.replace(track.url)
+        player.play()
+      } catch {
+        setIsLoading(false)
+      }
     },
     [player, syncMeta],
   )
@@ -126,7 +136,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (queueRef.current.length === 0) return
     const nextIndex = indexRef.current + 1
     if (nextIndex < queueRef.current.length) {
-      playAtIndex(nextIndex)
+      await playAtIndex(nextIndex)
     }
   }, [playAtIndex])
 
@@ -134,7 +144,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (queueRef.current.length === 0) return
     const prevIndex = indexRef.current - 1
     if (prevIndex >= 0) {
-      playAtIndex(prevIndex)
+      await playAtIndex(prevIndex)
     }
   }, [playAtIndex])
 

@@ -10,15 +10,23 @@ export interface AudioTrack {
   queueLength?: number
 }
 
+function isHttpUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https?:\/\//i.test(value)
+}
+
 function pickAudioUrl(rec: Record<string, unknown>): string {
-  return (
-    (rec.audio_url as string) ??
-    (rec.audio as string) ??
-    (rec.audio_file as string) ??
-    (rec.stream_url as string) ??
-    (rec.file as string) ??
-    ''
-  )
+  // Prefer the full-hosted URL if present; otherwise accept an absolute/relative audio_file path.
+  const candidates = [
+    rec.audio_url,
+    rec.audio,
+    rec.audio_file,
+    rec.stream_url,
+    rec.file,
+  ]
+  const http = candidates.find(isHttpUrl)
+  if (http) return http
+  const anyString = candidates.find((c): c is string => typeof c === 'string' && c.length > 0)
+  return anyString ?? ''
 }
 
 function pickAudioTitle(rec: Record<string, unknown>): string {

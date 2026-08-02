@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { AudioTrack } from '@/stores/bookAudio'
 
-defineProps<{ title: string; tracks: AudioTrack[] }>()
+const props = defineProps<{ title: string; tracks: AudioTrack[] }>()
 
-function play(track: AudioTrack) {
+function play(startTrack: AudioTrack) {
   window.dispatchEvent(new CustomEvent('loikmon:playAudioTrack', {
-    detail: { track, queue: [] },
+    detail: { track: startTrack, queue: props.tracks },
   }))
 }
 </script>
@@ -19,13 +19,11 @@ function play(track: AudioTrack) {
       <button
         v-for="track in tracks.slice(0, 12)"
         :key="track.id"
-        class="shrink-0 w-36 text-left group"
+        class="shrink-0 w-36 text-left group relative"
         @click="play(track)"
       >
         <div class="aspect-[3/4] rounded-xl bg-gray-100 dark:bg-surface-800 overflow-hidden flex items-center justify-center text-4xl mb-2 shadow-sm group-hover:ring-2 ring-brand-500 transition-all">
-          <span v-if="track.cover">
-            <img :src="track.cover" class="w-full h-full object-cover" />
-          </span>
+          <img v-if="track.cover" :src="track.cover" class="w-full h-full object-cover" />
           <span v-else>🎧</span>
           <div class="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
             <span class="text-white text-2xl">▶️</span>

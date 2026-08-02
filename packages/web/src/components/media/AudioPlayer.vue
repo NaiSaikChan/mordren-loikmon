@@ -1,18 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import type { MediaItem } from '@loikmon/api'
 import { useBookAudioStore, type AudioTrack } from '@/stores/bookAudio'
 
-export interface PlayerTrack extends AudioTrack {}
+declare global {
+  interface WindowEventMap {
+    'loikmon:playAudioTrack': CustomEvent<{ track: AudioTrack; queue?: AudioTrack[] }>
+  }
+}
 
 let globalAudio: HTMLAudioElement | null = null
-
-try {
-  globalAudio = new Audio()
-  globalAudio.preload = 'metadata'
-} catch {
-  globalAudio = null
-}
 
 const current = ref<AudioTrack | null>(null)
 const playing = ref(false)
@@ -36,27 +33,27 @@ const durationText = computed(() => formatTime(duration.value))
 
 function setCurrent(track: AudioTrack, newQueue: AudioTrack[] = []) {
   current.value = track
-  queue.value = newQueue
-  const idx = newQueue.findIndex((t) => t.url === track.url)
+  queue.value = newQueue.length ? newQueue : [track]
+  const idx = queue.value.findIndex((t) => t.url === track.url)
   currentIndex.value = idx >= 0 ? idx : 0
-  if (idx < 0) {
-    queue.value = [track]
-    currentIndex.value = 0
-  }
 }
 
-function playTrack(track: AudioTrack, newQueue?: AudioTrack[]) {
+async function playTrack(track: AudioTrack, newQueue?: AudioTrack[]) {
   if (!globalAudio) return
   setCurrent(track, newQueue ?? queue.value)
   loading.value = true
   playing.value = false
-  globalAudio.src = track.url
-  globalAudio.play().then(() => {
+  try {
+    globalAudio.src = track.url
+    globalAudio.load()
+    await globalAudio.play()
     playing.value = true
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[AudioPlayer] playback error', err)
+  } finally {
     loading.value = false
-  }).catch(() => {
-    loading.value = false
-  })
+  }
 }
 
 function toggle() {
@@ -65,16 +62,15 @@ function toggle() {
     globalAudio.pause()
     playing.value = false
   } else {
-    globalAudio.play().then(() => {
-      playing.value = true
-    }).catch(() => undefined)
+    globalAudio.play().then(() => { playing.value = true }).catch(() => undefined)
   }
 }
 
 function close() {
   if (globalAudio) {
     globalAudio.pause()
-    globalAudio.src = ''
+    globalAudio.removeAttribute('src')
+    globalAudio.load()
   }
   current.value = null
   playing.value = false
@@ -82,12 +78,12 @@ function close() {
   duration.value = 0
   queue.value = []
   currentIndex.value = 0
+  loading.value = false
 }
 
 function seek(percent: number) {
   if (!globalAudio || !duration.value) return
   const bounded = Math.max(0, Math.min(100, percent))
-  progress.value = bounded
   globalAudio.currentTime = (bounded / 100) * duration.value
 }
 
@@ -95,7 +91,7 @@ function playNext() {
   if (!queue.value.length) return
   const nextIndex = currentIndex.value + 1
   if (nextIndex < queue.value.length) {
-    playTrack(queue.value[nextIndex])
+    void playTrack(queue.value[nextIndex], queue.value)
   }
 }
 
@@ -103,59 +99,65 @@ function playPrevious() {
   if (!queue.value.length) return
   const prevIndex = currentIndex.value - 1
   if (prevIndex >= 0) {
-    playTrack(queue.value[prevIndex])
+    void playTrack(queue.value[prevIndex], queue.value)
   }
 }
 
-if (globalAudio) {
-  globalAudio.addEventListener('timeupdate', () => {
-    if (globalAudio!.duration) {
-      duration.value = globalAudio!.duration
-      progress.value = (globalAudio!.currentTime / globalAudio!.duration) * 100
+function onTimeUpdate() {
+  if (!globalAudio) return
+  duration.value = globalAudio.duration || duration.value
+  if (globalAudio.duration) {
+    progress.value = (globalAudio.currentTime / globalAudio.duration) * 100
+  }
+}
+
+function onLoadedMetadata() {
+  if (!globalAudio) return
+  duration.value = globalAudio.duration || 0
+}
+
+function onExternalPlay(e: CustomEvent<{ track: AudioTrack; queue?: AudioTrack[] }>) {
+  if (e.detail?.track) {
+    void playTrack(e.detail.track, e.detail.queue)
+  }
+}
+
+defineExpose({
+  start: playTrack,
+  startFromMedia(media: MediaItem) {
+    const rec = media as unknown as Record<string, unknown>
+    const url = (rec.audio_url as string) ?? (rec.audio as string) ?? (rec.file as string) ?? ''
+    if (!url) return
+    const track: AudioTrack = {
+      id: (rec.id as string | number) ?? url,
+      title: (rec.title as string) ?? 'Untitled',
+      artist: (rec.artist as string) ?? (rec.authorname as string) ?? (rec.author as string) ?? '',
+      url,
+      cover: '',
     }
-  })
-  globalAudio.addEventListener('ended', () => {
-    playNext()
-  })
-  globalAudio.addEventListener('loadedmetadata', () => {
-    duration.value = globalAudio!.duration || 0
-  })
-}
+    void playTrack(track)
+  },
+})
 
-// Public method exposed on the component instance so pages can start playback.
-function start(track: AudioTrack, autoQueue?: AudioTrack[]) {
-  playTrack(track, autoQueue)
-}
-
-function startFromMedia(media: MediaItem) {
-  const rec = media as unknown as Record<string, unknown>
-  const url = (rec.audio_url as string) ?? (rec.audio as string) ?? (rec.file as string) ?? ''
-  if (!url) return
-  const track: AudioTrack = {
-    id: (rec.id as string | number) ?? url,
-    title: (rec.title as string) ?? 'Untitled',
-    artist: (rec.artist as string) ?? (rec.authorname as string) ?? (rec.author as string) ?? '',
-    url,
-    cover: '',
-  }
-  playTrack(track)
-}
-
-function onExternalPlay(e: Event) {
-  const detail = (e as CustomEvent).detail as { track: AudioTrack; queue?: AudioTrack[] } | undefined
-  if (detail?.track) {
-    playTrack(detail.track, detail.queue)
-  }
-}
-
-if (typeof window !== 'undefined') {
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  globalAudio = new Audio()
+  globalAudio.preload = 'metadata'
+  globalAudio.addEventListener('timeupdate', onTimeUpdate)
+  globalAudio.addEventListener('ended', playNext)
+  globalAudio.addEventListener('loadedmetadata', onLoadedMetadata)
   window.addEventListener('loikmon:playAudioTrack', onExternalPlay)
-}
+})
 
 onUnmounted(() => {
   if (globalAudio) {
     globalAudio.pause()
-    globalAudio.src = ''
+    globalAudio.removeAttribute('src')
+    globalAudio.removeEventListener('timeupdate', onTimeUpdate)
+    globalAudio.removeEventListener('ended', playNext)
+    globalAudio.removeEventListener('loadedmetadata', onLoadedMetadata)
+    globalAudio.load()
+    globalAudio = null
   }
   if (typeof window !== 'undefined') {
     window.removeEventListener('loikmon:playAudioTrack', onExternalPlay)

@@ -39,10 +39,12 @@ export function useBookAudioChapters(
     try {
       const res = await booksApi.getAudioChapters(bookId)
       const payload = res.data as Record<string, unknown>
-      const list =
-        (payload.data as BookAudioChapter[]) ??
-        ((payload.data as Record<string, unknown>)?.chapters as BookAudioChapter[]) ??
-        (payload.chapters as BookAudioChapter[]) ??
+      const data = payload.data as unknown
+      const list: BookAudioChapter[] =
+        Array.isArray(data) ? data :
+        (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).chapters))
+          ? (data as Record<string, unknown>).chapters as BookAudioChapter[] :
+        Array.isArray(payload.chapters) ? payload.chapters as BookAudioChapter[] :
         []
       setChapters(list)
     } catch (err) {
