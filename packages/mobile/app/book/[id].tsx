@@ -26,6 +26,8 @@ import { useLibrary } from '@/context/LibraryContext'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
 import { useIsOwned } from '@/hooks/useIsOwned'
+import { useBookAudioChapters } from '@/hooks/useBookAudioChapters'
+import { useAudio } from '@/context/AudioContext'
 import { pickCover } from '@/lib/url'
 import { isFree } from '@/lib/normalize'
 
@@ -143,6 +145,11 @@ export default function BookDetailScreen() {
   const { isBookmarked, toggleBook } = useLibrary()
   const { bodyTextStyle, headerTextStyle } = useTypography()
   const { owned: canRead } = useIsOwned(id, 'book')
+  const { tracks: audioTracks, hasAudio } = useBookAudioChapters(
+    book?.id,
+    book?.title,
+  )
+  const { play } = useAudio()
   const { width } = useWindowDimensions()
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState<BookDetailTab>('details')
@@ -222,6 +229,21 @@ export default function BookDetailScreen() {
       </Screen>
     )
   }
+
+  const onListenAudio = () => {
+    if (audioTracks.length === 0) return
+    void play(audioTracks[0], audioTracks)
+    router.push('/music')
+  }
+
+const audioButton = hasAudio ? (
+    <PrimaryButton
+      label="🎧 Listen"
+      onPress={() => onListenAudio()}
+      labelClassName="text-xl font-bold"
+      labelStyle={headerTextStyle}
+    />
+  ) : null
 
   const openReader = async (source: string, format?: 'epub' | 'pdf') => {
     if (!source) {
@@ -404,6 +426,7 @@ export default function BookDetailScreen() {
                           labelStyle={headerTextStyle}
                         />
                       ) : null}
+                      {audioButton}
                     </View>
                   ) : isLoggedIn ? (
                     <PrimaryButton

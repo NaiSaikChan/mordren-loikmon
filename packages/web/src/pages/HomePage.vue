@@ -4,8 +4,10 @@ import { useI18n } from 'vue-i18n'
 import { useBooksStore } from '@/stores/books'
 import { useArticlesStore } from '@/stores/articles'
 import { useAuthStore } from '@/stores/auth'
+import { useBookAudioStore } from '@/stores/bookAudio'
 import { misc } from '@loikmon/api'
 import BookCard from '@/components/shared/BookCard.vue'
+import BookAudioRow from '@/components/shared/BookAudioRow.vue'
 import ArticleCard from '@/components/shared/ArticleCard.vue'
 import SectionHeader from '@/components/shared/SectionHeader.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
@@ -14,6 +16,7 @@ const { t } = useI18n()
 const booksStore   = useBooksStore()
 const articlesStore = useArticlesStore()
 const authStore    = useAuthStore()
+const audioStore   = useBookAudioStore()
 
 const sliders   = ref<any[]>([])
 const leagues   = ref<any[]>([])
@@ -59,6 +62,7 @@ onMounted(async () => {
 
   if (!booksStore.list.length)    booksStore.fetchBooks()
   if (!articlesStore.list.length) articlesStore.fetchArticles()
+  audioStore.fetchChapters('home-featured', 'Audiobooks')
   initDone.value = true
 
   // Auto-rotate sliders every 5 seconds

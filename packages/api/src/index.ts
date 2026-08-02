@@ -1,6 +1,6 @@
 // Types
 export type {
-  User, Book, BookChapter, Article, Author, Review, Reply,
+  User, Book, BookChapter, BookAudioChapter, Article, Author, Review, Reply,
   MediaItem, SearchResults, ApiResponse, LoginPayload, RegisterPayload, RawAuthResponse
 } from './types.js'
 
@@ -17,4 +17,4 @@ export { misc }        from './endpoints/misc.js'
 export { search }      from './endpoints/search.js'
 
 // Client
-export { getClient }   from './client.js'
+export { getClient, setClient } from './client.js'

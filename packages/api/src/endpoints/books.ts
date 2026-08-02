@@ -13,6 +13,10 @@ export const books = {
   getItem: (id: string | number) =>
     getClient().post<any>('getitem', { type: 'book', id }),
 
+  // Flutter: { book_id }
+  getAudioChapters: (bookId: string | number) =>
+    getClient().post<any>('getBookChapters', { book_id: bookId }),
+
   // Flutter: { bookid }
   getChapters: (bookId: string | number) =>
     getClient().post<any>('getBookChapters', { bookid: bookId }),

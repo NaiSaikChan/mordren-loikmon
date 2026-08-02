@@ -58,6 +58,17 @@ export interface BookChapter {
   [key: string]: unknown
 }
 
+export interface BookAudioChapter {
+  id: string | number
+  title?: string
+  chapter_title?: string
+  audio?: string
+  audio_file?: string
+  stream_url?: string
+  duration?: number
+  [key: string]: unknown
+}
+
 export interface Article {
   id: string | number
   title: string

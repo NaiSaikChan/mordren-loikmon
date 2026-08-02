@@ -5,6 +5,7 @@ import { useBooksStore } from '@/stores/books'
 import { useReviewsStore } from '@/stores/reviews'
 import { useAuthStore } from '@/stores/auth'
 import { usePurchasesStore } from '@/stores/purchases'
+import { useBookAudioStore } from '@/stores/bookAudio'
 import { books as booksApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import BookCard from '@/components/shared/BookCard.vue'
@@ -15,6 +16,7 @@ const store  = useBooksStore()
 const reviews = useReviewsStore()
 const auth   = useAuthStore()
 const purchasesStore = usePurchasesStore()
+const audioStore = useBookAudioStore()
 
 const book    = computed(() => store.detail)
 const cover   = computed(() => {
@@ -74,6 +76,13 @@ async function buyBook() {
   }
 }
 
+function startAudioPlayer() {
+  if (!audioStore.tracks.length) return
+  window.dispatchEvent(new CustomEvent('loikmon:playAudioTrack', {
+    detail: { track: audioStore.tracks[0], queue: audioStore.tracks },
+  }))
+}
+
 async function loadBook() {
   coverError.value = false
   await store.fetchDetail(props.id)
@@ -81,6 +90,7 @@ async function loadBook() {
   booksApi.updateTotalViews(props.id)
   if (book.value) store.fetchRelated(props.id)
   if (auth.isLoggedIn) purchasesStore.fetchAll()
+  if (book.value) audioStore.fetchChapters(props.id, book.value.title)
 }
 
 onMounted(loadBook)

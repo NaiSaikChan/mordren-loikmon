@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, Pressable } from 'react-native'
+import { ScrollView, View, Text, Pressable, Image } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
@@ -13,7 +13,55 @@ import { useAuthors } from '@/hooks/useAuthors'
 import { useI18n } from '@/context/I18nContext'
 import { useAuth } from '@/context/AuthContext'
 import { useTypography } from '@/context/TypographyContext'
+import { useAudio } from '@/context/AudioContext'
+import { useBookAudioChapters } from '@/hooks/useBookAudioChapters'
+import type { AudioTrack } from '@/lib/audio'
 
+function AudioBookCard({ track }: { track: AudioTrack }) {
+  const { play, current, isPlaying, toggle } = useAudio()
+  const isCurrent = current && current.url === track.url
+
+  return (
+    <Pressable
+      onPress={() => {
+        if (isCurrent) {
+          void toggle()
+        } else {
+          void play(track)
+        }
+      }}
+      className="mr-3 w-36"
+    >
+      <View className="aspect-[3/4] overflow-hidden rounded-xl bg-surface-200 dark:bg-surface-800">
+        {track.cover ? (
+          <Image source={{ uri: track.cover }} className="h-full w-full" resizeMode="cover" />
+        ) : (
+          <View className="h-full w-full items-center justify-center">
+            <Text className="text-4xl">🎧</Text>
+          </View>
+        )}
+        <View className="absolute inset-0 items-center justify-center bg-black/20">
+          <Ionicons
+            name={isCurrent && isPlaying ? 'pause' : 'play'}
+            size={32}
+            color="#ffffff"
+          />
+        </View>
+      </View>
+      <Text
+        numberOfLines={1}
+        className="mt-2 text-xs font-medium text-surface-900 dark:text-surface-50"
+      >
+        {track.title}
+      </Text>
+      {track.artist ? (
+        <Text numberOfLines={1} className="text-[10px] text-surface-400">
+          {track.artist}
+        </Text>
+      ) : null}
+    </Pressable>
+  )
+}
 
 export default function HomeScreen() {
   const { t } = useI18n()
@@ -22,6 +70,7 @@ export default function HomeScreen() {
   const books = useBooks()
   const articles = useArticles()
   const authors = useAuthors()
+  const { tracks: featuredAudioTracks } = useBookAudioChapters(undefined, t('home.audiobooks'))
 
   return (
     <Screen>
@@ -89,6 +138,22 @@ export default function HomeScreen() {
             ))}
           </ScrollView>
         )}
+
+        {/* Featured audiobooks */}
+        {featuredAudioTracks.length > 0 ? (
+          <SectionHeader title={t('home.audiobooks')} />
+        ) : null}
+        {featuredAudioTracks.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingLeft: 16, paddingRight: 4, alignItems: 'flex-start' }}
+          >
+            {featuredAudioTracks.slice(0, 10).map((track) => (
+              <AudioBookCard key={String(track.id)} track={track} />
+            ))}
+          </ScrollView>
+        ) : null}
 
         {/* Latest articles */}
         <SectionHeader

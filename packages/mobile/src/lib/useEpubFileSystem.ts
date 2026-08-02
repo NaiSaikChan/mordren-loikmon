@@ -22,7 +22,7 @@ export function useEpubFileSystem() {
     async (
       fromUrl: string,
       toFile: string,
-    ): Promise<{ uri: string | null; mimeType: string | null | undefined }> => {
+    ): Promise<{ uri: string | null; mimeType: string | null }> => {
       const callback = (downloadProgress: FileSystem.DownloadProgressData) => {
         const currentProgress = Math.round(
           (downloadProgress.totalBytesWritten /
@@ -50,7 +50,7 @@ export function useEpubFileSystem() {
           setSuccess(true)
           setError(null)
           setFile(value.uri)
-          return { uri: value.uri, mimeType: value.mimeType }
+          return { uri: value.uri, mimeType: value.mimeType ?? null }
         })
         .catch((err: unknown) => {
           const msg = err instanceof Error ? err.message : 'Error downloading file'

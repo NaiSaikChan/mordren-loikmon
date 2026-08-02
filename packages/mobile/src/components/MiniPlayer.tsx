@@ -5,11 +5,12 @@ import { useTypography } from '@/context/TypographyContext'
 
 /** Global mini audio player shown above the tab bar while a track is loaded. */
 export function MiniPlayer() {
-  const { current, isPlaying, isLoading, positionMillis, durationMillis, toggle, stop } = useAudio()
+  const { current, isPlaying, isLoading, positionMillis, durationMillis, toggle, stop, next, previous } = useAudio()
   const { bodyTextStyle, headerTextStyle } = useTypography()
   if (!current) return null
 
   const progress = durationMillis > 0 ? positionMillis / durationMillis : 0
+  const hasQueue = current.queueLength ? current.queueLength > 0 : false
 
   return (
     <View className="border-t border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800">
@@ -40,6 +41,11 @@ export function MiniPlayer() {
             </Text>
           ) : null}
         </View>
+        {hasQueue ? (
+          <Pressable onPress={previous} hitSlop={8} className="mr-1 p-1">
+            <Ionicons name="play-skip-back" size={22} color="#64748b" />
+          </Pressable>
+        ) : null}
         <Pressable onPress={toggle} hitSlop={8} className="mr-1 p-1">
           {isLoading ? (
             <ActivityIndicator color="#2563eb" />
@@ -47,6 +53,11 @@ export function MiniPlayer() {
             <Ionicons name={isPlaying ? 'pause' : 'play'} size={26} color="#2563eb" />
           )}
         </Pressable>
+        {hasQueue ? (
+          <Pressable onPress={next} hitSlop={8} className="mr-1 p-1">
+            <Ionicons name="play-skip-forward" size={22} color="#64748b" />
+          </Pressable>
+        ) : null}
         <Pressable onPress={stop} hitSlop={8} className="p-1">
           <Ionicons name="close" size={22} color="#94a3b8" />
         </Pressable>
