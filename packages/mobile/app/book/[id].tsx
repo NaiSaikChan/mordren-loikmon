@@ -233,7 +233,6 @@ export default function BookDetailScreen() {
   const onListenAudio = () => {
     if (audioTracks.length === 0) return
     void play(audioTracks[0], audioTracks)
-    router.push('/audio')
   }
 
 const audioButton = hasAudio ? (
