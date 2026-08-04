@@ -232,7 +232,9 @@ export default function BookDetailScreen() {
 
   const onListenAudio = () => {
     if (audioTracks.length === 0) return
+    // Pre-load audio then open the full-screen audiobook player
     void play(audioTracks[0], audioTracks)
+    router.push({ pathname: '/audiobook/[id]', params: { id: String(id) } })
   }
 
 const audioButton = hasAudio ? (

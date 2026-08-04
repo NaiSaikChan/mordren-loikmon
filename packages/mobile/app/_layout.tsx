@@ -47,6 +47,7 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="reader" options={{ title: '' }} />
         <Stack.Screen name="audio" options={{ title: '' }} />
+        <Stack.Screen name="audiobook/[id]" options={{ headerShown: false }} />
       </Stack>
     </>
   )
