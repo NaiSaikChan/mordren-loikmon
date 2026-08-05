@@ -31,11 +31,12 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAudio } from '@/context/AudioContext'
 import { useBookAudioChapters } from '@/hooks/useBookAudioChapters'
 import { useBookDetail } from '@/hooks/useBooks'
+import type { AudioTrack } from '@/lib/audio'
 import { pickCover } from '@/lib/url'
 
 const GOLD = '#C9922A'
 const GOLD_LIGHT = '#D4A843'
-const BG = '#F5F5F0'
+const BG = '#F9F7F2'
 const TEXT_DARK = '#1A1A1A'
 const TEXT_MID = '#6B6B6B'
 const TEXT_LIGHT = '#A0A0A0'
@@ -144,8 +145,9 @@ export default function AudiobookPlayerScreen() {
   const cover = book ? pickCover(book as unknown as Record<string, unknown>) : ''
   const title = book?.title ?? ''
   const rec = book as Record<string, unknown> | undefined
+  const chapterNumber = (rec?.chapter_number as string | number) ?? (rec?.chapter as string | number) ?? ''
+  const chapterTitle = (rec?.chapter_title as string) ?? (rec?.title as string) ?? ''
   const author = (rec?.authorname as string) ?? (rec?.author as string) ?? ''
-  const description = (rec?.description as string) ?? (rec?.about as string) ?? ''
   const pageCount = (rec?.pages as string | number) ?? (rec?.pagecount as string | number)
 
   const { tracks, loading: chaptersLoading } = useBookAudioChapters(book?.id, title)
@@ -180,11 +182,14 @@ export default function AudiobookPlayerScreen() {
   const displayIndex = isThisBook ? currentIndex : 0
   const chapterCount = isThisBook ? queue.length : tracks.length
   const currentTrack = isThisBook ? current : (tracks[0] ?? null)
+  const playlistTracks = tracks.length > 0 ? tracks : queue
 
   const chapterLabel =
     currentTrack?.title?.split('\u2013').pop()?.trim() ??
     currentTrack?.title ??
     `Chapter ${displayIndex + 1}`
+
+  const chapterDisplayTitle = currentTrack?.chapterTitle ?? (chapterTitle || chapterLabel)
 
   const onSkipBack = useCallback(
     () => void seek(Math.max(0, positionMillis - 15_000)),
@@ -203,6 +208,14 @@ export default function AudiobookPlayerScreen() {
     if (positionMillis > 3000) void seek(0)
     else void previous()
   }, [positionMillis, seek, previous])
+
+  const onSelectChapter = useCallback(
+    (track: AudioTrack) => {
+      if (tracks.length === 0) return
+      void play(track, tracks)
+    },
+    [play, tracks],
+  )
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
@@ -240,12 +253,17 @@ export default function AudiobookPlayerScreen() {
         </View>
 
         {/* Title / Author */}
-        <Text style={styles.bookTitle} numberOfLines={2}>
-          {title}
-        </Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>
-          {author ? `By ${author}` : ''}
-        </Text>
+        <View style={styles.metaCard}>
+          <Text style={styles.bookTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <Text style={styles.bookAuthor} numberOfLines={1}>
+            {author ? `By ${author}` : ''}
+          </Text>
+          <Text style={styles.nowPlayingText} numberOfLines={1}>
+            Now Playing: {chapterDisplayTitle}
+          </Text>
+        </View>
 
         {/* Arc + Controls */}
         <View style={styles.arcWrapper}>
@@ -276,12 +294,50 @@ export default function AudiobookPlayerScreen() {
           onSeek={seek}
         />
 
-        {/* Lyrics / description */}
-        <View style={styles.lyricsBox}>
-          <Text style={styles.lyricsWatermark} numberOfLines={1}>
-            {title.split(' ')[0]?.toUpperCase() ?? ''}
-          </Text>
-          <Text style={styles.lyricsText}>{description || chapterLabel}</Text>
+        {/* Chapter playlist */}
+        <View style={styles.playlistBox}>
+          <Text style={styles.sectionTitle}>Playlist</Text>
+          {playlistTracks.length === 0 ? (
+            <Text style={styles.emptyPlaylistText}>No chapters available yet.</Text>
+          ) : (
+            playlistTracks.map((track, idx) => {
+              const active = currentTrack?.url === track.url
+              const itemLabel =
+                track.chapterTitle ??
+                track.title?.split('\u2013').pop()?.trim() ??
+                `Chapter ${idx + 1}`
+
+              return (
+                <Pressable
+                  key={`${String(track.id)}-${idx}`}
+                  onPress={() => onSelectChapter(track)}
+                  style={[styles.playlistItem, active && styles.playlistItemActive]}
+                >
+                  <View style={[styles.playlistIndex, active && styles.playlistIndexActive]}>
+                    <Text style={[styles.playlistIndexText, active && styles.playlistIndexTextActive]}>
+                      {idx + 1}
+                    </Text>
+                  </View>
+                  <View style={styles.playlistTextWrap}>
+                    <Text
+                      style={[styles.playlistTitle, active && styles.playlistTitleActive]}
+                      numberOfLines={1}
+                    >
+                      {itemLabel}
+                    </Text>
+                    <Text style={styles.playlistMeta} numberOfLines={1}>
+                      {active ? (isPlaying ? 'Playing' : 'Paused') : 'Tap to play'}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={active && isPlaying ? 'pause-circle' : 'play-circle'}
+                    size={26}
+                    color={active ? GOLD : '#B8A88D'}
+                  />
+                </Pressable>
+              )
+            })
+          )}
         </View>
       </ScrollView>
 
@@ -337,13 +393,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 8 : 4,
-    paddingBottom: 8,
+    paddingBottom: 10,
   },
   headerIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#EDEDE8',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#ECE7DB',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -351,37 +407,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    paddingHorizontal: 14,
+    paddingHorizontal: 13,
     paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: '#EDEDE8',
+    borderRadius: 12,
+    backgroundColor: '#ECE7DB',
   },
   readBtnText: { color: GOLD, fontSize: 14, fontWeight: '600' },
 
-  scroll: { alignItems: 'center', paddingBottom: 12 },
+  scroll: { alignItems: 'center', paddingBottom: 20 },
 
   coverShadow: {
-    marginTop: 16,
+    marginTop: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 10,
-    borderRadius: 16,
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    elevation: 8,
+    borderRadius: 20,
   },
-  cover: { width: COVER_SIZE, height: COVER_SIZE, borderRadius: 16 },
+  cover: { width: COVER_SIZE, height: COVER_SIZE, borderRadius: 20 },
   coverFallback: { backgroundColor: '#E8E0D0', alignItems: 'center', justifyContent: 'center' },
 
+  metaCard: {
+    marginTop: 18,
+    width: SW - 40,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E9E2D6',
+    backgroundColor: '#FFFDF8',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+
   bookTitle: {
-    marginTop: 20,
     fontSize: 18,
     fontWeight: '700',
     color: GOLD,
     textAlign: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 8,
     lineHeight: 24,
   },
   bookAuthor: { marginTop: 4, fontSize: 13, color: TEXT_MID, textAlign: 'center' },
+  nowPlayingText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#8C744A',
+    fontWeight: '600',
+  },
 
   arcWrapper: {
     width: SW,
@@ -406,7 +479,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 36,
     zIndex: 2,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   playBtn: {
     width: 64,
@@ -423,7 +496,7 @@ const styles = StyleSheet.create({
   },
   skipBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
-  seekContainer: { width: SW - 40, marginTop: 4 },
+  seekContainer: { width: SW - 40, marginTop: 8 },
   trackOuter: { height: 20, justifyContent: 'center' },
   trackBg: {
     position: 'absolute',
@@ -445,17 +518,79 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   timeText: { fontSize: 11, color: TEXT_MID },
 
-  lyricsBox: { width: SW - 40, marginTop: 16, minHeight: 120, overflow: 'hidden' },
-  lyricsWatermark: {
-    position: 'absolute',
-    top: -12,
-    left: -8,
-    fontSize: 72,
-    fontWeight: '900',
-    color: 'rgba(0,0,0,0.04)',
-    letterSpacing: -2,
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT_DARK,
+    marginBottom: 8,
   },
-  lyricsText: { fontSize: 13, lineHeight: 22, color: TEXT_MID, textAlign: 'justify' },
+  playlistBox: {
+    width: SW - 30,
+    marginTop: 18,
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E8E0D0',
+    backgroundColor: '#FFFCF6',
+    padding: 12,
+  },
+  playlistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: '#F7F3EA',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ECE3D4',
+  },
+  playlistItemActive: {
+    backgroundColor: '#FDF2DD',
+    borderColor: '#E9C177',
+  },
+  playlistIndex: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EBE4D7',
+  },
+  playlistIndexActive: {
+    backgroundColor: GOLD,
+  },
+  playlistIndexText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8B795B',
+  },
+  playlistIndexTextActive: {
+    color: '#fff',
+  },
+  playlistTextWrap: {
+    flex: 1,
+    marginLeft: 10,
+    marginRight: 8,
+  },
+  playlistTitle: {
+    fontSize: 13,
+    color: TEXT_DARK,
+    fontWeight: '600',
+  },
+  playlistTitleActive: {
+    color: GOLD,
+  },
+  playlistMeta: {
+    marginTop: 2,
+    fontSize: 11,
+    color: TEXT_MID,
+  },
+  emptyPlaylistText: {
+    fontSize: 12,
+    color: TEXT_MID,
+    paddingVertical: 8,
+  },
 
   footer: {
     flexDirection: 'row',

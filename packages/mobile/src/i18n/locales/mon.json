@@ -37,7 +37,9 @@
     "error": "ယောၚ်ယာ",
     "retry": "ကၠေၚ်စမ်",
     "viewAll": "ညာတ်ဖအိုတ်",
-    "coins": "ကွာန်"
+    "coins": "တၚ်္ကာ",
+    "anonymous": "ညးယၟုဟၟဲ",
+    "you": "မၞး"
   },
   "auth": {
     "login": "လုပ်ကျောဝ်",
@@ -72,7 +74,25 @@
     "related": "ဆက်စိုပ်",
     "pages": "{count} မုက်",
     "rating": "သ္ပအထိုၚ်သး",
-    "noBooks": "လိက်ကၞပ်ဟၟဲ"
+    "noBooks": "လိက်ကၞပ်ဟၟဲ",
+    "readEpub": "ဗှ် EPUB",
+    "readPdf": "ဗှ် PDF",
+    "listen": "ကလၚ်",
+    "couponPrompt": "နွံကူပံၚ်လိက်ကၞပ်ဟာ?",
+    "couponPlaceholder": "ကုဒ်ကူပံၚ်",
+    "couponSuccess": "ရာန်လိက်ကၞပ်ဂွံစိုပ်ဒတုဲ! 🎉",
+    "couponInvalid": "ကူပံၚ်ဗၠေတ်ဒၟံၚ်ရ။",
+    "couponError": "ကူပံၚ် ယောၚ်ယာဒၟံၚ်ရောၚ်",
+    "detailsTab": "ပရောပရာ",
+    "reviewsTab": "သ္ပအထိုၚ်သး ({count})",
+    "writeReview": "ချူသ္ပအထိုၚ်သး",
+    "reviewPlaceholder": "ဟီုတၚ်ထင်ဟပ်ပိုဲညိ...",
+    "submitReview": "ဒုၚ်စ သ္ပအထိုၚ်သး",
+    "reviewSubmitted": "ဒုၚ်စသ္ပအထိုၚ်သးတုဲ!",
+    "reviewSubmitFailed": "ဒုၚ်စသ္ပအထိုၚ်သး ဟွံအံၚ်ဇၞး",
+    "loginToReview": "လုပ်ကျောဝ်တုဲ ချူသ္ပအထိုၚ်သးညိ။",
+    "noReviews": "သ္ပအထိုၚ်သး ဟွံမွဲဏီ",
+    "noReviewsHint": "သွက်လိက်ကၞပ်ဏအ် သၟာန်သ္ပအထိုၚ်သးအလန်ကိုပ်ကၠာညိ။"
   },
   "articles": {
     "title": "လိခ်ပရေၚ်ဂမၠိုၚ်",
@@ -132,7 +152,14 @@
     "submitting": "ဒုၚ်စဒၟံၚ်…",
     "proofSubmitted": "သက်သဳဒုၚ်စတုဲ! တၚ်္ကာဒၞဲါဂၠံၚ်တရဴ ၂၄ နာဍဳ မ္ဂးကဵုစၟဳစၟတ်ပ္ဍဲ ပရဟ်ကၟက်ရ။",
     "noPurchases": "စုတ်သၠဲဟၟဲ",
-    "packages": "ကွာန်"
+    "packages": "ကွာန်",
+    "redeemAction": "ကူပံၚ်",
+    "coinCouponTitle": "ကူပံၚ်တၚ်္ကာ",
+    "coinCouponHint": "စုတ်ကုဒ်ကူပံၚ်တၚ်္ကာတုဲ တိုးတၚ်္ကာပ္ဍဲလၟိဟ်ညး။",
+    "coinCouponPlaceholder": "ကုဒ်ကူပံၚ်",
+    "coinCouponSuccess": "တၚ်္ကာတိုးဂွံတုဲ! 🎉",
+    "coinCouponInvalid": "ကူပံၚ်ဟွံဂၙဳ မဟုတ် သက်တမ်တုဲရ။",
+    "coinCouponError": "ကာလကူပံၚ်တၚ်္ကာ ယောၚ်ယာ"
   },
   "settings": {
     "title": "ဒၞာဲထိၚ်",

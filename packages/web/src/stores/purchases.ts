@@ -48,6 +48,15 @@ export const usePurchasesStore = defineStore('purchases', () => {
     return res.data as any
   }
 
+  async function redeemCoinCoupon(code: string) {
+    const auth = useAuthStore()
+    if (!auth.user?.email) throw new Error('Not logged in')
+    const res = await purchasesApi.redeemCoinCoupon(auth.user.email as string, code)
+    const body = res.data as any
+    if (body?.status === 'ok') await fetchAll()
+    return body
+  }
+
   const buyLoading = ref(false)
   const buyError   = ref<string | null>(null)
 
@@ -118,5 +127,5 @@ export const usePurchasesStore = defineStore('purchases', () => {
     }
   }
 
-  return { books, articles, coinBalance, coinPackages, loading, fetchAll, hasBook, hasArticle, fetchCoinPackages, redeemCoupon, buyLoading, buyError, buyCoins, purchaseBook, purchaseArticle }
+  return { books, articles, coinBalance, coinPackages, loading, fetchAll, hasBook, hasArticle, fetchCoinPackages, redeemCoupon, redeemCoinCoupon, buyLoading, buyError, buyCoins, purchaseBook, purchaseArticle }
 })

@@ -37,7 +37,9 @@
     "error": "An error occurred. Please try again.",
     "retry": "Retry",
     "viewAll": "View all",
-    "coins": "coins"
+    "coins": "coins",
+    "anonymous": "Anonymous",
+    "you": "You"
   },
   "auth": {
     "login": "Log In",
@@ -72,7 +74,25 @@
     "related": "Related Books",
     "pages": "{count} pages",
     "rating": "Rating",
-    "noBooks": "No books found."
+    "noBooks": "No books found.",
+    "readEpub": "Read EPUB",
+    "readPdf": "Read PDF",
+    "listen": "Listen",
+    "couponPrompt": "Have a book coupon?",
+    "couponPlaceholder": "Coupon code",
+    "couponSuccess": "Book unlocked! 🎉",
+    "couponInvalid": "Invalid or expired coupon.",
+    "couponError": "Error redeeming coupon",
+    "detailsTab": "Details",
+    "reviewsTab": "Reviews ({count})",
+    "writeReview": "Write a Review",
+    "reviewPlaceholder": "Share your thoughts...",
+    "submitReview": "Submit Review",
+    "reviewSubmitted": "Review submitted!",
+    "reviewSubmitFailed": "Failed to submit review",
+    "loginToReview": "Login to write a review.",
+    "noReviews": "No reviews yet",
+    "noReviewsHint": "Be the first one to share what you think about this book."
   },
   "articles": {
     "title": "Articles",
@@ -132,7 +152,14 @@
     "submitting": "Submitting…",
     "proofSubmitted": "Payment proof submitted! Coins will be credited after admin review.",
     "noPurchases": "No purchases yet",
-    "packages": "Coin packages"
+    "packages": "Coin packages",
+    "redeemAction": "Redeem",
+    "coinCouponTitle": "Coin Coupon",
+    "coinCouponHint": "Enter a coin coupon code to add coins to your balance.",
+    "coinCouponPlaceholder": "COUPON CODE",
+    "coinCouponSuccess": "Coins added successfully! 🎉",
+    "coinCouponInvalid": "Invalid or expired coupon.",
+    "coinCouponError": "Error redeeming coupon"
   },
   "settings": {
     "title": "Settings",

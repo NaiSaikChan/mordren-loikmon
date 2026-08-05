@@ -176,6 +176,8 @@ export default function ArticleDetailScreen() {
   const body = article ? String(article.content ?? article.body ?? article.description ?? '') : ''
   const bookmarked = article ? isBookmarked('article', article.id) : false
   const category = article ? ((article.categoryname as string) ?? (article.category as string) ?? '') : ''
+  const descriptionPreview = article ? String(article.description ?? article.body ?? '') : ''
+  const descriptionPreviewText = descriptionPreview ? stripHtml(descriptionPreview) : ''
   const price = Number(article?.price ?? article?.amount ?? 0)
   const isPaid = !!article && !article.is_free && price > 0
   const canRead = useMemo(() => {
@@ -423,6 +425,23 @@ export default function ArticleDetailScreen() {
             <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
               {!canRead ? (
                 <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
+                  {descriptionPreviewText.trim() ? (
+                    <View className="mb-5 rounded-xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900">
+                      <Text
+                        className="mb-2 text-base font-semibold text-surface-900 dark:text-surface-50"
+                        style={headerTextStyle}
+                      >
+                        Description Preview
+                      </Text>
+                      <Text
+                        className="leading-7 text-surface-700 dark:text-surface-200"
+                        style={bodyTextStyle}
+                      >
+                        {descriptionPreviewText}
+                      </Text>
+                    </View>
+                  ) : null}
+
                   <View className="items-center py-6">
                     <Text className="text-5xl">🔒</Text>
                     <Text className="mt-3 text-center text-lg font-semibold text-surface-900 dark:text-surface-50" style={headerTextStyle}>

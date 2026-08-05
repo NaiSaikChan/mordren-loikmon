@@ -31,6 +31,11 @@ const submitting   = ref(false)
 const reviewMsg    = ref('')
 const isPurchasing = ref(false)
 const purchaseMsg  = ref('')
+const purchaseSuccess = ref(false)
+const bookCoupon        = ref('')
+const bookCouponMsg     = ref('')
+const bookCouponLoading = ref(false)
+const bookCouponSuccess = ref(false)
 
 // A book is paid if it has a positive price and is not flagged free
 const isPaid = computed(() => {
@@ -58,21 +63,46 @@ async function submitReview() {
   try {
     await reviews.submitReview(props.id, 'book', newReview.value, newRating.value)
     newReview.value = ''
-    reviewMsg.value = 'Review submitted!'
-  } catch { reviewMsg.value = 'Failed to submit' }
+    reviewMsg.value = t('books.reviewSubmitted')
+  } catch { reviewMsg.value = t('books.reviewSubmitFailed') }
   finally { submitting.value = false }
 }
 
 async function buyBook() {
   isPurchasing.value = true
   purchaseMsg.value  = ''
+  purchaseSuccess.value = false
   try {
     await purchasesStore.purchaseBook(props.id, Number(book.value?.price ?? book.value?.amount ?? 0))
-    purchaseMsg.value = 'Purchase successful! You can now read this book.'
+    purchaseSuccess.value = true
+    purchaseMsg.value = t('books.purchaseSuccess')
   } catch (e: any) {
-    purchaseMsg.value = e.message ?? 'Purchase failed. Please check your coin balance.'
+    purchaseMsg.value = e.message ?? t('books.purchaseFailed')
   } finally {
     isPurchasing.value = false
+  }
+}
+
+async function redeemBookCoupon() {
+  if (!bookCoupon.value.trim()) return
+  bookCouponLoading.value = true
+  bookCouponMsg.value = ''
+  bookCouponSuccess.value = false
+  try {
+    const res = await purchasesStore.redeemCoupon(bookCoupon.value.trim(), props.id)
+    const body = res as any
+    if (body?.status === 'ok') {
+      bookCouponSuccess.value = true
+      bookCouponMsg.value = body?.message ?? body?.msg ?? t('books.couponSuccess')
+      bookCoupon.value = ''
+      await purchasesStore.fetchAll()
+    } else {
+      bookCouponMsg.value = body?.message ?? body?.msg ?? t('books.couponInvalid')
+    }
+  } catch (e: any) {
+    bookCouponMsg.value = e?.message ?? t('books.couponError')
+  } finally {
+    bookCouponLoading.value = false
   }
 }
 
@@ -134,10 +164,10 @@ watch(() => props.id, loadBook)
 
             <!-- Stats row -->
             <div class="flex items-center gap-4 text-xs text-gray-400 mb-4 flex-wrap">
-              <span v-if="book.pages ?? book.pagecount">📄 {{ book.pages ?? book.pagecount }} pages</span>
+              <span v-if="book.pages ?? book.pagecount">📄 {{ t('books.pages', { count: book.pages ?? book.pagecount }) }}</span>
               <span v-if="book.rating">⭐ {{ book.rating }}/5</span>
-              <span v-if="book.views ?? book.total_views">👁 {{ book.views ?? book.total_views }} views</span>
-              <span v-if="book.is_free" class="text-green-500 font-semibold">Free</span>
+              <span v-if="book.views ?? book.total_views">👁 {{ t('books.views', { count: book.views ?? book.total_views }) }}</span>
+              <span v-if="book.is_free" class="text-green-500 font-semibold">{{ t('books.free') }}</span>
               <span v-else-if="book.price ?? book.amount" class="text-brand-600 font-semibold">🪙 {{ book.price ?? book.amount }} coins</span>
             </div>
 
@@ -147,7 +177,7 @@ watch(() => props.id, loadBook)
               <template v-if="canRead">
                 <template v-if="book.epub">
                   <RouterLink :to="`/books/${props.id}/read?format=epub`" class="btn-primary">
-                    📖 Read EPUB
+                    📖 {{ t('books.readEpub') }}
                   </RouterLink>
                   <span class="inline-block text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
                     EPUB
@@ -155,35 +185,57 @@ watch(() => props.id, loadBook)
                 </template>
                 <template v-if="book.pdf || book.pdffile">
                   <RouterLink :to="`/books/${props.id}/read?format=pdf`" class="btn-primary">
-                    📄 Read PDF
+                    📄 {{ t('books.readPdf') }}
                   </RouterLink>
                   <span class="inline-block text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-0.5 rounded-full">
                     PDF
                   </span>
                 </template>
                 <RouterLink v-if="store.chapters.length" :to="`/books/${props.id}/read`" class="btn-secondary">
-                  📑 Chapters ({{ store.chapters.length }})
+                  📑 {{ t('books.chaptersCount', { count: store.chapters.length }) }}
                 </RouterLink>
                 <button
                   v-if="audioStore.tracks.length"
                   class="btn-primary"
                   @click="startAudioPlayer">
-                  🎧 Listen ({{ audioStore.tracks.length }} chapters)
+                  🎧 {{ t('books.listenChapters', { count: audioStore.tracks.length }) }}
                 </button>
               </template>
               <!-- Paid & not purchased: show buy / login prompt -->
               <template v-else-if="isPaid">
                 <button v-if="auth.isLoggedIn" class="btn-primary" @click="buyBook"
                   :disabled="purchasesStore.buyLoading || isPurchasing">
-                  {{ purchasesStore.buyLoading || isPurchasing ? 'Purchasing…' : `🪙 Buy for ${book.price ?? book.amount} coins` }}
+                  {{ purchasesStore.buyLoading || isPurchasing ? t('books.purchasing') : `🪙 ${t('books.buyForCoins', { amount: book.price ?? book.amount })}` }}
                 </button>
                 <RouterLink v-else to="/auth" class="btn-primary">
-                  🔐 Login to Read
+                  🔐 {{ t('books.loginToRead') }}
                 </RouterLink>
                 <p v-if="purchaseMsg" class="text-sm w-full mt-1"
-                  :class="purchaseMsg.includes('successful') ? 'text-green-500' : 'text-red-400'">
+                  :class="purchaseSuccess ? 'text-green-500' : 'text-red-400'">
                   {{ purchaseMsg }}
                 </p>
+                <!-- Book Coupon (only for logged-in users who haven't purchased) -->
+                <div v-if="auth.isLoggedIn" class="w-full mt-3 pt-3 border-t border-gray-100 dark:border-surface-700">
+                  <p class="text-xs text-gray-400 dark:text-gray-500 mb-2">🎫 {{ t('books.couponPrompt') }}</p>
+                  <div class="flex gap-2">
+                    <input
+                      v-model="bookCoupon"
+                      class="input flex-1"
+                      :placeholder="t('books.couponPlaceholder')"
+                      @keyup.enter="redeemBookCoupon"
+                    />
+                    <button
+                      class="btn-ghost whitespace-nowrap"
+                      :disabled="!bookCoupon.trim() || bookCouponLoading"
+                      @click="redeemBookCoupon">
+                      {{ bookCouponLoading ? '…' : t('purchases.redeemAction') }}
+                    </button>
+                  </div>
+                  <p v-if="bookCouponMsg" class="text-xs mt-1.5"
+                    :class="bookCouponSuccess ? 'text-green-500' : 'text-red-400'">
+                    {{ bookCouponMsg }}
+                  </p>
+                </div>
               </template>
             </div>
           </div>
@@ -193,15 +245,15 @@ watch(() => props.id, loadBook)
       <!-- Tabs -->
       <div class="flex gap-2 mb-6">
         <button :class="['px-4 py-2 rounded-xl text-sm font-medium', tab === 'details' ? 'bg-brand-600 text-white' : 'btn-ghost']"
-          @click="tab = 'details'">Details</button>
+          @click="tab = 'details'">{{ t('books.detailsTab') }}</button>
         <button :class="['px-4 py-2 rounded-xl text-sm font-medium', tab === 'reviews' ? 'bg-brand-600 text-white' : 'btn-ghost']"
-          @click="tab = 'reviews'">Reviews ({{ reviews.list.length }})</button>
+          @click="tab = 'reviews'">{{ t('books.reviewsTab', { count: reviews.list.length }) }}</button>
       </div>
 
       <!-- Details tab -->
       <div v-if="tab === 'details'">
         <div v-if="book.description ?? book.about" class="card p-5 mb-6">
-          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">About</h2>
+          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">{{ t('books.description') }}</h2>
           <p class="text-sm text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
             {{ book.description ?? book.about }}
           </p>
@@ -209,7 +261,7 @@ watch(() => props.id, loadBook)
 
         <!-- Related books -->
         <div v-if="store.related.length">
-          <h2 class="section-title">Related Books</h2>
+          <h2 class="section-title">{{ t('books.related') }}</h2>
           <div class="content-grid">
             <BookCard v-for="b in store.related.slice(0, 6)" :key="b.id" :book="b" />
           </div>
@@ -220,18 +272,18 @@ watch(() => props.id, loadBook)
       <div v-if="tab === 'reviews'">
         <!-- Submit review -->
         <div v-if="auth.isLoggedIn" class="card p-5 mb-6">
-          <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Write a Review</h3>
+          <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ t('books.writeReview') }}</h3>
           <!-- Star rating -->
           <div class="flex gap-1 mb-3">
             <button v-for="s in 5" :key="s"
               :class="['text-2xl transition-transform hover:scale-110', s <= newRating ? 'text-yellow-400' : 'text-gray-300']"
               @click="newRating = s">★</button>
           </div>
-          <textarea v-model="newReview" class="input w-full h-24 resize-none" placeholder="Share your thoughts..." />
+          <textarea v-model="newReview" class="input w-full h-24 resize-none" :placeholder="t('books.reviewPlaceholder')" />
           <div class="flex items-center justify-between mt-3">
             <p v-if="reviewMsg" class="text-sm text-green-500">{{ reviewMsg }}</p>
             <button class="btn-primary ml-auto" :disabled="submitting || !newReview.trim()" @click="submitReview">
-              {{ submitting ? 'Submitting...' : 'Submit Review' }}
+              {{ submitting ? t('purchases.submitting') : t('books.submitReview') }}
             </button>
           </div>
         </div>
@@ -254,7 +306,7 @@ watch(() => props.id, loadBook)
             </div>
           </div>
         </div>
-        <div v-else class="text-center py-8 text-gray-400">No reviews yet. Be the first!</div>
+        <div v-else class="text-center py-8 text-gray-400">{{ t('books.noReviews') }}</div>
       </div>
     </div>
 

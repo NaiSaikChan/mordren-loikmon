@@ -11,15 +11,23 @@ const store = usePurchasesStore()
 
 const couponCode = ref('')
 const couponMsg  = ref('')
-const couponBookId = ref('')
+const couponLoading = ref(false)
+const couponSuccess = ref(false)
 
-async function redeemCoupon() {
-  if (!couponCode.value) return
+async function redeemCoinCoupon() {
+  if (!couponCode.value.trim()) return
+  couponLoading.value = true
+  couponMsg.value = ''
+  couponSuccess.value = false
   try {
-    const res = await store.redeemCoupon(couponCode.value, couponBookId.value || '0')
-    couponMsg.value = res.message ?? (res.status === 'ok' ? 'Redeemed successfully!' : 'Failed')
-  } catch {
-    couponMsg.value = 'Error redeeming coupon'
+    const res = await store.redeemCoinCoupon(couponCode.value.trim())
+    couponSuccess.value = res?.status === 'ok'
+    couponMsg.value = res?.message ?? res?.msg ?? (res?.status === 'ok' ? t('purchases.coinCouponSuccess') : t('purchases.coinCouponFailed'))
+    if (res?.status === 'ok') couponCode.value = ''
+  } catch (e: any) {
+    couponMsg.value = e?.message ?? t('purchases.coinCouponError')
+  } finally {
+    couponLoading.value = false
   }
 }
 
@@ -54,7 +62,7 @@ async function submitPayment() {
     buySuccess.value = true
     buyMsg.value = t('purchases.proofSubmitted')
   } catch {
-    buyMsg.value = store.buyError ?? 'Submission failed. Please try again.'
+    buyMsg.value = store.buyError ?? t('purchases.submissionFailed')
   }
 }
 
@@ -80,8 +88,8 @@ onMounted(async () => {
     <!-- Not logged in -->
     <div v-if="!authStore.isLoggedIn" class="card p-12 text-center text-gray-400">
       <div class="text-6xl mb-4">🪙</div>
-      <p class="mb-4">Login to view your purchases and coins</p>
-      <RouterLink to="/auth" class="btn-primary inline-flex">Login</RouterLink>
+      <p class="mb-4">{{ t('purchases.loginPrompt') }}</p>
+      <RouterLink to="/auth" class="btn-primary inline-flex">{{ t('auth.login') }}</RouterLink>
     </div>
 
     <div v-else>
@@ -111,21 +119,24 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Redeem coupon -->
+        <!-- Redeem Coin Coupon -->
         <div class="card p-6">
-          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-4">{{ t('purchases.redeemCoupon') }}</h2>
+          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">🎫 {{ t('purchases.coinCouponTitle') }}</h2>
+          <p class="text-xs text-gray-400 dark:text-gray-500 mb-4">{{ t('purchases.coinCouponHint') }}</p>
           <div class="flex gap-2">
-            <input v-model="couponCode" class="input flex-1" placeholder="Enter coupon code" />
-            <button class="btn-primary" @click="redeemCoupon">Redeem</button>
+            <input v-model="couponCode" class="input flex-1" :placeholder="t('purchases.coinCouponPlaceholder')" @keyup.enter="redeemCoinCoupon" />
+            <button class="btn-primary" :disabled="!couponCode.trim() || couponLoading" @click="redeemCoinCoupon">
+              {{ couponLoading ? '…' : t('purchases.redeemAction') }}
+            </button>
           </div>
-          <p v-if="couponMsg" :class="['text-sm mt-2', couponMsg.includes('success') ? 'text-green-500' : 'text-red-400']">
+          <p v-if="couponMsg" :class="['text-sm mt-2', couponSuccess ? 'text-green-500' : 'text-red-400']">
             {{ couponMsg }}
           </p>
         </div>
 
         <!-- Purchased books list -->
         <div v-if="store.books.length">
-          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Purchased Books ({{ store.books.length }})</h2>
+          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ t('purchases.purchasedBooks', { count: store.books.length }) }}</h2>
           <div class="space-y-2">
             <RouterLink v-for="b in store.books" :key="b.id" :to="`/books/${b.id}`"
               class="card p-3 flex items-center gap-3 hover:border-brand-400 transition-colors">
@@ -137,7 +148,7 @@ onMounted(async () => {
 
         <!-- Purchased articles list -->
         <div v-if="store.articles.length">
-          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Purchased Articles ({{ store.articles.length }})</h2>
+          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ t('purchases.purchasedArticles', { count: store.articles.length }) }}</h2>
           <div class="space-y-2">
             <RouterLink v-for="a in store.articles" :key="a.id" :to="`/articles/${a.id}`"
               class="card p-3 flex items-center gap-3 hover:border-brand-400 transition-colors">
@@ -174,7 +185,7 @@ onMounted(async () => {
         <!-- Success state -->
         <div v-if="buySuccess" class="text-center py-4 space-y-3">
           <div class="text-5xl">✅</div>
-          <p class="text-green-600 dark:text-green-400 font-semibold">Proof submitted!</p>
+          <p class="text-green-600 dark:text-green-400 font-semibold">{{ t('purchases.proofSubmittedShort') }}</p>
           <p class="text-sm text-gray-500 dark:text-gray-400">{{ buyMsg }}</p>
           <button @click="closeModal" class="btn-primary mt-2 px-6">{{ t('common.close') }}</button>
         </div>
@@ -185,16 +196,16 @@ onMounted(async () => {
           <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
             <p class="font-semibold">{{ t('purchases.paymentInstructions') }}</p>
             <ol class="list-decimal list-inside space-y-1 text-gray-500 dark:text-gray-400">
-              <li>Transfer <strong class="text-gray-700 dark:text-gray-200">{{ selectedPkg.value }} THB</strong> to our bank account.</li>
-              <li>Take a screenshot or photo of the transfer receipt.</li>
-              <li>Upload the proof image below and tap Submit.</li>
+              <li>{{ t('purchases.paymentTransferStep', { amount: selectedPkg.value }) }}</li>
+              <li>{{ t('purchases.paymentReceiptStep') }}</li>
+              <li>{{ t('purchases.paymentUploadStep') }}</li>
             </ol>
-            <p class="text-xs text-gray-400 pt-1">Coins are credited within 24 hours after admin review.</p>
+            <p class="text-xs text-gray-400 pt-1">{{ t('purchases.creditAfterReview') }}</p>
           </div>
 
           <!-- File upload -->
           <label class="block">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">Payment Proof</span>
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">{{ t('purchases.paymentProof') }}</span>
             <input
               ref="fileInputRef"
               type="file"

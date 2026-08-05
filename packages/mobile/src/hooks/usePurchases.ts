@@ -23,6 +23,7 @@ export function usePurchases() {
   const [packages, setPackages] = useState<CoinPackage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -62,5 +63,40 @@ export function usePurchases() {
     load()
   }, [load])
 
-  return { books, articles, coins, packages, loading, error, reload: load }
+  const redeemCoinCoupon = useCallback(
+    async (code: string): Promise<{ status: string; message?: string; msg?: string }> => {
+      if (!email) throw new Error('Not logged in')
+      setCouponLoading(true)
+      try {
+        const res = await purchasesApi.redeemCoinCoupon(email, code)
+        const body = res.data as Record<string, unknown>
+        if (body.status === 'ok') await load()
+        return body as { status: string; message?: string; msg?: string }
+      } finally {
+        setCouponLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [email],
+  )
+
+  const redeemBookCoupon = useCallback(
+    async (
+      bookId: string | number,
+      code: string,
+    ): Promise<{ status: string; message?: string; msg?: string }> => {
+      if (!email) throw new Error('Not logged in')
+      setCouponLoading(true)
+      try {
+        const res = await purchasesApi.redeemCoupon(email, code, bookId)
+        return res.data as { status: string; message?: string; msg?: string }
+      } finally {
+        setCouponLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [email],
+  )
+
+  return { books, articles, coins, packages, loading, error, couponLoading, reload: load, redeemCoinCoupon, redeemBookCoupon }
 }

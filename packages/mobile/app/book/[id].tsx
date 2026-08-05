@@ -98,7 +98,8 @@ function ReviewCard({
   headerTextStyle: ReturnType<typeof useTypography>['headerTextStyle']
   highlighted?: boolean
 }) {
-  const author = review.author_name ?? review.username ?? 'Anonymous'
+  const { t } = useI18n()
+  const author = review.author_name ?? review.username ?? t('common.anonymous')
   const content = review.content ?? review.comment ?? ''
   const rating = Number(review.rating ?? 0)
 
@@ -128,7 +129,7 @@ function ReviewCard({
         {highlighted ? (
           <View className="rounded-full bg-brand-500 px-2 py-0.5">
             <Text className="text-[10px] font-semibold text-white" style={bodyTextStyle}>
-              You
+              {t('common.you')}
             </Text>
           </View>
         ) : null}
@@ -144,7 +145,7 @@ export default function BookDetailScreen() {
   const { user, isLoggedIn, refreshUser } = useAuth()
   const { isBookmarked, toggleBook } = useLibrary()
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const { owned: canRead } = useIsOwned(id, 'book')
+  const { owned: canRead, reload: reloadOwnership } = useIsOwned(id, 'book')
   const { tracks: audioTracks, hasAudio } = useBookAudioChapters(
     book?.id,
     book?.title,
@@ -153,6 +154,11 @@ export default function BookDetailScreen() {
   const { width } = useWindowDimensions()
   const [purchasing, setPurchasing] = useState(false)
   const [activeTab, setActiveTab] = useState<BookDetailTab>('details')
+  const [bookCoupon, setBookCoupon] = useState('')
+  const [bookCouponMsg, setBookCouponMsg] = useState('')
+  const [bookCouponLoading, setBookCouponLoading] = useState(false)
+  const [bookCouponSuccess, setBookCouponSuccess] = useState(false)
+  const [showCoupon, setShowCoupon] = useState(false)
   const [reviews, setReviews] = useState<Review[]>([])
   const [userReview, setUserReview] = useState<Review | null>(null)
   const [reviewsLoading, setReviewsLoading] = useState(false)
@@ -162,9 +168,10 @@ export default function BookDetailScreen() {
   const [newRating, setNewRating] = useState(5)
 
   const isTablet = width >= 768
-  const relatedColumns = Math.max(2, Math.min(4, Math.floor(width / 260)))
-  const coverWidth = isTablet ? Math.min(240, Math.max(180, Math.round(width * 0.22))) : 128
-  const coverHeight = Math.round(coverWidth * 1.5)
+  const relatedColumns = Math.max(2, Math.min(4, Math.floor(width / 200)))
+  const coverW = isTablet ? Math.min(220, Math.round(width * 0.22)) : Math.round(width * 0.38)
+  const coverH = Math.round(coverW * 1.48)
+  const heroH = coverH + 72
   const cover = book ? pickCover(book as unknown as Record<string, unknown>) : ''
   const author = book ? (book.authorname as string) ?? (book.author as string) ?? '' : ''
   const free = book ? isFree(book as unknown as Record<string, unknown>) : false
@@ -237,11 +244,10 @@ export default function BookDetailScreen() {
     router.push({ pathname: '/audiobook/[id]', params: { id: String(id) } })
   }
 
-const audioButton = hasAudio ? (
+  const audioButton = hasAudio ? (
     <PrimaryButton
-      label="🎧 Listen"
+      label={`🎧 ${t('books.listen')}`}
       onPress={() => onListenAudio()}
-      labelClassName="text-xl font-bold"
       labelStyle={headerTextStyle}
     />
   ) : null
@@ -295,6 +301,38 @@ const audioButton = hasAudio ? (
     }
   }
 
+  const onRedeemBookCoupon = async () => {
+    if (!isLoggedIn || !user?.email) {
+      router.push('/(auth)/login')
+      return
+    }
+    const code = bookCoupon.trim()
+    if (!code) return
+    setBookCouponLoading(true)
+    setBookCouponMsg('')
+    setBookCouponSuccess(false)
+    try {
+      const res = await purchasesApi.redeemCoupon(user.email, code, id)
+      const body = res.data as Record<string, unknown>
+      if (body.status === 'ok') {
+        setBookCouponSuccess(true)
+        setBookCouponMsg(String(body.message ?? body.msg ?? t('books.couponSuccess')))
+        setBookCoupon('')
+        // Refresh purchases list so canRead flips immediately
+        await reloadOwnership()
+        const coinRes = await purchasesApi.getUserCoins(user.email).catch(() => ({ data: {} }))
+        const coins = Number((coinRes.data as Record<string, unknown>).coins ?? user.coins ?? 0)
+        await refreshUser({ ...user, coins })
+      } else {
+        setBookCouponMsg(String(body.message ?? body.msg ?? t('books.couponInvalid')))
+      }
+    } catch (e: unknown) {
+      setBookCouponMsg(e instanceof Error ? e.message : t('books.couponError'))
+    } finally {
+      setBookCouponLoading(false)
+    }
+  }
+
   const onSubmitReview = async () => {
     if (!isLoggedIn || !user?.email) {
       router.push('/(auth)/login')
@@ -324,10 +362,10 @@ const audioButton = hasAudio ? (
         await loadReviews()
       }
       setNewReview('')
-      setReviewMessage('Review submitted!')
+      setReviewMessage(t('books.reviewSubmitted'))
       setActiveTab('reviews')
     } catch {
-      setReviewMessage('Failed to submit review')
+      setReviewMessage(t('books.reviewSubmitFailed'))
     } finally {
       setSubmittingReview(false)
     }
@@ -335,126 +373,400 @@ const audioButton = hasAudio ? (
 
   const reviewCount = displayedReviews.length
 
+  // ── JSX fragments shared by phone and tablet layouts ─────────────────
+  const statChips = (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+      {book.rating ? (
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
+            backgroundColor: 'rgba(245,158,11,0.12)',
+          }}
+        >
+          <Ionicons name="star" size={12} color="#f59e0b" />
+          <Text className="text-xs font-bold text-amber-600 dark:text-amber-400" style={bodyTextStyle}>
+            {Number(book.rating).toFixed(1)}
+          </Text>
+        </View>
+      ) : null}
+      {(book.pages || book.pagecount) ? (
+        <View
+          className="bg-surface-100 dark:bg-surface-700"
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
+          }}
+        >
+          <Ionicons name="document-text-outline" size={12} color="#64748b" />
+          <Text className="text-xs font-medium text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
+            {t('books.pages', { count: String(book.pages ?? book.pagecount) })}
+          </Text>
+        </View>
+      ) : null}
+      {free ? (
+        <View
+          style={{
+            borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
+            backgroundColor: 'rgba(16,185,129,0.12)',
+          }}
+        >
+          <Text className="text-xs font-bold text-emerald-600 dark:text-emerald-400" style={bodyTextStyle}>
+            {t('books.free')}
+          </Text>
+        </View>
+      ) : (
+        <View
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
+            backgroundColor: 'rgba(37,99,235,0.1)',
+          }}
+        >
+          <Ionicons name="server-outline" size={12} color="#2563eb" />
+          <Text className="text-xs font-bold text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
+            {price} {t('purchases.coins')}
+          </Text>
+        </View>
+      )}
+    </View>
+  )
+
+  const actionButtons = (
+    <View style={{ gap: 10 }}>
+      {free || canRead ? (
+        <>
+          {epubSource ? (
+            <PrimaryButton
+              label={`📖 ${t('books.readEpub')}`}
+              onPress={() => void openReader(epubSource, 'epub')}
+              labelStyle={headerTextStyle}
+            />
+          ) : null}
+          {pdfSource ? (
+            <PrimaryButton
+              label={`📄 ${t('books.readPdf')}`}
+              onPress={() => void openReader(pdfSource, 'pdf')}
+              labelStyle={headerTextStyle}
+            />
+          ) : null}
+          {audioButton}
+        </>
+      ) : isLoggedIn ? (
+        <>
+          <PrimaryButton
+            label={`${t('books.purchase')} ${price} ${t('purchases.coins')}`}
+            loading={purchasing}
+            onPress={onPurchase}
+            labelStyle={headerTextStyle}
+          />
+          <Pressable
+            onPress={() => setShowCoupon((v) => !v)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: 8,
+            }}
+          >
+            <Text
+              className="text-s font-semibold text-surface-400 dark:text-surface-500"
+              style={bodyTextStyle}
+            >
+              🎫 {t('books.couponPrompt')}
+            </Text>
+            <Ionicons
+              name={showCoupon ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color="#94a3b8"
+            />
+          </Pressable>
+          {showCoupon ? (
+            <View className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 p-3">
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TextInput
+                  value={bookCoupon}
+                  onChangeText={(v) => {
+                    setBookCoupon(v)
+                    setBookCouponMsg('')
+                  }}
+                  placeholder={t('books.couponPlaceholder')}
+                  autoCapitalize="characters"
+                  placeholderTextColor="#94a3b8"
+                  className="flex-1 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 px-3 py-2.5 text-sm text-surface-900 dark:text-surface-50"
+                />
+                <Pressable
+                  onPress={() => void onRedeemBookCoupon()}
+                  disabled={!bookCoupon.trim() || bookCouponLoading}
+                  style={{
+                    borderRadius: 12,
+                    paddingHorizontal: 16,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    minWidth: 80,
+                    backgroundColor:
+                      bookCoupon.trim() && !bookCouponLoading ? '#2563eb' : '#93c5fd',
+                  }}
+                >
+                  <Text className="text-sm font-bold text-white" style={bodyTextStyle}>
+                    {bookCouponLoading ? '…' : t('purchases.redeemAction')}
+                  </Text>
+                </Pressable>
+              </View>
+              {bookCouponMsg ? (
+                <Text
+                  className={`mt-2 text-xs ${bookCouponSuccess ? 'text-emerald-500' : 'text-red-400'}`}
+                  style={bodyTextStyle}
+                >
+                  {bookCouponMsg}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </>
+      ) : (
+        <PrimaryButton
+          label={`${t('books.purchase')} ${price} ${t('purchases.coins')}`}
+          onPress={() => router.push('/(auth)/login')}
+          labelStyle={headerTextStyle}
+        />
+      )}
+    </View>
+  )
+
   return (
     <Screen edges={['top']}>
-      <Stack.Screen
-        options={{
-          title: '',
-          headerRight: () => (
-            <Pressable onPress={() => toggleBook(book)} hitSlop={8}>
-              <Ionicons
-                name={bookmarked ? 'bookmark' : 'bookmark-outline'}
-                size={22}
-                color="#2563eb"
-              />
-            </Pressable>
-          ),
-        }}
-      />
+      <Stack.Screen options={{ headerShown: false }} />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
-          contentContainerStyle={{
-            paddingBottom: 32,
-            width: '100%',
-            alignSelf: 'center',
-            maxWidth: isTablet ? 1080 : undefined,
-          }}
-        >
-          <View className={`${isTablet ? 'px-6 pt-6' : 'px-4 pt-4'}`}>
-            <View className={`flex-row ${isTablet ? 'gap-6' : 'gap-4'}`}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
+
+          {/* ── Phone: full-width blurred hero ───────────────── */}
+          {!isTablet ? (
+            <View
+              style={{
+                height: heroH,
+                overflow: 'hidden',
+                backgroundColor: '#0f172a',
+                borderBottomLeftRadius: 28,
+                borderBottomRightRadius: 28,
+              }}
+            >
+              {cover ? (
+                <Image
+                  source={{ uri: cover }}
+                  style={{ position: 'absolute', width: '100%', height: '100%' }}
+                  blurRadius={22}
+                  resizeMode="cover"
+                />
+              ) : null}
               <View
-                className="overflow-hidden rounded-2xl bg-surface-200 dark:bg-surface-800 shadow-sm"
-                style={{ width: coverWidth, height: coverHeight }}
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  backgroundColor: 'rgba(0,0,0,0.52)',
+                }}
+              />
+              {/* Back and bookmark floating over the blurred hero */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  left: 16,
+                  right: 16,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  zIndex: 10,
+                }}
               >
-                {cover ? (
-                  <Image source={{ uri: cover }} className="h-full w-full" resizeMode="cover" />
-                ) : (
-                  <View className="h-full w-full items-center justify-center">
-                    <Text className="text-4xl">📚</Text>
-                  </View>
-                )}
+                <Pressable
+                  onPress={() => router.back()}
+                  hitSlop={8}
+                  style={{
+                    width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: 'rgba(0,0,0,0.35)',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons name="chevron-back" size={22} color="#fff" />
+                </Pressable>
+                <Pressable
+                  onPress={() => toggleBook(book)}
+                  hitSlop={8}
+                  style={{
+                    width: 36, height: 36, borderRadius: 18,
+                    backgroundColor: 'rgba(0,0,0,0.35)',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Ionicons
+                    name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+                    size={20}
+                    color="#fff"
+                  />
+                </Pressable>
               </View>
-
-              <View className="flex-1 justify-center space-x-1">
-                <Text className="text-xl font-bold text-surface-900 dark:text-surface-50 pt-1" style={headerTextStyle}>
-                  {book.title}
-                </Text>
-                {author ? (
-                  <Text className="mt-1 text-base text-brand-600 dark:text-brand-400 pt-1" style={bodyTextStyle}>
-                    {t('common.by')} {author}
-                  </Text>
-                ) : null}
-
-                <View className="mt-3 flex-row flex-wrap items-center gap-3">
-                  {book.rating ? (
-                    <Text className="text-sm text-yellow-500" style={bodyTextStyle}>
-                      ⭐ {Number(book.rating).toFixed(1)}
-                    </Text>
-                  ) : null}
-                  {book.pages || book.pagecount ? (
-                    <Text className="text-sm text-surface-400" style={bodyTextStyle}>
-                      {t('books.pages', { count: String(book.pages ?? book.pagecount) })}
-                    </Text>
-                  ) : null}
-                  <Text className="text-sm font-semibold text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
-                    {free ? t('books.free') : `${price} ${t('purchases.coins')}`}
-                  </Text>
-                </View>
-
-                <View className={`mt-5 items-center justify-center ${isTablet ? 'items-start' : 'items-stretch'}`}>
-                  {free || canRead ? (
-                    <View className="w-full gap-2">
-                      {epubSource ? (
-                        <PrimaryButton
-                          label="📖 Read EPUB"
-                          onPress={() => {
-                            void openReader(epubSource, 'epub')
-                          }}
-                          labelClassName="text-xl font-bold"
-                          labelStyle={headerTextStyle}
-                        />
-                      ) : null}
-                      {pdfSource ? (
-                        <PrimaryButton
-                          label="📄 Read PDF"
-                          onPress={() => {
-                            void openReader(pdfSource, 'pdf')
-                          }}
-                          labelClassName="text-xl font-bold"
-                          labelStyle={headerTextStyle}
-                        />
-                      ) : null}
-                      {audioButton}
-                    </View>
-                  ) : isLoggedIn ? (
-                    <PrimaryButton
-                      label={`${t('books.purchase')} ${price} ${t('purchases.coins')}`}
-                      loading={purchasing}
-                      onPress={onPurchase}
-                      labelClassName="text-xl font-bold"
-                      labelStyle={headerTextStyle}
+              <View
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingTop: 20,
+                  paddingBottom: 10,
+                }}
+              >
+                <View
+                  style={{
+                    elevation: 24,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 14 },
+                    shadowOpacity: 0.65,
+                    shadowRadius: 22,
+                  }}
+                >
+                  {cover ? (
+                    <Image
+                      source={{ uri: cover }}
+                      style={{ width: coverW, height: coverH, borderRadius: 18 }}
+                      resizeMode="cover"
                     />
                   ) : (
-                    <PrimaryButton
-                      label={`${t('books.purchase')} ${price} ${t('purchases.coins')}`}
-                      onPress={() => router.push('/(auth)/login')}
-                      labelClassName="text-xl font-bold"
-                      labelStyle={headerTextStyle}
-                    />
+                    <View
+                      style={{
+                        width: coverW,
+                        height: coverH,
+                        borderRadius: 18,
+                        backgroundColor: '#1e293b',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 52 }}>📚</Text>
+                    </View>
                   )}
                 </View>
               </View>
             </View>
-          </View>
+          ) : null}
 
-          <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
-            <View className="flex-row rounded-2xl bg-surface-200 dark:bg-surface-800 p-1">
+          {/* ── Phone: title / author / chips / actions ──────── */}
+          {!isTablet ? (
+            <View style={{ paddingHorizontal: 20, paddingTop: 22 }}>
+              <Text
+                className="text-[22px] leading-snug text-surface-900 dark:text-surface-50"
+                style={headerTextStyle}
+              >
+                {book.title}
+              </Text>
+              {author ? (
+                <Text
+                  className="mt-1.5 text-sm font-semibold text-brand-600 dark:text-brand-400"
+                  style={bodyTextStyle}
+                >
+                  {t('common.by')} {author}
+                </Text>
+              ) : null}
+              {statChips}
+              <View style={{ marginTop: 20 }}>{actionButtons}</View>
+            </View>
+          ) : null}
+
+          {/* ── Tablet: side-by-side ─────────────────────────── */}
+          {isTablet ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 28,
+                paddingHorizontal: 28,
+                paddingTop: 28,
+                paddingBottom: 4,
+                alignItems: 'flex-start',
+              }}
+            >
+              {/* Tablet nav: back left, bookmark right */}
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0, left: 0, right: 0,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 28,
+                  paddingVertical: 4,
+                }}
+              >
+                <Pressable onPress={() => router.back()} hitSlop={8}>
+                  <Ionicons name="chevron-back" size={24} color="#2563eb" />
+                </Pressable>
+                <Pressable onPress={() => toggleBook(book)} hitSlop={8}>
+                  <Ionicons
+                    name={bookmarked ? 'bookmark' : 'bookmark-outline'}
+                    size={22}
+                    color="#2563eb"
+                  />
+                </Pressable>
+              </View>
+              <View
+                style={{
+                  elevation: 18,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 10 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 18,
+                }}
+              >
+                {cover ? (
+                  <Image
+                    source={{ uri: cover }}
+                    style={{ width: coverW, height: coverH, borderRadius: 18 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: coverW,
+                      height: coverH,
+                      borderRadius: 18,
+                      backgroundColor: '#1e293b',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 52 }}>📚</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  className="text-3xl font-bold leading-tight text-surface-900 dark:text-surface-50"
+                  style={headerTextStyle}
+                >
+                  {book.title}
+                </Text>
+                {author ? (
+                  <Text
+                    className="mt-2 text-base font-semibold text-brand-600 dark:text-brand-400"
+                    style={bodyTextStyle}
+                  >
+                    by {author}
+                  </Text>
+                ) : null}
+                {statChips}
+                <View style={{ marginTop: 24 }}>{actionButtons}</View>
+              </View>
+            </View>
+          ) : null}
+
+          {/* ── Tab bar ──────────────────────────────────────── */}
+          <View style={{ paddingHorizontal: isTablet ? 28 : 20, paddingTop: 24 }}>
+            <View className="flex-row rounded-2xl bg-surface-100 dark:bg-surface-800 p-1">
               {([
-                { id: 'details' as const, label: 'Details' },
-                { id: 'reviews' as const, label: `Reviews (${reviewCount})` },
+                { id: 'details' as const, label: t('books.detailsTab') },
+                { id: 'reviews' as const, label: t('books.reviewsTab', { count: reviewCount }) },
               ] as const).map((tab) => {
                 const selected = activeTab === tab.id
                 return (
@@ -464,9 +776,9 @@ const audioButton = hasAudio ? (
                     className={`flex-1 rounded-xl px-4 py-2.5 ${selected ? 'bg-white dark:bg-surface-700' : ''}`}
                   >
                     <Text
-                      className={`text-center text-sm font-medium ${
+                      className={`text-center text-sm font-semibold ${
                         selected
-                          ? 'text-surface-900 dark:text-surface-50'
+                          ? 'text-brand-600 dark:text-brand-400'
                           : 'text-surface-500 dark:text-surface-400'
                       }`}
                       style={selected ? headerTextStyle : bodyTextStyle}
@@ -479,119 +791,136 @@ const audioButton = hasAudio ? (
             </View>
           </View>
 
-          {activeTab === 'details' ? (
-            <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
-              {book.description || book.about ? (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-4">
-                  <Text className="mb-2 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                    {t('books.description')}
-                  </Text>
-                  <Text className="leading-7 text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
-                    {String(book.description ?? book.about)}
-                  </Text>
-                </View>
-              ) : null}
-
-              {related.length > 0 ? (
-                <View className="mt-6">
-                  <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                    {t('books.related')}
-                  </Text>
-                  <View className="flex-row flex-wrap -mx-2">
-                    {related.map((item) => (
-                      <View
-                        key={String(item.id)}
-                        className="p-2"
-                        style={{ width: `${100 / relatedColumns}%` }}
-                      >
-                        <BookCard book={item} variant="grid" />
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
-              {isLoggedIn ? (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-4">
-                  <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                    Write a Review
-                  </Text>
-
-                  <View className="mb-4">
-                    <ReviewStars rating={newRating} onChange={setNewRating} />
-                  </View>
-
-                  <TextInput
-                    value={newReview}
-                    onChangeText={setNewReview}
-                    placeholder="Share your thoughts..."
-                    placeholderTextColor="#94a3b8"
-                    multiline
-                    textAlignVertical="top"
-                    className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-3 text-surface-900 dark:border-surface-700 dark:bg-surface-900 dark:text-surface-50"
-                    style={[bodyTextStyle, { minHeight: 120, textAlignVertical: 'top' }]}
-                  />
-
-                  <View className="mt-3 flex-row items-center justify-between gap-3">
-                    <Text className="flex-1 text-sm text-emerald-600 dark:text-emerald-400" style={bodyTextStyle}>
-                      {reviewMessage}
+          {/* ── Tab content ──────────────────────────────────── */}
+          <View style={{ paddingHorizontal: isTablet ? 28 : 20, paddingTop: 16 }}>
+            {activeTab === 'details' ? (
+              <>
+                {book.description || book.about ? (
+                  <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
+                    <Text
+                      className="mb-2 text-base font-bold text-surface-900 dark:text-surface-50"
+                      style={headerTextStyle}
+                    >
+                      {t('books.description')}
                     </Text>
-                    <PrimaryButton
-                      label={submittingReview ? 'Submitting…' : 'Submit Review'}
-                      loading={submittingReview}
-                      onPress={onSubmitReview}
-                      labelClassName="text-base font-bold"
-                      labelStyle={headerTextStyle}
-                    />
+                    <Text
+                      className="text-sm leading-7 text-surface-600 dark:text-surface-300"
+                      style={bodyTextStyle}
+                    >
+                      {String(book.description ?? book.about)}
+                    </Text>
                   </View>
-                </View>
-              ) : (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-4">
-                  <Text className="text-center text-surface-700 dark:text-surface-300" style={bodyTextStyle}>
-                    Login to write a review.
-                  </Text>
-                  <View className="mt-3 items-center">
+                ) : null}
+
+                {related.length > 0 ? (
+                  <View style={{ marginTop: 24 }}>
+                    <Text
+                      className="mb-3 text-base font-bold text-surface-900 dark:text-surface-50"
+                      style={headerTextStyle}
+                    >
+                      {t('books.related')}
+                    </Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -8 }}>
+                      {related.map((item) => (
+                        <View
+                          key={String(item.id)}
+                          style={{ width: `${100 / relatedColumns}%`, padding: 8 }}
+                        >
+                          <BookCard book={item} variant="grid" />
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {isLoggedIn ? (
+                  <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
+                    <Text
+                      className="mb-3 text-base font-bold text-surface-900 dark:text-surface-50"
+                      style={headerTextStyle}
+                    >
+                      {t('books.writeReview')}
+                    </Text>
+                    <View className="mb-4">
+                      <ReviewStars rating={newRating} onChange={setNewRating} />
+                    </View>
+                    <TextInput
+                      value={newReview}
+                      onChangeText={setNewReview}
+                      placeholder={t('books.reviewPlaceholder')}
+                      placeholderTextColor="#94a3b8"
+                      multiline
+                      textAlignVertical="top"
+                      className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-3 text-surface-900 dark:border-surface-700 dark:bg-surface-900 dark:text-surface-50"
+                      style={[bodyTextStyle, { minHeight: 110, textAlignVertical: 'top' }]}
+                    />
+                    <View className="mt-3 flex-row items-center justify-between gap-3">
+                      <Text
+                        className="flex-1 text-sm text-emerald-600 dark:text-emerald-400"
+                        style={bodyTextStyle}
+                      >
+                        {reviewMessage}
+                      </Text>
+                      <PrimaryButton
+                        label={submittingReview ? t('purchases.submitting') : t('books.submitReview')}
+                        loading={submittingReview}
+                        onPress={onSubmitReview}
+                        labelClassName="text-sm font-bold"
+                        labelStyle={headerTextStyle}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <View className="rounded-2xl bg-white dark:bg-surface-800 p-5 items-center">
+                    <Text
+                      className="mb-3 text-center text-surface-600 dark:text-surface-300"
+                      style={bodyTextStyle}
+                    >
+                      {t('books.loginToReview')}
+                    </Text>
                     <PrimaryButton
                       label={t('auth.login')}
                       onPress={() => router.push('/(auth)/login')}
-                      labelClassName="text-base font-bold"
+                      labelClassName="text-sm font-bold"
                       labelStyle={headerTextStyle}
                     />
                   </View>
-                </View>
-              )}
-
-              <View className="mt-6">
-                <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                  Reviews ({reviewCount})
-                </Text>
-
-                {reviewsLoading ? (
-                  <LoadingSpinner />
-                ) : reviewCount > 0 ? (
-                  <View className="gap-3">
-                    {displayedReviews.map((review) => (
-                      <ReviewCard
-                        key={String(review.id)}
-                        review={review}
-                        highlighted={String(userReview?.id ?? '') === String(review.id)}
-                        bodyTextStyle={bodyTextStyle}
-                        headerTextStyle={headerTextStyle}
-                      />
-                    ))}
-                  </View>
-                ) : (
-                  <EmptyState
-                    icon="💬"
-                    title="No reviews yet"
-                    subtitle="Be the first one to share what you think about this book."
-                  />
                 )}
-              </View>
-            </View>
-          )}
+
+                <View style={{ marginTop: 20 }}>
+                  <Text
+                    className="mb-3 text-base font-bold text-surface-900 dark:text-surface-50"
+                    style={headerTextStyle}
+                  >
+                    {t('books.reviewsTab', { count: reviewCount })}
+                  </Text>
+                  {reviewsLoading ? (
+                    <LoadingSpinner />
+                  ) : reviewCount > 0 ? (
+                    <View style={{ gap: 12 }}>
+                      {displayedReviews.map((review) => (
+                        <ReviewCard
+                          key={String(review.id)}
+                          review={review}
+                          highlighted={String(userReview?.id ?? '') === String(review.id)}
+                          bodyTextStyle={bodyTextStyle}
+                          headerTextStyle={headerTextStyle}
+                        />
+                      ))}
+                    </View>
+                  ) : (
+                    <EmptyState
+                      icon="💬"
+                      title={t('books.noReviews')}
+                      subtitle={t('books.noReviewsHint')}
+                    />
+                  )}
+                </View>
+              </>
+            )}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

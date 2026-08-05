@@ -59,7 +59,11 @@ export function useBookAudioChapters(
     load()
   }, [load])
 
-  const tracks = chaptersToTracks(chapters, bookTitle)
+  const tracks = chaptersToTracks(chapters, bookTitle).map((track, _index, all) => ({
+    ...track,
+    sourceBookId: track.sourceBookId ?? bookId,
+    queueLength: all.length,
+  }))
   const hasAudio = tracks.length > 0
 
   return { chapters, tracks, loading, error, hasAudio, refetch: load }

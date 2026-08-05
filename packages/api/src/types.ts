@@ -62,9 +62,10 @@ export interface BookAudioChapter {
   id: string | number
   title?: string
   chapter_title?: string
+  chapter_number?: string | number
   audio?: string
   audio_file?: string
-  stream_url?: string
+  book_id?: string
   duration?: number
   [key: string]: unknown
 }

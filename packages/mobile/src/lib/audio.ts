@@ -4,9 +4,11 @@ import { fixUrl, pickCover } from './url'
 export interface AudioTrack {
   id: string | number
   title: string
+  chapterTitle?: string
   artist?: string
   url: string
   cover?: string
+  sourceBookId?: string | number
   queueLength?: number
 }
 
@@ -41,9 +43,15 @@ export function toTrack(item: MediaItem | Record<string, unknown>): AudioTrack |
   return {
     id: (rec.id as string | number) ?? url,
     title: (rec.title as string) ?? 'Untitled',
+    chapterTitle: (rec.title as string) ?? undefined,
     artist: (rec.artist as string) ?? (rec.authorname as string) ?? (rec.author as string) ?? '',
     url,
     cover: pickCover(rec),
+    sourceBookId:
+      (rec.book_id as string | number) ??
+      (rec.bookid as string | number) ??
+      (rec.id as string | number) ??
+      undefined,
     queueLength: 1,
   }
 }
@@ -61,13 +69,20 @@ export function toChapterTrack(
   const rec = chapter as Record<string, unknown>
   const url = fixUrl(pickAudioUrl(rec))
   if (!url) return null
-  const title = [bookTitle, pickAudioTitle(rec)].filter(Boolean).join(' – ')
+  const chapterTitle = pickAudioTitle(rec)
+  const title = [bookTitle, chapterTitle].filter(Boolean).join(' – ')
   return {
     id: (rec.id as string | number) ?? url,
     title: title || 'Untitled Chapter',
+    chapterTitle,
     artist: '',
     url,
     cover: '',
+    sourceBookId:
+      (rec.book_id as string | number) ??
+      (rec.bookid as string | number) ??
+      (rec.book as string | number) ??
+      undefined,
     queueLength: 1,
   }
 }

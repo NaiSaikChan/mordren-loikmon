@@ -37,6 +37,10 @@ export const purchases = {
   redeemCoupon: (email: string, code: string, bookId: string | number) =>
     getClient().post<any>('subscribeBookCoupon', { email, code, book_id: bookId }),
 
+  // { email, code, coinsid, value, amount }
+  redeemCoinCoupon: (email: string, code: string) =>
+    getClient().post<any>('subscribeCoupon', { email, code, coinsid: 0, value: 0, amount: 0 }),
+
   /**
    * Upload bank-transfer proof of payment.
    * Sends as multipart/form-data (NOT text/plain) — server requires a file upload.

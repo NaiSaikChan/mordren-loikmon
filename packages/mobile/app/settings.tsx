@@ -151,7 +151,7 @@ export default function SettingsScreen() {
             {t('settings.preview')}
           </Text>
           <Text
-            className="text-lg font-bold text-surface-900 dark:text-surface-50"
+            className="text-lg text-surface-900 dark:text-surface-50"
             style={headerFontFamily ? { fontFamily: headerFontFamily } : undefined}
           >
             ဒုၚ်တၠုၚ်မုက်လိက် — Loikmon

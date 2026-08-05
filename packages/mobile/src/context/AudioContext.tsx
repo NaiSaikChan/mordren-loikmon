@@ -118,8 +118,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   )
 
   const stop = useCallback(async () => {
-    player.pause()
-    player.replace(null)
+    try {
+      player.pause()
+      player.replace(null)
+    } catch {
+      // Even if the native player errors, still clear app-level playback state.
+    }
     currentTrackRef.current = null
     queueRef.current = []
     indexRef.current = -1

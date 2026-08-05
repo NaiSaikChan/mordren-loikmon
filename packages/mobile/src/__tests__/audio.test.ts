@@ -21,6 +21,11 @@ describe('toTrack', () => {
     const track = toTrack({ id: 1, title: 'T', audio_file: '/media/b.mp3' })
     expect(track?.url).toBe('https://loikmon.org/media/b.mp3')
   })
+
+  it('exposes sourceBookId from record id by default', () => {
+    const track = toTrack({ id: 42, title: 'Book Audio', audio_url: '/audio.mp3' })
+    expect(track?.sourceBookId).toBe(42)
+  })
 })
 
 describe('toChapterTrack', () => {
@@ -36,6 +41,7 @@ describe('toChapterTrack', () => {
   it('uses chapter_title when title is missing', () => {
     const track = toChapterTrack({ id: 'c2', chapter_title: 'Intro', stream_url: '/media/c2.mp3' })
     expect(track?.title).toBe('Intro')
+    expect(track?.chapterTitle).toBe('Intro')
   })
 
   it('returns null when no audio URL is present', () => {

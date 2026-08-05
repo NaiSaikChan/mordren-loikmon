@@ -48,7 +48,7 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-brand-50 to-indigo-100 dark:from-surface-950 dark:to-surface-900">
+  <div class="min-h-screen flex items-center justify-center p-4 bg-linear-to-br from-brand-50 to-indigo-100 dark:from-surface-950 dark:to-surface-900">
     <div class="w-full max-w-md">
       <!-- Logo -->
       <div class="text-center mb-8">

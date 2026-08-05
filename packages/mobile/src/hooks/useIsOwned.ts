@@ -9,7 +9,7 @@ import { usePurchases } from './usePurchases'
  * is logged out.
  */
 export function useIsOwned(id: string | number | undefined, type: 'book' | 'article' = 'book') {
-  const { books, articles, loading, error } = usePurchases()
+  const { books, articles, loading, error, reload } = usePurchases()
 
   const owned = useMemo(() => {
     if (id == null) return false
@@ -18,5 +18,5 @@ export function useIsOwned(id: string | number | undefined, type: 'book' | 'arti
     return list.some((item) => String(item.id) === target)
   }, [id, type, books, articles])
 
-  return { owned, loading, error }
+  return { owned, loading, error, reload }
 }

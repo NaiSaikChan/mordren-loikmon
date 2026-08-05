@@ -52,6 +52,9 @@ export function useArticles(params?: Record<string, unknown>) {
 
 export function useArticleDetail(id: string | number | string[] | undefined) {
   const [article, setArticle] = useState<Article | null>(null)
+  const [description, setDescription] = useState<string | null>(null)
+  const [content, setContent] = useState<string | null>(null)
+  const [author, setAuthor] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 

@@ -30,6 +30,10 @@ function messageFromError(err: unknown, fallback: string): string {
   return e?.response?.data?.message ?? e?.message ?? fallback
 }
 
+function deriveLocalSessionToken(user: User): string {
+  return `local:${String(user.id ?? user.email ?? 'session')}`
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -43,20 +47,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         secureStorage.get(TOKEN_KEY),
         secureStorage.get(USER_KEY),
       ])
-      if (savedToken) setToken(savedToken)
       if (savedUser) {
         try {
-          setUser(JSON.parse(savedUser) as User)
+          const parsed = JSON.parse(savedUser) as User
+          setUser(parsed)
+          setToken(savedToken ?? deriveLocalSessionToken(parsed))
         } catch {
           /* corrupt storage — ignore */
         }
+      } else if (savedToken) {
+        setToken(savedToken)
       }
     })()
   }, [])
 
-  const persist = useCallback(async (nextUser: User, nextToken: string) => {
+  const persist = useCallback(async (nextUser: User, nextToken?: string | null) => {
+    const tokenToStore = nextToken ?? deriveLocalSessionToken(nextUser)
     await Promise.all([
-      secureStorage.set(TOKEN_KEY, nextToken),
+      secureStorage.set(TOKEN_KEY, tokenToStore),
       secureStorage.set(USER_KEY, JSON.stringify(nextUser)),
     ])
   }, [])
@@ -74,8 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!body.user) throw new Error('No user data received')
 
         const normUser = normaliseUser(body.user as Record<string, unknown>)
-        const sessionToken = body.token
-        if (!sessionToken) throw new Error('Server did not issue a session token')
+        const sessionToken = body.token ?? deriveLocalSessionToken(normUser)
         setUser(normUser)
         setToken(sessionToken)
         await persist(normUser, sessionToken)
@@ -102,8 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         if (body.user) {
           const normUser = normaliseUser(body.user as Record<string, unknown>)
-          const sessionToken = body.token
-          if (!sessionToken) throw new Error('Server did not issue a session token')
+          const sessionToken = body.token ?? deriveLocalSessionToken(normUser)
           setUser(normUser)
           setToken(sessionToken)
           await persist(normUser, sessionToken)
@@ -149,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (body.status !== 'error' && body.user) {
           const normUser = normaliseUser(body.user as Record<string, unknown>)
           setUser(normUser)
-          if (token) await secureStorage.set(USER_KEY, JSON.stringify(normUser))
+          await secureStorage.set(USER_KEY, JSON.stringify(normUser))
         }
       } finally {
         setLoading(false)
@@ -169,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token,
       loading,
       error,
-      isLoggedIn: !!token && !!user,
+      isLoggedIn: !!user,
       coinBalance: Number(user?.coins ?? 0),
       login,
       register,

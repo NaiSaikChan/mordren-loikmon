@@ -134,7 +134,7 @@ describe('@loikmon/api — Endpoint modules (mocked Axios)', () => {
       const { books } = await import('../endpoints/books.js')
       await books.getChapters(72)
       const { default: axios } = await import('axios')
-      const mockInstance = (axios.create as ReturnType<typeof vi.fn>)()
+      const mockInstance = (axios.create as vi.Mock)()
       expect(mockInstance.post).toHaveBeenCalledWith('getBookChapters', { book_id: 72 })
     })
   })

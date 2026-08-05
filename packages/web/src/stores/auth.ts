@@ -20,6 +20,10 @@ function normaliseUser(raw: Record<string, unknown>): User {
   } as User
 }
 
+function deriveLocalSessionToken(user: User): string {
+  return `local:${String(user.id ?? user.email ?? 'session')}`
+}
+
 // ── Store ─────────────────────────────────────────────────────────────────────
 export const useAuthStore = defineStore('auth', () => {
   // ── State ─────────────────────────────────────────
@@ -41,7 +45,7 @@ export const useAuthStore = defineStore('auth', () => {
   )
 
   // ── Getters ───────────────────────────────────────
-  const isLoggedIn    = computed(() => !!token.value && !!user.value)
+  const isLoggedIn    = computed(() => !!user.value)
   const displayName   = computed(() => user.value?.name ?? '')
   const avatar        = computed(() => user.value?.avatar ?? user.value?.thumbnail ?? '')
   const coinBalance   = computed(() => Number(user.value?.coins ?? 0))
@@ -68,12 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
       const normUser = normaliseUser(body.user as Record<string, unknown>)
       user.value  = normUser
 
-      // Server doesn't issue a JWT — create a local session token from user id
-      const sessionToken = body.token
-      if (!sessionToken) {
-        error.value = 'Server did not issue a session token'
-        throw error.value
-      }
+      const sessionToken = body.token ?? deriveLocalSessionToken(normUser)
       token.value = sessionToken
 
       // Persist session
@@ -105,11 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (body.user) {
         const normUser = normaliseUser(body.user as Record<string, unknown>)
         user.value  = normUser
-        const sessionToken = body.token
-        if (!sessionToken) {
-          error.value = 'Server did not issue a session token'
-          throw error.value
-        }
+        const sessionToken = body.token ?? deriveLocalSessionToken(normUser)
         token.value = sessionToken
         localStorage.setItem('token', sessionToken)
         localStorage.setItem('user',  JSON.stringify(normUser))
@@ -149,11 +144,12 @@ export const useAuthStore = defineStore('auth', () => {
   function restore() {
     const savedToken = localStorage.getItem('token')
     const savedUser  = localStorage.getItem('user')
-    if (savedToken) token.value = savedToken
     if (savedUser) {
       try { user.value = JSON.parse(savedUser) as User }
       catch { /* corrupt storage — ignore */ }
     }
+    if (savedToken) token.value = savedToken
+    else if (user.value) token.value = deriveLocalSessionToken(user.value)
   }
 
   return {
