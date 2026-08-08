@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, ScrollView, FlatList } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
 import { Screen } from '@/components/Screen'
 import { SearchBar } from '@/components/SearchBar'
 import { BookCard } from '@/components/BookCard'
@@ -12,8 +13,15 @@ import { useTypography } from '@/context/TypographyContext'
 export default function SearchScreen() {
   const { t } = useI18n()
   const { books, articles, loading, searched, run } = useSearch()
-  const [text, setText] = useState('')
+  const { q } = useLocalSearchParams<{ q?: string }>()
+  const [text, setText] = useState(q ?? '')
   const { headerTextStyle, bodyTextStyle } = useTypography()
+
+  // Auto-run search when navigated from home bar
+  useEffect(() => {
+    if (q?.trim()) { setText(q); run(q) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const hasResults = books.length > 0 || articles.length > 0
 

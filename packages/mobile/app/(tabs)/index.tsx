@@ -1,4 +1,5 @@
 import { ScrollView, View, Text, Pressable, Image } from 'react-native'
+import { useState } from 'react'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
@@ -7,6 +8,7 @@ import { BookCard } from '@/components/BookCard'
 import { ArticleCard } from '@/components/ArticleCard'
 import { AuthorCard } from '@/components/AuthorCard'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { SearchBar } from '@/components/SearchBar'
 import { useBooks } from '@/hooks/useBooks'
 import { useArticles } from '@/hooks/useArticles'
 import { useAuthors } from '@/hooks/useAuthors'
@@ -71,6 +73,7 @@ export default function HomeScreen() {
   const articles = useArticles()
   const authors = useAuthors()
   const { tracks: featuredAudioTracks } = useBookAudioChapters(undefined, t('home.audiobooks'))
+  const [searchText, setSearchText] = useState('')
 
   return (
     <Screen>
@@ -118,6 +121,21 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
+
+        {/* Search */}
+        <Pressable
+          onPress={() => router.push('/search')}
+          className="mx-4 mt-3 flex-row items-center rounded-xl bg-white dark:bg-surface-800 px-3 py-2.5"
+        >
+          <Ionicons name="search" size={18} color="#94a3b8" />
+          <Text
+            numberOfLines={1}
+            className="ml-2 flex-1 text-base text-surface-400"
+            style={bodyTextStyle}
+          >
+            {t('search.placeholder')}
+          </Text>
+        </Pressable>
 
         {/* Latest books */}
         <SectionHeader

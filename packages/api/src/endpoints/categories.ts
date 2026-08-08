@@ -8,7 +8,7 @@ export const categories = {
   fetchAuthorCategories: (authorId: string | number, type = 'book', page = 0) =>
     getClient().post<any>('fetchauthorcategories', { author: authorId, type, page }),
 
-  // Books filtered by category: cat + optional sub, page
-  fetchBooksByCategory: (cat: string | number, sub?: string | number, page = 0) =>
-    getClient().post<any>('fetchbooks', { cat, ...(sub ? { sub } : {}), page: String(page) }),
+  // Books filtered by category: cat + optional subcategory, page
+  fetchBooksByCategory: (category: string | number, subcategory?: string | number, page = 0) =>
+    getClient().post<any>('fetchbooks', { category, ...(subcategory ? { subcategory } : {}), page: String(page) }),
 }

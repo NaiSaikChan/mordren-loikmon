@@ -797,12 +797,17 @@ watch(() => props.url, url => render(url))
       @touchstart.passive="onTouchStart"
       @touchend.passive="onTouchEnd"
     >
-      <!-- epubjs render target -->
+      <!-- epubjs render target — centered with a comfortable reading width -->
       <div
-        ref="container"
-        class="absolute inset-0 overflow-hidden transition-colors duration-300"
+        class="absolute inset-0 flex justify-center transition-colors duration-300"
         :style="{ backgroundColor: effectiveBg }"
-      />
+      >
+        <div
+          ref="container"
+          class="relative w-full h-full overflow-hidden transition-colors duration-300"
+          :style="{ maxWidth: '800px', backgroundColor: effectiveBg }"
+        />
+      </div>
 
       <!-- Loading overlay -->
       <div

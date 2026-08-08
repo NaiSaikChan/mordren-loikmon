@@ -27,8 +27,8 @@ function RootNavigator() {
       ? t('nav.books')
       : currentTabSegment === 'articles'
         ? t('nav.articles')
-        : currentTabSegment === 'search'
-          ? t('nav.search')
+        : currentTabSegment === 'category'
+          ? t('nav.categories')
           : currentTabSegment === 'library'
             ? t('nav.library')
             : t('nav.home')
@@ -48,6 +48,7 @@ function RootNavigator() {
         <Stack.Screen name="reader" options={{ title: '' }} />
         <Stack.Screen name="audio" options={{ title: '' }} />
         <Stack.Screen name="audiobook/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
       </Stack>
     </>
   )

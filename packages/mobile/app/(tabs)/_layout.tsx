@@ -52,12 +52,16 @@ export default function TabsLayout() {
             options={{ title: t('nav.articles'), tabBarIcon: tabIcon('newspaper-outline') }}
           />
           <Tabs.Screen
-            name="search"
-            options={{ title: t('nav.search'), tabBarIcon: tabIcon('search-outline') }}
+            name="categories"
+            options={{ title: t('nav.categories'), tabBarIcon: tabIcon('grid-outline') }}
           />
           <Tabs.Screen
             name="library"
             options={{ title: t('nav.library'), tabBarIcon: tabIcon('library-outline') }}
+          />
+          <Tabs.Screen
+            name="search"
+            options={{ href: null }}
           />
         </Tabs>
       <View

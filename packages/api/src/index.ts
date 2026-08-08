@@ -1,7 +1,8 @@
 // Types
 export type {
   User, Book, BookChapter, BookAudioChapter, Article, Author, Review, Reply,
-  MediaItem, SearchResults, ApiResponse, LoginPayload, RegisterPayload, RawAuthResponse
+  MediaItem, SearchResults, ApiResponse, LoginPayload, RegisterPayload, RawAuthResponse,
+  Category
 } from './types.js'
 
 // Endpoints

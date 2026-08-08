@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, computed, ref } from 'vue'
+import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 import { useArticlesStore } from '@/stores/articles'
 import { useReviewsStore } from '@/stores/reviews'
@@ -36,6 +37,16 @@ const canRead = computed(() => {
   if (!auth.isLoggedIn) return false
   return purchasesStore.hasArticle(props.id)
 })
+
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['b','strong','i','em','u','s','h1','h2','h3','h4','h5','h6',
+      'p','br','hr','ul','ol','li','blockquote','pre','code',
+      'a','img','span','div','table','thead','tbody','tr','th','td'],
+    ALLOWED_ATTR: ['href','src','alt','title','class','target','rel','width','height'],
+    ALLOW_DATA_ATTR: false,
+  })
+}
 
 function fixUrl(url?: string) {
   if (!url) return ''
@@ -130,8 +141,8 @@ onMounted(async () => {
         </div>
         <!-- Content available -->
         <div v-else
-          class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-line"
-          v-html="article.content ?? article.description ?? article.body ?? 'No content available.'">
+          class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed"
+          v-html="sanitizeHtml(article.content ?? article.description ?? article.body ?? 'No content available.')">
         </div>
       </div>
 

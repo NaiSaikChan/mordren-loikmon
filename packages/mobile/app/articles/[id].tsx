@@ -36,7 +36,7 @@ function stripHtml(html: string): string {
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<\/p>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
@@ -353,7 +353,7 @@ export default function ArticleDetailScreen() {
 
             <View className="flex-row items-start justify-between gap-3">
               <View className="flex-1 pb-4">
-                <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   {article.title}
                 </Text>
                 <View className="mt-3 flex-row flex-wrap justify-start gap-3">
