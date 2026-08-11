@@ -105,19 +105,19 @@ export default function AuthorDetailScreen() {
                   <Image source={{ uri: avatar }} className="h-full w-full" resizeMode="cover" />
                 ) : (
                   <View className="h-full w-full items-center justify-center">
-                    <Text className="text-4xl">{String(author.name?.[0] ?? '👤')}</Text>
+                    <Text className="text-4xl" style={headerTextStyle}>{String(author.name?.[0] ?? '👤')}</Text>
                   </View>
                 )}
               </View>
 
               <View className={`mt-4 flex-1 ${isTablet ? 'mt-0' : ''}`}>
-                <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   {author.name}
                 </Text>
                 <View className="mt-3 flex-row flex-wrap gap-4">
                   {stats.map((stat) => (
                     <View key={stat.id} className="flex-row items-center gap-2">
-                      <Text className="text-base">{stat.icon}</Text>
+                      <Text className="text-base" style={bodyTextStyle}>{stat.icon}</Text>
                       <Text className="text-sm font-semibold text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
                         {stat.text}
                       </Text>
@@ -174,7 +174,7 @@ export default function AuthorDetailScreen() {
           <View className={`${isTablet ? 'px-6' : 'px-4'} mt-5 gap-4`}>
             {author.bio ? (
               <View className="rounded-2xl bg-white p-5 dark:bg-surface-800">
-                <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   Biography
                 </Text>
                 <Text className="leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
@@ -185,7 +185,7 @@ export default function AuthorDetailScreen() {
 
             {socials.length ? (
               <View className="rounded-2xl bg-white p-5 dark:bg-surface-800">
-                <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   Follow
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
@@ -206,7 +206,7 @@ export default function AuthorDetailScreen() {
 
             {author.description || author.created_at || author.status ? (
               <View className="rounded-2xl bg-white p-5 dark:bg-surface-800">
-                <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   Additional Information
                 </Text>
                 {author.description ? (

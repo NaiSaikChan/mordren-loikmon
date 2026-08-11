@@ -41,7 +41,7 @@ function AudioRow({ book }: { book: Book }) {
           <Image source={{ uri: cover }} className="h-full w-full" resizeMode="cover" />
         ) : (
           <View className="h-full w-full items-center justify-center">
-            <Text className="text-2xl">🎵</Text>
+            <Text className="text-2xl" style={headerTextStyle}>🎵</Text>
           </View>
         )}
       </View>

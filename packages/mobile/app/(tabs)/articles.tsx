@@ -23,7 +23,7 @@ export default function ArticlesScreen() {
   return (
     <Screen>
       <View className="px-4 pt-2">
-        <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}>
+        <Text className="text-2xl text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}>
           {t('nav.articles')}
         </Text>
       </View>

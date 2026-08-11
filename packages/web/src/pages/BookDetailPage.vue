@@ -18,6 +18,15 @@ const auth   = useAuthStore()
 const purchasesStore = usePurchasesStore()
 const audioStore = useBookAudioStore()
 
+// Review content is stored as Base64 (encoded by the mobile app before submission)
+function decodeBase64(str: string): string {
+  try {
+    return new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0)))
+  } catch {
+    return str
+  }
+}
+
 const book    = computed(() => store.detail)
 const cover   = computed(() => {
   if (!book.value) return ''
@@ -300,7 +309,7 @@ watch(() => props.id, loadBook)
                   <span class="font-medium text-sm text-gray-900 dark:text-white">{{ r.author_name ?? r.username }}</span>
                   <span class="text-yellow-400 text-xs">{{ '★'.repeat(r.rating ?? 0) }}</span>
                 </div>
-                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">{{ r.content ?? r.comment }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">{{ decodeBase64(r.content ?? r.comment ?? '') }}</p>
                 <p v-if="r.created_at" class="text-xs text-gray-400 mt-1">{{ new Date(r.created_at).toLocaleDateString() }}</p>
               </div>
             </div>

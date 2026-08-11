@@ -61,6 +61,71 @@ function getReview(payload: unknown): Review | null {
   return review.id ? review : review.content || review.comment ? review : null
 }
 
+// Review content is stored as Base64 (encoded before submission)
+function decodeBase64(str: string): string {
+  const input = String(str ?? '').trim()
+  if (!input) return ''
+
+  const normalized = input.replace(/\s+/g, '')
+  const looksBase64 =
+    normalized.length >= 8 &&
+    normalized.length % 4 === 0 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(normalized)
+
+  if (!looksBase64) return str
+
+  const decodeUtf8 = (base64Text: string): string | null => {
+    try {
+      if (typeof atob === 'function') {
+        const binary = atob(base64Text)
+        const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0))
+
+        if (typeof TextDecoder !== 'undefined') {
+          return new TextDecoder('utf-8').decode(bytes)
+        }
+
+        return decodeURIComponent(
+          Array.from(bytes)
+            .map((b) => `%${b.toString(16).padStart(2, '0')}`)
+            .join(''),
+        )
+      }
+    } catch {
+      // fall through to Buffer path
+    }
+
+    try {
+      if (typeof Buffer !== 'undefined') {
+        return Buffer.from(base64Text, 'base64').toString('utf8')
+      }
+    } catch {
+      // noop
+    }
+
+    return null
+  }
+
+  try {
+    const once = decodeUtf8(normalized)
+    if (!once) return str
+
+    const maybeSecondPass = once.replace(/\s+/g, '')
+    const looksBase64Again =
+      maybeSecondPass.length >= 8 &&
+      maybeSecondPass.length % 4 === 0 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(maybeSecondPass)
+
+    if (looksBase64Again) {
+      const twice = decodeUtf8(maybeSecondPass)
+      if (twice) return twice
+    }
+
+    return once
+  } catch {
+    return str
+  }
+}
+
 function ReviewStars({
   rating,
   onChange,
@@ -109,7 +174,7 @@ function ReviewCard({
   highlighted?: boolean
 }) {
   const author = review.author_name ?? review.username ?? 'Anonymous'
-  const content = review.content ?? review.comment ?? ''
+  const content = decodeBase64(review.content ?? review.comment ?? '')
   const rating = Number(review.rating ?? 0)
 
   return (
@@ -457,14 +522,14 @@ export default function ArticleDetailScreen() {
                           label={purchasing ? `Purchasing…` : `🪙 Buy for ${price} coins`}
                           loading={purchasing}
                           onPress={onPurchase}
-                          labelClassName="text-base font-bold"
+                          labelClassName="text-base"
                           labelStyle={headerTextStyle}
                         />
                       ) : (
                         <PrimaryButton
                           label="🔐 Login to Read"
                           onPress={() => router.push('/(auth)/login')}
-                          labelClassName="text-base font-bold"
+                          labelClassName="text-base"
                           labelStyle={headerTextStyle}
                         />
                       )}
@@ -482,7 +547,7 @@ export default function ArticleDetailScreen() {
                 </View>
               ) : (
                 <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                  <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                  <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                     Content
                   </Text>
                   <Text className="leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
@@ -495,7 +560,7 @@ export default function ArticleDetailScreen() {
             <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
               {isLoggedIn ? (
                 <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                  <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                  <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                     Write a Review
                   </Text>
 
@@ -522,7 +587,7 @@ export default function ArticleDetailScreen() {
                       label={submittingReview ? 'Submitting…' : 'Submit Review'}
                       loading={submittingReview}
                       onPress={onSubmitReview}
-                      labelClassName="text-base font-bold"
+                      labelClassName="text-base"
                       labelStyle={headerTextStyle}
                     />
                   </View>
@@ -536,7 +601,7 @@ export default function ArticleDetailScreen() {
                     <PrimaryButton
                       label={t('auth.login')}
                       onPress={() => router.push('/(auth)/login')}
-                      labelClassName="text-base font-bold"
+                      labelClassName="text-base"
                       labelStyle={headerTextStyle}
                     />
                   </View>
@@ -544,7 +609,7 @@ export default function ArticleDetailScreen() {
               )}
 
               <View className="mt-6">
-                <Text className="mb-3 text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                   Reviews ({displayedReviews.length})
                 </Text>
 

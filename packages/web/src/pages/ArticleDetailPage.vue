@@ -16,6 +16,15 @@ const reviews = useReviewsStore()
 const auth   = useAuthStore()
 const purchasesStore = usePurchasesStore()
 
+// Review content is stored as Base64 (encoded by the mobile app before submission)
+function decodeBase64(str: string): string {
+  try {
+    return new TextDecoder().decode(Uint8Array.from(atob(str), c => c.charCodeAt(0)))
+  } catch {
+    return str
+  }
+}
+
 const article  = computed(() => store.detail)
 const tab      = ref<'content' | 'reviews'>('content')
 const newReview  = ref('')
@@ -175,7 +184,7 @@ onMounted(async () => {
                   <span class="font-medium text-sm text-gray-900 dark:text-white">{{ r.author_name ?? r.username }}</span>
                   <span class="text-yellow-400 text-xs">{{ '★'.repeat(r.rating ?? 0) }}</span>
                 </div>
-                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">{{ r.content ?? r.comment }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">{{ decodeBase64(r.content ?? r.comment ?? '') }}</p>
               </div>
             </div>
           </div>

@@ -24,6 +24,8 @@ export function usePurchases() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
+  const [buyLoading, setBuyLoading] = useState(false)
+  const [buyError, setBuyError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -98,5 +100,50 @@ export function usePurchases() {
     [email],
   )
 
-  return { books, articles, coins, packages, loading, error, couponLoading, reload: load, redeemCoinCoupon, redeemBookCoupon }
+  const loadCountries = useCallback(async (): Promise<any[]> => {
+    const res = await purchasesApi.loadCountries()
+    return (res.data as Record<string, unknown>).countries as any[] ?? []
+  }, [])
+
+  const loadBanks = useCallback(async (countryId: number): Promise<any[]> => {
+    const res = await purchasesApi.loadBanks(countryId)
+    return (res.data as Record<string, unknown>).banks as any[] ?? []
+  }, [])
+
+  const buyCoins = useCallback(
+    async (
+      packageId: string,
+      packageName: string,
+      coinAmount: string,
+      file: { uri: string; name: string; type: string },
+      coupon?: string,
+      bankId?: string,
+    ): Promise<void> => {
+      if (!email) throw new Error('Not logged in')
+      setBuyLoading(true)
+      setBuyError(null)
+      try {
+        const res = await purchasesApi.proofOfPayment(
+          email,
+          packageId,
+          packageName,
+          coinAmount,
+          file as unknown as File,
+          coupon,
+          bankId,
+        )
+        const body = res.data as Record<string, unknown>
+        if (body.status !== 'ok') throw new Error((body.msg ?? body.message ?? 'Payment submission failed') as string)
+      } catch (e) {
+        setBuyError(e instanceof Error ? e.message : 'Unknown error')
+        throw e
+      } finally {
+        setBuyLoading(false)
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [email],
+  )
+
+  return { books, articles, coins, packages, loading, error, couponLoading, reload: load, redeemCoinCoupon, redeemBookCoupon, loadCountries, loadBanks, buyCoins, buyLoading, buyError }
 }

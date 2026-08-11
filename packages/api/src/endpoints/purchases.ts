@@ -21,6 +21,14 @@ export const purchases = {
   fetchCoinPackages: () =>
     getClient().get<any>('fetchcoins'),
 
+  // GET  → { countries:[...] }
+  loadCountries: () =>
+    getClient().get<any>('loadcountries'),
+
+  // { country } → { banks:[...] }
+  loadBanks: (countryId: number) =>
+    getClient().post<any>('loadbanks', { country: countryId }),
+
   // { email, bookid, amount }
   purchaseBook: (email: string, bookId: string | number, amount: number) =>
     getClient().post<any>('purchasebook', { email, bookid: bookId, amount }),
@@ -54,6 +62,8 @@ export const purchases = {
     packageName: string,
     coinAmount: string,
     file: File,
+    coupon?: string,
+    bankId?: string,
   ) => {
     const form = new FormData()
     form.append('email',     email)
@@ -61,6 +71,8 @@ export const purchases = {
     form.append('package',   packageName)
     form.append('amount',    coinAmount)
     form.append('file',      file)
+    if (coupon) form.append('coupon', coupon)
+    if (bankId) form.append('bankid', bankId)
     // Pass FormData directly — Axios will set multipart/form-data + boundary automatically
     // Do NOT wrap in {data:...} — the interceptor skips FormData instances
     return getClient().post<any>('proofofpayment', form)

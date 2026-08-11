@@ -35,7 +35,8 @@
     "close": "Close",
     "submit": "Submit",
     "error": "An error occurred. Please try again.",
-    "anonymous": "Anonymous"
+    "anonymous": "Anonymous",
+    "optional": "optional"
   },
   "auth": {
     "login": "Log In",
@@ -148,7 +149,14 @@
     "paymentReceiptStep": "Take a screenshot or photo of the transfer receipt.",
     "paymentUploadStep": "Upload the proof image below and tap Submit.",
     "creditAfterReview": "Coins are credited within 24 hours after admin review.",
-    "paymentProof": "Payment Proof"
+    "paymentProof": "Payment Proof",
+    "selectCountry": "Select Country",
+    "chooseCountry": "-- Choose a country --",
+    "selectBank": "Payment Method",
+    "loadingBanks": "Loading payment methods\u2026",
+    "noBanks": "No payment methods available for this country.",
+    "modalCouponLabel": "Coupon Code",
+    "modalCouponPlaceholder": "Enter coupon code (optional)"
   },
   "settings": {
     "title": "Settings",

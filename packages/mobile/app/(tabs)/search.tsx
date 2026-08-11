@@ -28,7 +28,7 @@ export default function SearchScreen() {
   return (
     <Screen>
       <View className="px-4 pt-2">
-        <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}>
+        <Text className="text-2xl text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}>
           {t('nav.search')}
         </Text>
       </View>
@@ -51,7 +51,7 @@ export default function SearchScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
           {books.length > 0 ? (
             <>
-              <Text className="px-4 pt-4 pb-2 text-base font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+              <Text className="px-4 pt-4 pb-2 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                 {t('nav.books')}
               </Text>
               <FlatList
@@ -67,7 +67,7 @@ export default function SearchScreen() {
 
           {articles.length > 0 ? (
             <>
-              <Text className="px-4 pt-4 pb-2 text-base font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+              <Text className="px-4 pt-4 pb-2 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
                 {t('nav.articles')}
               </Text>
               <View className="px-4">

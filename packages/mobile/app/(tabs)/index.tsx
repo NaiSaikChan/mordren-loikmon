@@ -1,5 +1,4 @@
 import { ScrollView, View, Text, Pressable, Image } from 'react-native'
-import { useState } from 'react'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
@@ -8,7 +7,6 @@ import { BookCard } from '@/components/BookCard'
 import { ArticleCard } from '@/components/ArticleCard'
 import { AuthorCard } from '@/components/AuthorCard'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
-import { SearchBar } from '@/components/SearchBar'
 import { useBooks } from '@/hooks/useBooks'
 import { useArticles } from '@/hooks/useArticles'
 import { useAuthors } from '@/hooks/useAuthors'
@@ -21,6 +19,10 @@ import type { AudioTrack } from '@/lib/audio'
 
 function AudioBookCard({ track }: { track: AudioTrack }) {
   const { play, current, isPlaying, toggle } = useAudio()
+  const { bodyTextStyle, headerTextStyle } = useTypography()
+  const titleStyle = bodyTextStyle
+  const bodyStyle = bodyTextStyle
+  const headerPreviewStyle = headerTextStyle
   const isCurrent = current && current.url === track.url
 
   return (
@@ -39,7 +41,7 @@ function AudioBookCard({ track }: { track: AudioTrack }) {
           <Image source={{ uri: track.cover }} className="h-full w-full" resizeMode="cover" />
         ) : (
           <View className="h-full w-full items-center justify-center">
-            <Text className="text-4xl">🎧</Text>
+            <Text className="text-4xl" style={headerPreviewStyle}>🎧</Text>
           </View>
         )}
         <View className="absolute inset-0 items-center justify-center bg-black/20">
@@ -53,11 +55,12 @@ function AudioBookCard({ track }: { track: AudioTrack }) {
       <Text
         numberOfLines={1}
         className="mt-2 text-xs font-medium text-surface-900 dark:text-surface-50"
+        style={titleStyle}
       >
         {track.title}
       </Text>
       {track.artist ? (
-        <Text numberOfLines={1} className="text-[10px] text-surface-400">
+        <Text numberOfLines={1} className="text-[10px] text-surface-400" style={bodyStyle}>
           {track.artist}
         </Text>
       ) : null}
@@ -69,11 +72,13 @@ export default function HomeScreen() {
   const { t } = useI18n()
   const { user, isLoggedIn } = useAuth()
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const titleStyle = bodyTextStyle
+  const bodyStyle = bodyTextStyle
+  const headerPreviewStyle = headerTextStyle
   const books = useBooks()
   const articles = useArticles()
   const authors = useAuthors()
   const { tracks: featuredAudioTracks } = useBookAudioChapters(undefined, t('home.audiobooks'))
-  const [searchText, setSearchText] = useState('')
 
   return (
     <Screen>
@@ -85,10 +90,10 @@ export default function HomeScreen() {
         {/* Header */}
         <View className="flex-row items-center justify-between px-4 pb-1">
           <View>
-            <Text className="text-xl text-surface-500 dark:text-surface-400 pt-safe" style={headerTextStyle}>
+            <Text className="text-xl text-surface-500 dark:text-surface-400 pt-safe" style={headerPreviewStyle}>
               {t('home.greeting')}
             </Text>
-            <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+            <Text className="text-2xl text-surface-900 dark:text-surface-50" style={titleStyle}>
               {isLoggedIn ? (user?.name ?? 'Loikmon') : 'Loikmon'}
             </Text>
           </View>
@@ -99,7 +104,7 @@ export default function HomeScreen() {
                 className="flex-row items-center rounded-full bg-brand-50 dark:bg-brand-900/30 px-3 py-1.5"
               >
                 <Ionicons name="server-outline" size={16} color="#2563eb" />
-                <Text className="ml-1 text-sm text-brand-600 dark:text-brand-300">
+                <Text className="ml-1 text-sm text-brand-600 dark:text-brand-300" style={bodyStyle}>
                   {Number(user?.coins ?? 0)}
                 </Text>
               </Pressable>
@@ -110,7 +115,7 @@ export default function HomeScreen() {
               >
                 <Text
                   className="text-sm font-normal text-white pt-1"
-                  style={bodyTextStyle}
+                  style={bodyStyle}
                 >
                   {t('auth.login')}
                 </Text>
@@ -131,7 +136,7 @@ export default function HomeScreen() {
           <Text
             numberOfLines={1}
             className="ml-2 flex-1 text-base text-surface-400"
-            style={bodyTextStyle}
+            style={bodyStyle}
           >
             {t('search.placeholder')}
           </Text>
@@ -159,7 +164,7 @@ export default function HomeScreen() {
 
         {/* Featured audiobooks */}
         {featuredAudioTracks.length > 0 ? (
-          <SectionHeader title={t('home.audiobooks')} />
+          <SectionHeader title={t('home.audiobooks')}/>
         ) : null}
         {featuredAudioTracks.length > 0 ? (
           <ScrollView

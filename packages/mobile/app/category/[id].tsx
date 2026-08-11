@@ -54,7 +54,7 @@ export default function CategoryDetailScreen() {
       {/* Category header */}
       <View className="flex-row items-center gap-3 px-4 pb-4 pt-1">
         <View className="w-14 h-14 rounded-xl bg-brand-50 dark:bg-brand-900/30 items-center justify-center shrink-0">
-          <Text style={{ fontSize: 30 }}>{icon}</Text>
+          <Text style={[headerTextStyle, { fontSize: 30 }]}>{icon}</Text>
         </View>
         <View className="flex-1">
           <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle}>
@@ -84,11 +84,11 @@ export default function CategoryDetailScreen() {
           {books.length > 0 ? (
             <View className="mb-6">
               <Text
-                className="text-base font-bold text-surface-900 dark:text-surface-50 mb-3"
+                className="text-base text-surface-900 dark:text-surface-50 mb-3"
                 style={headerTextStyle}
               >
                 {t('books.title')}
-                <Text className="text-sm font-normal text-surface-400">  {books.length}</Text>
+                <Text className="text-sm font-normal text-surface-400" style={headerTextStyle}>  {books.length}</Text>
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4 }}>
                 {books.map((book) => (
@@ -104,11 +104,11 @@ export default function CategoryDetailScreen() {
           {articles.length > 0 ? (
             <View className={books.length > 0 ? 'pt-2 border-t border-surface-100 dark:border-surface-800' : ''}>
               <Text
-                className="text-base font-bold text-surface-900 dark:text-surface-50 mb-3 mt-4"
+                className="text-base text-surface-900 dark:text-surface-50 mb-3 mt-4"
                 style={headerTextStyle}
               >
                 {t('articles.title')}
-                <Text className="text-sm font-normal text-surface-400">  {articles.length}</Text>
+                <Text className="text-sm font-normal text-surface-400" style={headerTextStyle}>  {articles.length}</Text>
               </Text>
               {articles.map((article) => (
                 <ArticleCard key={article.id} article={article} />

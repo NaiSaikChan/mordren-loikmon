@@ -13,7 +13,7 @@ export function SectionHeader({
   const { bodyTextStyle, headerTextStyle } = useTypography()
   return (
     <View className="mb-3 mt-5 flex-row items-center justify-between px-4">
-      <Text className="text-lg font-bold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+      <Text className="text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
         {title}
       </Text>
       {actionLabel && onAction ? (

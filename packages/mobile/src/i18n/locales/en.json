@@ -39,7 +39,8 @@
     "viewAll": "View all",
     "coins": "coins",
     "anonymous": "Anonymous",
-    "you": "You"
+    "you": "You",
+    "optional": "optional"
   },
   "auth": {
     "login": "Log In",
@@ -159,7 +160,21 @@
     "coinCouponPlaceholder": "COUPON CODE",
     "coinCouponSuccess": "Coins added successfully! 🎉",
     "coinCouponInvalid": "Invalid or expired coupon.",
-    "coinCouponError": "Error redeeming coupon"
+    "coinCouponError": "Error redeeming coupon",
+    "selectCountry": "Select Country",
+    "chooseCountry": "-- Choose a country --",
+    "selectBank": "Payment Method",
+    "loadingBanks": "Loading payment methods\u2026",
+    "noBanks": "No payment methods available for this country.",
+    "modalCouponLabel": "Coupon Code",
+    "paymentProof": "Payment Proof",
+    "paymentTransferStep": "Transfer {amount} THB to the bank account shown above.",
+    "paymentReceiptStep": "Take a screenshot or photo of the transfer receipt.",
+    "paymentUploadStep": "Upload the proof image below and tap Submit.",
+    "creditAfterReview": "Coins are credited within 24 hours after admin review.",
+    "chooseFile": "Choose payment screenshot\u2026",
+    "submissionFailed": "Submission failed. Please try again.",
+    "proofSubmittedShort": "Proof submitted!"
   },
   "settings": {
     "title": "Settings",

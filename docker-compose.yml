@@ -14,12 +14,29 @@ services:
       WATCHPACK_POLLING: "true"
       # Keep the npm cache outside the bind mount for better performance
       npm_config_cache: /npm-cache
-    ports:
-      - "5173:5173" # Vite dev server
-      - "4000:4000" # Express BFF
+    expose:
+      - "5173" # Vite dev server
+      - "4000" # Express BFF
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - traefik.http.routers.loikmon-api.rule=Host(`api.loikmon.org`)
+      - traefik.http.routers.loikmon-api.entrypoints=websecure
+      - traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-api.service=loikmon-api-svc
+      - traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4000
+      
+      - traefik.http.routers.loikmon-app.rule=Host(`app.loikmon.org`)
+      - traefik.http.routers.loikmon-app.entrypoints=websecure
+      - traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-app.service=loikmon-app-svc
+      - traefik.http.services.loikmon-app-svc.loadbalancer.server.port=5173
     volumes:
       - ./:/workspace
       - npm-cache:/npm-cache
+    networks:
+      - default
+      - traefik
     command: >
       bash -lc "
       set -e
@@ -41,3 +58,7 @@ services:
 
 volumes:
   npm-cache:
+
+networks:
+  traefik:
+    external: true

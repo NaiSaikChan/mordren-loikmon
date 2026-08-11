@@ -103,6 +103,8 @@ export const usePurchasesStore = defineStore('purchases', () => {
     packageName: string,
     coinAmount: string,
     file: File,
+    coupon?: string,
+    bankId?: string,
   ) {
     const auth = useAuthStore()
     if (!auth.user?.email) throw new Error('Not logged in')
@@ -115,6 +117,8 @@ export const usePurchasesStore = defineStore('purchases', () => {
         packageName,
         coinAmount,
         file,
+        coupon,
+        bankId,
       )
       const body = res.data as any
       if (body?.status !== 'ok') throw new Error(body?.msg ?? 'Payment submission failed')
@@ -127,5 +131,15 @@ export const usePurchasesStore = defineStore('purchases', () => {
     }
   }
 
-  return { books, articles, coinBalance, coinPackages, loading, fetchAll, hasBook, hasArticle, fetchCoinPackages, redeemCoupon, redeemCoinCoupon, buyLoading, buyError, buyCoins, purchaseBook, purchaseArticle }
+  async function loadBanks(countryId: number) {
+    const res = await purchasesApi.loadBanks(countryId)
+    return res.data as any
+  }
+
+  async function loadCountries() {
+    const res = await purchasesApi.loadCountries()
+    return res.data as any
+  }
+
+  return { books, articles, coinBalance, coinPackages, loading, fetchAll, hasBook, hasArticle, fetchCoinPackages, redeemCoupon, redeemCoinCoupon, buyLoading, buyError, buyCoins, loadBanks, loadCountries, purchaseBook, purchaseArticle }
 })

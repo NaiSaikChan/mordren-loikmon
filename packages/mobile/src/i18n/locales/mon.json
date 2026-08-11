@@ -34,12 +34,13 @@
     "delete": "ဇိုတ်ကၠေံ",
     "close": "ကၟာတ်",
     "submit": "ဒုၚ်စ",
-    "error": "ယောၚ်ယာ",
+    "error": "ယောၚ်ယာအာတုဲရ။ ကလေၚ်ဂစာန်ရံၚ်မွဲဝါပၠန်ညိ။",
     "retry": "ကၠေၚ်စမ်",
     "viewAll": "ညာတ်ဖအိုတ်",
     "coins": "တၚ်္ကာ",
     "anonymous": "ညးယၟုဟၟဲ",
-    "you": "မၞး"
+    "you": "မၞး",
+    "optional": "နွံမ္ဂး"
   },
   "auth": {
     "login": "လုပ်ကျောဝ်",
@@ -60,7 +61,7 @@
     "createAccount": "ခၞံကောန်တၟိ",
     "signIn": "လုပ်ကျောဝ်",
     "signUp": "ခၞံတၟိ",
-    "resetInstructions": "စုတ်အဳမေမ်ဂှ်ညိ",
+    "resetInstructions": "စုတ် အဳမေလ် မၞး တုဲ ပိုဲ ဗလးကဵု လုၚ်ခ် သွက်ဂွံ ကလေၚ်စွံ ကု မၞး ရောၚ်။",
     "sendResetLink": "စေၚ်လၚ်",
     "backToLogin": "က္လေၚ်လုပ်ကျောဝ်"
   },
@@ -110,9 +111,9 @@
     "noAuthors": "အ္စာကၞေဟ် ဟၟဲ",
     "biography": "ပရူပရာ",
     "followLinks": "ပုရိသာဒ်",
-    "additionalInfo": "အချက်အလက် ထပ်မံ",
-    "joined": "လုပ်ဝင်",
-    "status": "အခြေအနေ",
+    "additionalInfo": "တင်နၚ်ဂမၠိုၚ်",
+    "joined": "ပါလုပ်တုဲ",
+    "status": "အကာဲအရာ",
     "socialFacebook": "Facebook",
     "socialInstagram": "Instagram",
     "socialYouTube": "YouTube",
@@ -135,7 +136,7 @@
     "downloaded": "တံၚ်ဂြဲစွံလဝ်",
     "purchased": "ရာန်စွံလဝ်",
     "empty": "ဇံၚ်လိခ်ဟၟဲ",
-    "emptyHint": "ဗှ်လိခ်ဂမၠိုၚ်"
+    "emptyHint": "စၟတ်သမ္တီလဝ် လိက်အုပ် ကေုာံ လိက်ပရေၚ်တအ် သွက်ဂွံ ဂၠာဲဆဵု ဍေံတအ် ပ္ဍဲဒၞာဲဏအ် ရ။"
   },
   "purchases": {
     "title": "လိခ်မရာန်စွံလဝ်ဂမၠိုၚ်",
@@ -150,16 +151,30 @@
     "paymentInstructions": "ညးစၟတ်တ္ၚဲဗ္ဒမ်",
     "submitProof": "ဒုၚ်စ သက်သဳ",
     "submitting": "ဒုၚ်စဒၟံၚ်…",
-    "proofSubmitted": "သက်သဳဒုၚ်စတုဲ! တၚ်္ကာဒၞဲါဂၠံၚ်တရဴ ၂၄ နာဍဳ မ္ဂးကဵုစၟဳစၟတ်ပ္ဍဲ ပရဟ်ကၟက်ရ။",
+    "proofSubmitted": "သက်သဳပလံင်သြန် ပလံင်ဗစိုပ်တုဲဒှ်ရ! ကြဴနူစၟဳစၟတ်တုဲ ညးပကၚ်ရၚ်တအ် စုတ်ကဵုရောင်။",
     "noPurchases": "စုတ်သၠဲဟၟဲ",
-    "packages": "ကွာန်",
+    "packages": "ဂွဳ",
     "redeemAction": "ကူပံၚ်",
     "coinCouponTitle": "ကူပံၚ်တၚ်္ကာ",
-    "coinCouponHint": "စုတ်ကုဒ်ကူပံၚ်တၚ်္ကာတုဲ တိုးတၚ်္ကာပ္ဍဲလၟိဟ်ညး။",
+    "coinCouponHint": "စုတ် ကုဒ် ကူပံၚ် တၚ်္ကာ သွက်ဂွံ ထပ် တၚ်္ကာ ပ္ဍဲ စရင်သြန် မၞး ညိ။",
     "coinCouponPlaceholder": "ကုဒ်ကူပံၚ်",
-    "coinCouponSuccess": "တၚ်္ကာတိုးဂွံတုဲ! 🎉",
-    "coinCouponInvalid": "ကူပံၚ်ဟွံဂၙဳ မဟုတ် သက်တမ်တုဲရ။",
-    "coinCouponError": "ကာလကူပံၚ်တၚ်္ကာ ယောၚ်ယာ"
+    "coinCouponSuccess": "ထပ်စုတ် တၚ်္ကာဗွဲမအံင်ဇၞး တုဲရ! 🎉",
+    "coinCouponInvalid": "ကူပံၚ်ဟွံဂွံ အာယုက်အိုတ်မံၚ်ရ။",
+    "coinCouponError": "ကာလကူပံၚ်တၚ်္ကာ ယောၚ်ယာ",
+    "selectCountry": "ရုဲစှ် ဍုၚ်",
+    "chooseCountry": "-- ရုဲစှ် ဍုၚ်--",
+    "selectBank": "ရုဲစှ် ဘဏ္ဍာ",
+    "loadingBanks": "လဇ...\u2026",
+    "noBanks": "သွက်ဍုင်ဏအ် နဲကဲကဵုသြန် ဟွံမွဲရ။",
+    "modalCouponLabel": "ကုဒ်ကူပံၚ်",
+    "paymentProof": "တၞးသက်သဳပၠံၚ်သြန်",
+    "paymentTransferStep": "ပလံၚ် {amount} THB တုဲမ္ဂး သွက်စရၚ်ဘဏ်ပ္ဍဲလပါ်တြေံညိ။",
+    "paymentReceiptStep": "တက်ကေတ် ဗီုမုက်လိက် ဟွံသေၚ်သာ်ဂှ် ဗီုဓာတ် လိက်စၟတ်သမ္တီစလောံသြန် ညိ။",
+    "paymentUploadStep": "ပတိုန် ရုပ်သက်သဳ ဗွဲသၟဝ်ဏအ် တုဲ ဍဵု ပလံင် ညိ။",
+    "creditAfterReview": "ကြဴနူ ညးပကၚ်ရၚ် စၟဳစၟတ်တုဲ ပ္ဍဲပွိုၚ် ၂၄ နာဍဳ သြန်လုပ်စုတ်ကဵုရောၚ်။",
+    "chooseFile": "ရုဲစှ် ဗီုစခရင်ပၠုပ်သြန်\u2026",
+    "submissionFailed": "ပွမပလံင်ဗစိုပ် ဟွံအံင်ဇၞးရ။ ကလေင်ဂစာန်မွဲဝါပၠန်ညိ။",
+    "proofSubmittedShort": "သက်သဳ ပအပ်တုဲရ။"
   },
   "settings": {
     "title": "ဒၞာဲထိၚ်",
@@ -181,7 +196,7 @@
     "general": "ဗွဲမ္ၚး"
   },
   "reader": {
-    "notAvailable": "ဖိုင်ဗှ်ဗၠိုၚ်ဟွံမွဲ",
+    "notAvailable": "သွက်လိက်အုပ်ဏအ် ဝှာၚ်ဗှ်ဂွံ ဟွံမွဲရ။",
     "open": "ဖ္တိုက်ဗှ်",
     "loading": "လဇ…"
   },

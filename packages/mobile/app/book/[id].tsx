@@ -51,6 +51,72 @@ function getReview(payload: unknown): Review | null {
   return review.id ? review : review.content || review.comment ? review : null
 }
 
+// Review content is stored as Base64 (encoded by the mobile app before submission)
+function decodeBase64(str: string): string {
+  const input = String(str ?? '').trim()
+  if (!input) return ''
+
+  const normalized = input.replace(/\s+/g, '')
+  const looksBase64 =
+    normalized.length >= 8 &&
+    normalized.length % 4 === 0 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(normalized)
+
+  if (!looksBase64) return str
+
+  const decodeUtf8 = (base64Text: string): string | null => {
+    try {
+      if (typeof atob === 'function') {
+        const binary = atob(base64Text)
+        const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0))
+
+        if (typeof TextDecoder !== 'undefined') {
+          return new TextDecoder('utf-8').decode(bytes)
+        }
+
+        return decodeURIComponent(
+          Array.from(bytes)
+            .map((b) => `%${b.toString(16).padStart(2, '0')}`)
+            .join(''),
+        )
+      }
+    } catch {
+      // fall through to Buffer path
+    }
+
+    try {
+      if (typeof Buffer !== 'undefined') {
+        return Buffer.from(base64Text, 'base64').toString('utf8')
+      }
+    } catch {
+      // noop
+    }
+
+    return null
+  }
+
+  try {
+    const once = decodeUtf8(normalized)
+    if (!once) return str
+
+    // Some legacy payloads may be encoded twice.
+    const maybeSecondPass = once.replace(/\s+/g, '')
+    const looksBase64Again =
+      maybeSecondPass.length >= 8 &&
+      maybeSecondPass.length % 4 === 0 &&
+      /^[A-Za-z0-9+/]+={0,2}$/.test(maybeSecondPass)
+
+    if (looksBase64Again) {
+      const twice = decodeUtf8(maybeSecondPass)
+      if (twice) return twice
+    }
+
+    return once
+  } catch {
+    return str
+  }
+}
+
 function ReviewStars({
   rating,
   onChange,
@@ -100,7 +166,7 @@ function ReviewCard({
 }) {
   const { t } = useI18n()
   const author = review.author_name ?? review.username ?? t('common.anonymous')
-  const content = review.content ?? review.comment ?? ''
+  const content = decodeBase64(review.content ?? review.comment ?? '')
   const rating = Number(review.rating ?? 0)
 
   return (
@@ -385,7 +451,7 @@ export default function BookDetailScreen() {
           }}
         >
           <Ionicons name="star" size={12} color="#f59e0b" />
-          <Text className="text-xs font-bold text-amber-600 dark:text-amber-400" style={bodyTextStyle}>
+          <Text className="text-xs text-amber-600 dark:text-amber-400" style={bodyTextStyle}>
             {Number(book.rating).toFixed(1)}
           </Text>
         </View>
@@ -411,7 +477,7 @@ export default function BookDetailScreen() {
             backgroundColor: 'rgba(16,185,129,0.12)',
           }}
         >
-          <Text className="text-xs font-bold text-emerald-600 dark:text-emerald-400" style={bodyTextStyle}>
+          <Text className="text-xs text-emerald-600 dark:text-emerald-400" style={bodyTextStyle}>
             {t('books.free')}
           </Text>
         </View>
@@ -424,7 +490,7 @@ export default function BookDetailScreen() {
           }}
         >
           <Ionicons name="server-outline" size={12} color="#2563eb" />
-          <Text className="text-xs font-bold text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
+          <Text className="text-xs text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
             {price} {t('purchases.coins')}
           </Text>
         </View>
@@ -509,7 +575,7 @@ export default function BookDetailScreen() {
                       bookCoupon.trim() && !bookCouponLoading ? '#2563eb' : '#93c5fd',
                   }}
                 >
-                  <Text className="text-sm font-bold text-white" style={bodyTextStyle}>
+                  <Text className="text-sm text-white" style={bodyTextStyle}>
                     {bookCouponLoading ? '…' : t('purchases.redeemAction')}
                   </Text>
                 </Pressable>
@@ -742,7 +808,7 @@ export default function BookDetailScreen() {
 
               <View style={{ flex: 1 }}>
                 <Text
-                  className="text-3xl font-bold leading-tight text-surface-900 dark:text-surface-50"
+                  className="text-3xl leading-tight text-surface-900 dark:text-surface-50"
                   style={headerTextStyle}
                 >
                   {book.title}
@@ -798,7 +864,7 @@ export default function BookDetailScreen() {
                 {book.description || book.about ? (
                   <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
                     <Text
-                      className="mb-2 text-base font-bold text-surface-900 dark:text-surface-50"
+                      className="mb-2 text-base text-surface-900 dark:text-surface-50"
                       style={headerTextStyle}
                     >
                       {t('books.description')}
@@ -815,7 +881,7 @@ export default function BookDetailScreen() {
                 {related.length > 0 ? (
                   <View style={{ marginTop: 24 }}>
                     <Text
-                      className="mb-3 text-base font-bold text-surface-900 dark:text-surface-50"
+                      className="mb-3 text-base text-surface-900 dark:text-surface-50"
                       style={headerTextStyle}
                     >
                       {t('books.related')}
@@ -838,7 +904,7 @@ export default function BookDetailScreen() {
                 {isLoggedIn ? (
                   <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
                     <Text
-                      className="mb-3 text-base font-bold text-surface-900 dark:text-surface-50"
+                      className="mb-3 text-base text-surface-900 dark:text-surface-50"
                       style={headerTextStyle}
                     >
                       {t('books.writeReview')}
@@ -867,7 +933,7 @@ export default function BookDetailScreen() {
                         label={submittingReview ? t('purchases.submitting') : t('books.submitReview')}
                         loading={submittingReview}
                         onPress={onSubmitReview}
-                        labelClassName="text-sm font-bold"
+                        labelClassName="text-sm"
                         labelStyle={headerTextStyle}
                       />
                     </View>
@@ -883,7 +949,7 @@ export default function BookDetailScreen() {
                     <PrimaryButton
                       label={t('auth.login')}
                       onPress={() => router.push('/(auth)/login')}
-                      labelClassName="text-sm font-bold"
+                      labelClassName="text-sm"
                       labelStyle={headerTextStyle}
                     />
                   </View>
@@ -891,7 +957,7 @@ export default function BookDetailScreen() {
 
                 <View style={{ marginTop: 20 }}>
                   <Text
-                    className="mb-3 text-base font-bold text-surface-900 dark:text-surface-50"
+                    className="mb-3 text-base text-surface-900 dark:text-surface-50"
                     style={headerTextStyle}
                   >
                     {t('books.reviewsTab', { count: reviewCount })}

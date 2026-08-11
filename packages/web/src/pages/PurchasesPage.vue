@@ -38,11 +38,77 @@ const fileInputRef  = ref<HTMLInputElement | null>(null)
 const buyMsg        = ref('')
 const buySuccess    = ref(false)
 
+// Country / bank selection
+const countries       = ref<any[]>([])
+const countriesLoading = ref(false)
+const selectedCountry = ref<number | null>(null)
+const banks           = ref<any[]>([])
+const banksLoading    = ref(false)
+const selectedBank    = ref<any>(null)
+
+async function fetchCountries() {
+  if (countries.value.length) return
+  countriesLoading.value = true
+  try {
+    const res = await store.loadCountries()
+    countries.value = res?.countries ?? []
+  } catch {
+    countries.value = []
+  } finally {
+    countriesLoading.value = false
+  }
+}
+
+// Coupon redeemable within the modal (calls subscribeCoupon independently of payment)
+const modalCoupon        = ref('')
+const modalCouponLoading = ref(false)
+const modalCouponMsg     = ref('')
+const modalCouponSuccess = ref(false)
+
+async function redeemModalCoupon() {
+  if (!modalCoupon.value.trim()) return
+  modalCouponLoading.value = true
+  modalCouponMsg.value     = ''
+  modalCouponSuccess.value = false
+  try {
+    const res = await store.redeemCoinCoupon(modalCoupon.value.trim())
+    modalCouponSuccess.value = res?.status === 'ok'
+    modalCouponMsg.value = res?.message ?? res?.msg ?? (res?.status === 'ok' ? t('purchases.coinCouponSuccess') : t('purchases.coinCouponFailed'))
+    if (res?.status === 'ok') modalCoupon.value = ''
+  } catch (e: any) {
+    modalCouponMsg.value = e?.message ?? t('purchases.coinCouponError')
+  } finally {
+    modalCouponLoading.value = false
+  }
+}
+
+async function onCountryChange() {
+  selectedBank.value = null
+  banks.value        = []
+  if (!selectedCountry.value) return
+  banksLoading.value = true
+  try {
+    const res  = await store.loadBanks(selectedCountry.value)
+    banks.value = res?.banks ?? []
+  } catch {
+    banks.value = []
+  } finally {
+    banksLoading.value = false
+  }
+}
+
 function selectPackage(pkg: any) {
-  selectedPkg.value = pkg
-  proofFile.value   = null
-  buyMsg.value      = ''
-  buySuccess.value  = false
+  selectedPkg.value        = pkg
+  proofFile.value          = null
+  buyMsg.value             = ''
+  buySuccess.value         = false
+  modalCoupon.value        = ''
+  modalCouponMsg.value     = ''
+  modalCouponSuccess.value = false
+  selectedCountry.value    = null
+  selectedBank.value       = null
+  banks.value              = []
+  fetchCountries()
 }
 
 function onFileChange(e: Event) {
@@ -58,6 +124,8 @@ async function submitPayment() {
       selectedPkg.value.name,
       String(selectedPkg.value.amount),
       proofFile.value,
+      undefined,
+      selectedBank.value ? String(selectedBank.value.id) : undefined,
     )
     buySuccess.value = true
     buyMsg.value = t('purchases.proofSubmitted')
@@ -67,10 +135,16 @@ async function submitPayment() {
 }
 
 function closeModal() {
-  selectedPkg.value = null
-  buySuccess.value  = false
-  buyMsg.value      = ''
-  proofFile.value   = null
+  selectedPkg.value        = null
+  buySuccess.value         = false
+  buyMsg.value             = ''
+  proofFile.value          = null
+  modalCoupon.value        = ''
+  modalCouponMsg.value     = ''
+  modalCouponSuccess.value = false
+  selectedCountry.value    = null
+  selectedBank.value       = null
+  banks.value              = []
 }
 
 onMounted(async () => {
@@ -109,29 +183,15 @@ onMounted(async () => {
         <div v-if="store.coinPackages.length">
           <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ t('purchases.buyCoins') }}</h2>
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div v-for="pkg in store.coinPackages" :key="pkg.id"
-              class="card p-4 text-center hover:border-brand-400 cursor-pointer transition-colors"
-              @click="selectPackage(pkg)">
-              <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ pkg.name }}</div>
-              <div class="text-2xl font-bold text-brand-600 dark:text-brand-400">{{ pkg.amount }} 🪙</div>
-              <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{{ pkg.value }} THB</div>
+            <div v-for="pkg in store.coinPackages" :key="pkg.id" class="card p-4 hover:border-brand-400 transition-colors">
+              <!-- Clickable package summary -->
+              <div class="text-center cursor-pointer mb-3" @click="selectPackage(pkg)">
+                <div class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">{{ pkg.name }}</div>
+                <div class="text-2xl font-bold text-brand-600 dark:text-brand-400">{{ pkg.amount }} 🪙</div>
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">{{ pkg.value }} THB</div>
+              </div>
             </div>
           </div>
-        </div>
-
-        <!-- Redeem Coin Coupon -->
-        <div class="card p-6">
-          <h2 class="font-semibold text-gray-800 dark:text-gray-200 mb-1">🎫 {{ t('purchases.coinCouponTitle') }}</h2>
-          <p class="text-xs text-gray-400 dark:text-gray-500 mb-4">{{ t('purchases.coinCouponHint') }}</p>
-          <div class="flex gap-2">
-            <input v-model="couponCode" class="input flex-1" :placeholder="t('purchases.coinCouponPlaceholder')" @keyup.enter="redeemCoinCoupon" />
-            <button class="btn-primary" :disabled="!couponCode.trim() || couponLoading" @click="redeemCoinCoupon">
-              {{ couponLoading ? '…' : t('purchases.redeemAction') }}
-            </button>
-          </div>
-          <p v-if="couponMsg" :class="['text-sm mt-2', couponSuccess ? 'text-green-500' : 'text-red-400']">
-            {{ couponMsg }}
-          </p>
         </div>
 
         <!-- Purchased books list -->
@@ -192,6 +252,59 @@ onMounted(async () => {
 
         <!-- Upload form -->
         <div v-else class="space-y-4">
+          <!-- Country dropdown -->
+          <div>
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+              {{ t('purchases.selectCountry') }}
+            </label>
+            <select
+              v-model="selectedCountry"
+              class="input w-full"
+              :disabled="countriesLoading"
+              @change="onCountryChange">
+              <option :value="null" disabled>
+                {{ countriesLoading ? t('purchases.loadingBanks') : t('purchases.chooseCountry') }}
+              </option>
+              <option v-for="c in countries" :key="c.id" :value="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+
+          <!-- Bank list -->
+          <div v-if="banksLoading" class="text-sm text-gray-400">{{ t('purchases.loadingBanks') }}</div>
+          <div v-else-if="selectedCountry !== null && !banks.length" class="text-sm text-gray-400">
+            {{ t('purchases.noBanks') }}
+          </div>
+          <div v-else-if="banks.length" class="space-y-2">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 block">
+              {{ t('purchases.selectBank') }}
+            </label>
+            <div
+              v-for="bank in banks"
+              :key="bank.id"
+              class="flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors"
+              :class="selectedBank?.id === bank.id
+                ? 'border-brand-400 bg-brand-50 dark:bg-brand-900/20'
+                : 'border-gray-200 dark:border-gray-700 hover:border-brand-300 dark:hover:border-brand-600'"
+              @click="selectedBank = bank">
+              <img v-if="bank.thumbnail" :src="bank.thumbnail" :alt="bank.accountname"
+                class="w-10 h-10 object-contain rounded-lg shrink-0" />
+              <div>
+                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">{{ bank.accountname }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ bank.countryname }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Selected bank account details -->
+          <div v-if="selectedBank"
+            class="bg-gray-50 dark:bg-surface-700 rounded-xl p-3 space-y-1 text-sm">
+            <p class="font-semibold text-gray-700 dark:text-gray-200">{{ selectedBank.accountname }}</p>
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div v-if="selectedBank.details"
+              class="text-gray-600 dark:text-gray-400 [&_span]:font-inherit! [&_p]:leading-normal"
+              v-html="selectedBank.details" />
+          </div>
+
           <!-- Payment instructions -->
           <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
             <p class="font-semibold">{{ t('purchases.paymentInstructions') }}</p>
@@ -201,6 +314,32 @@ onMounted(async () => {
               <li>{{ t('purchases.paymentUploadStep') }}</li>
             </ol>
             <p class="text-xs text-gray-400 pt-1">{{ t('purchases.creditAfterReview') }}</p>
+          </div>
+
+          <!-- Coupon code with inline Redeem -->
+          <div>
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 block">
+              {{ t('purchases.modalCouponLabel') }}
+              <span class="text-xs text-gray-400 font-normal ml-1">({{ t('common.optional') }})</span>
+            </label>
+            <div class="flex gap-2">
+              <input
+                v-model="modalCoupon"
+                type="text"
+                class="input flex-1"
+                :placeholder="t('purchases.modalCouponPlaceholder')"
+                @keyup.enter="redeemModalCoupon" />
+              <button
+                class="btn-primary shrink-0"
+                :disabled="!modalCoupon.trim() || modalCouponLoading"
+                :class="{ 'opacity-50 cursor-not-allowed': !modalCoupon.trim() || modalCouponLoading }"
+                @click="redeemModalCoupon">
+                {{ modalCouponLoading ? '…' : t('purchases.redeemAction') }}
+              </button>
+            </div>
+            <p v-if="modalCouponMsg" :class="['text-xs mt-1', modalCouponSuccess ? 'text-green-500' : 'text-red-400']">
+              {{ modalCouponMsg }}
+            </p>
           </div>
 
           <!-- File upload -->
@@ -228,8 +367,8 @@ onMounted(async () => {
             <button class="btn-ghost flex-1" @click="closeModal">{{ t('common.cancel') }}</button>
             <button
               class="btn-primary flex-1"
-              :disabled="!proofFile || store.buyLoading"
-              :class="{ 'opacity-50 cursor-not-allowed': !proofFile || store.buyLoading }"
+              :disabled="!proofFile || store.buyLoading || (banks.length > 0 && !selectedBank)"
+              :class="{ 'opacity-50 cursor-not-allowed': !proofFile || store.buyLoading || (banks.length > 0 && !selectedBank) }"
               @click="submitPayment">
               <span v-if="store.buyLoading">{{ t('purchases.submitting') }}</span>
               <span v-else>{{ t('purchases.submitProof') }}</span>

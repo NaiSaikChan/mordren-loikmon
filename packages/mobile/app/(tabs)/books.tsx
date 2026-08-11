@@ -14,7 +14,7 @@ export default function BooksScreen() {
     <Screen>
       <View className="px-4 pb-1 pt-2">
         <Text
-          className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}
+          className="text-2xl text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}
           allowFontScaling={false}
         >
           {t('nav.books')}

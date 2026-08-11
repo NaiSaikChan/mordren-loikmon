@@ -58,7 +58,7 @@ export default function LoginScreen() {
             autoComplete="password"
           />
 
-          {error ? <Text className="mb-3 text-sm text-red-500">{error}</Text> : null}
+          {error ? <Text className="mb-3 text-sm text-red-500" style={bodyTextStyle}>{error}</Text> : null}
 
           <Link href="/(auth)/forgot-password" asChild>
             <Pressable className="mb-6 self-end pt-2">

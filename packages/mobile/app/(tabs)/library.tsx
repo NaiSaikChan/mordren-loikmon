@@ -25,7 +25,7 @@ export default function LibraryScreen() {
   return (
     <Screen>
       <View className="px-4 pt-2">
-        <Text className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-5" style={headerTextStyle}>
+        <Text className="text-2xl text-surface-900 dark:text-surface-50 pt-5" style={headerTextStyle}>
           {t('nav.library')}
         </Text>
       </View>
@@ -93,7 +93,7 @@ function PurchasedTab({ isLoggedIn }: { isLoggedIn: boolean }) {
           onPress={() => router.push('/(auth)/login')}
           className="mt-2 rounded-xl bg-brand-600 px-6 py-3"
         >
-          <Text className="text-white">{t('auth.signIn')}</Text>
+          <Text className="text-white" style={bodyTextStyle}>{t('auth.signIn')}</Text>
         </Pressable>
       </View>
     )

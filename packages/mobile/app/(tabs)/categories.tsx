@@ -25,7 +25,7 @@ function CategoryItem({ cat, itemWidth }: { cat: Category; itemWidth: number }) 
         style={{ shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 }}
       >
         <View className="w-14 h-14 rounded-xl bg-brand-50 dark:bg-brand-900/30 items-center justify-center">
-          <Text style={{ fontSize: 30 }}>{getCategoryIcon(cat.id)}</Text>
+          <Text style={[headerTextStyle, { fontSize: 30 }]}>{getCategoryIcon(cat.id)}</Text>
         </View>
         <Text
           numberOfLines={2}
@@ -59,7 +59,7 @@ export default function CategoriesScreen() {
     <Screen>
       <View className="px-4 pb-1 pt-2">
         <Text
-          className="text-2xl font-bold text-surface-900 dark:text-surface-50 pt-2"
+          className="text-2xl text-surface-900 dark:text-surface-50 pt-2"
           style={headerTextStyle}
           allowFontScaling={false}
         >

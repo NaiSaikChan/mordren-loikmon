@@ -47,7 +47,7 @@ export default function RegisterScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1, justifyContent: 'center' }}>
-          <Text className="text-3xl font-bold text-surface-900 dark:text-surface-50 pt-safe" style={headerTextStyle}>
+          <Text className="text-3xl text-surface-900 dark:text-surface-50 pt-safe" style={headerTextStyle}>
             {t('auth.createAccount')}
           </Text>
           <Text className="mb-8 mt-1 text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
