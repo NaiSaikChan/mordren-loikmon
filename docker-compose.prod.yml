@@ -14,7 +14,7 @@ services:
       - "4000"
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik
+      - traefik.docker.network=mordren-loikmon_internal
       - "traefik.http.routers.loikmon-api.rule=Host(`${API_DOMAIN}`)"
       - traefik.http.routers.loikmon-api.entrypoints=websecure
       - traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt
@@ -27,7 +27,7 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - traefik
+      - mordren-loikmon_internal
       - internal
 
   web:
@@ -43,7 +43,7 @@ services:
       - "80"
     labels:
       - traefik.enable=true
-      - traefik.docker.network=traefik
+      - traefik.docker.network=mordren-loikmon_internal
       - "traefik.http.routers.loikmon-app.rule=Host(`${APP_DOMAIN}`)"
       - traefik.http.routers.loikmon-app.entrypoints=websecure
       - traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt
@@ -53,11 +53,11 @@ services:
       server:
         condition: service_healthy
     networks:
-      - traefik
+      - mordren-loikmon_internal
       - internal
 
 networks:
-  traefik:
+  mordren-loikmon_internal:
     external: true
   internal:
     driver: bridge
