@@ -6,7 +6,7 @@ import { fileURLToPath, URL } from 'node:url'
 // When building for GitHub Pages the app lives at /<repo-name>/
 // In dev it runs at root (proxy to local BFF on :4000)
 const isProd = process.env.NODE_ENV === 'production'
-const base = isProd ? '/mordren-loikmon/' : '/'
+const base = process.env.VITE_BASE ?? (isProd ? '/mordren-loikmon/' : '/')
 
 export default defineConfig({
   base,
