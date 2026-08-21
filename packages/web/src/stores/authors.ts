@@ -7,6 +7,7 @@ export const useAuthorsStore = defineStore('authors', () => {
   const list = ref<Author[]>([])
   const detail = shallowRef<Author | null>(null)
   const loading = ref(false)
+  const totalPages = ref(1)
 
   async function fetchAuthors(params?: Record<string, unknown>) {
     loading.value = true
@@ -15,11 +16,35 @@ export const useAuthorsStore = defineStore('authors', () => {
       const body = res.data as any
       // Handle both direct array and nested response formats
       const authors = body.authors ?? body.data?.authors ?? (Array.isArray(body) ? body : [])
-      // Append on pagination (if page > 0), otherwise replace
-      if (params?.page && params.page !== '0') {
-        list.value = [...list.value, ...authors]
-      } else {
+      const pageNumber = Number(params?.page ?? 0)
+      const shouldReplace = pageNumber <= 0
+
+      if (shouldReplace) {
         list.value = authors
+      } else {
+        list.value = [...list.value, ...authors]
+      }
+
+      const nextTotalPages = Number(
+        body.total_pages ??
+          body.totalPages ??
+          body.data?.total_pages ??
+          body.data?.totalPages ??
+          body.pagination?.total_pages ??
+          body.pagination?.totalPages ??
+          body.page_info?.total_pages ??
+          body.pageInfo?.totalPages ??
+          0,
+      )
+      const limit = Number(params?.limit ?? 0)
+      const hasPotentialNextPage = limit > 0 ? authors.length >= limit : authors.length > 0
+
+      if (nextTotalPages > 0) {
+        totalPages.value = nextTotalPages
+      } else if (hasPotentialNextPage || pageNumber > 0) {
+        totalPages.value = Math.max(2, pageNumber + 1)
+      } else {
+        totalPages.value = 1
       }
     } finally {
       loading.value = false
@@ -45,5 +70,5 @@ export const useAuthorsStore = defineStore('authors', () => {
     }
   }
 
-  return { list, detail, loading, fetchAuthors, fetchDetail, toggleFollow }
+  return { list, detail, loading, totalPages, fetchAuthors, fetchDetail, toggleFollow }
 })

@@ -61,6 +61,15 @@ describe('authors store', () => {
       expect(store.list[2].id).toBe(3)
     })
 
+    it('does not replace the accumulated list when page > 0 even if replace flag is passed', async () => {
+      mockFetchAuthors.mockResolvedValue({ data: { authors: [makeAuthor(3), makeAuthor(4)] } })
+      const store = useAuthorsStore()
+      store.list = [makeAuthor(1), makeAuthor(2)] as any
+      await store.fetchAuthors({ page: '1', replace: true })
+      expect(store.list).toHaveLength(4)
+      expect(store.list[2].id).toBe(3)
+    })
+
     it('handles array response directly', async () => {
       mockFetchAuthors.mockResolvedValue({ data: [makeAuthor(5)] })
       const store = useAuthorsStore()

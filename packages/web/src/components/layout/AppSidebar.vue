@@ -63,15 +63,19 @@ async function handleLogout() {
     ]"
   >
     <!-- Logo -->
-    <div class="flex items-center gap-3 px-4 py-5 border-b border-gray-100 dark:border-gray-800">
-      <div class="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center">
+    <button
+      type="button"
+      class="flex w-full items-center gap-3 border-b border-gray-100 px-4 py-5 text-left transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-surface-800"
+      @click="navigate('/')"
+    >
+      <div class="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center shadow-sm ring-1 ring-gray-200 dark:ring-gray-700">
         <img :src="logoUrl" alt="Loikmon" class="w-full h-full object-contain" />
       </div>
       <div>
         <div class="font-bold text-gray-900 dark:text-white text-sm leading-tight">{{ t('app.name') }}</div>
-        <div class="text-xs text-gray-400">{{ t('app.tagline') }}</div>
+        <div class="text-xs text-gray-400 pt-2">{{ t('app.tagline') }}</div>
       </div>
-    </div>
+    </button>
 
     <!-- User pill -->
     <div v-if="authStore.user" class="px-3 py-3 border-b border-gray-100 dark:border-gray-800">

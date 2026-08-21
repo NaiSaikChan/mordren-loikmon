@@ -1,24 +1,46 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthorsStore } from '@/stores/authors'
 import AuthorCard from '@/components/shared/AuthorCard.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
+import Pagination from '@/components/shared/Pagination.vue'
 
 const { t } = useI18n()
 const store = useAuthorsStore()
-const page = ref(0)
-const isLastPage = ref(false)
+const page = ref(1)
+const AUTHORS_PER_ROW = 5
+const AUTHORS_PER_PAGE = AUTHORS_PER_ROW * 4
 
-async function loadMore() {
-  page.value++
-  const prevLen = store.list.length
-  await store.fetchAuthors({ page: String(page.value) })
-  if (store.list.length === prevLen) isLastPage.value = true
+const totalPages = computed(() => {
+  const serverTotalPages = Number(store.totalPages ?? 0)
+  if (serverTotalPages > 0) return serverTotalPages
+  return Math.max(1, Math.ceil(Math.max(store.list.length, AUTHORS_PER_PAGE) / AUTHORS_PER_PAGE))
+})
+
+const isLastPage = computed(() => page.value >= totalPages.value)
+const paginatedAuthors = computed(() => {
+  const start = (page.value - 1) * AUTHORS_PER_PAGE
+  return store.list.slice(start, start + AUTHORS_PER_PAGE)
+})
+
+async function fetchPage(targetPage: number) {
+  const safePage = Math.max(1, targetPage)
+  page.value = safePage
+  await store.fetchAuthors({
+    page: String(safePage - 1),
+    limit: String(AUTHORS_PER_PAGE),
+    replace: false,
+  })
 }
 
-onMounted(() => store.fetchAuthors({ page: '0' }))
+function goToPage(targetPage: number) {
+  if (store.loading || targetPage < 1 || targetPage > totalPages.value) return
+  void fetchPage(targetPage)
+}
+
+onMounted(() => void fetchPage(1))
 </script>
 
 <template>
@@ -27,14 +49,17 @@ onMounted(() => store.fetchAuthors({ page: '0' }))
     <LoadingSpinner v-if="store.loading && !store.list.length" />
     <EmptyState v-else-if="!store.loading && !store.list.length" icon="✍️" :title="t('common.notFound')" />
     <div v-else>
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        <AuthorCard v-for="author in store.list" :key="author.id" :author="author" />
+      <div class="authors-grid">
+        <AuthorCard v-for="author in paginatedAuthors" :key="author.id" :author="author" />
       </div>
-      <div v-if="!isLastPage" class="mt-8 text-center">
-        <button class="btn-secondary" :disabled="store.loading" @click="loadMore">
-          {{ store.loading ? t('common.loading') : t('common.more') }}
-        </button>
-      </div>
+
+      <Pagination
+        :page="page"
+        :is-last-page="isLastPage"
+        :total-pages="totalPages"
+        :loading="store.loading"
+        @update:page="goToPage"
+      />
     </div>
   </div>
 </template>

@@ -6,6 +6,7 @@ export const authors = {
     getClient().post<any>('fetchauthors', {
       type: 'book',
       page: String(params?.page ?? '0'),
+      limit: String(params?.limit ?? '20'),
       query: String(params?.query ?? ''),
       email: String(params?.email ?? ''),
     }),

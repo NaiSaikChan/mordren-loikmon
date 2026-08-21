@@ -22,7 +22,7 @@ describe('authors endpoint', () => {
     it('posts to fetchauthors with default params', async () => {
       await authors.fetchAuthors()
       expect(mockPost).toHaveBeenCalledWith('fetchauthors', {
-        type: 'book', page: '0', query: '', email: ''
+        type: 'book', page: '0', limit: '20', query: '', email: ''
       })
     })
 
