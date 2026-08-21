@@ -76,6 +76,7 @@
     "purchasing": "Purchasing…",
     "purchaseSuccess": "Purchase successful! You can now read this book.",
     "purchaseFailed": "Purchase failed. Please check your coin balance.",
+    "description": "Description",
     "loginToRead": "Login to Read",
     "couponPrompt": "Have a book coupon code?",
     "couponPlaceholder": "Enter book coupon code",

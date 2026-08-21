@@ -47,6 +47,11 @@ describe('normaliseUrl()', () => {
     expect(normaliseUrl(dirty)).toBe('https://loikmon.org/uploads/my%20file.jpg')
   })
 
+  it('keeps valid PDF filenames with parentheses while encoding spaces', () => {
+    const dirty = 'https://loikmon.org/webapis/uploads/books/Mon Nationalism(1)_3.pdf'
+    expect(normaliseUrl(dirty)).toBe('https://loikmon.org/webapis/uploads/books/Mon%20Nationalism(1)_3.pdf')
+  })
+
   it('unescapes backslash-escaped slashes', () => {
     const escaped = 'https://loikmon.org\\/uploads\\/cover.jpg'
     expect(normaliseUrl(escaped)).toBe('https://loikmon.org/uploads/cover.jpg')

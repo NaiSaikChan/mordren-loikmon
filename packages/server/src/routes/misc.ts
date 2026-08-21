@@ -46,8 +46,17 @@ router.get('/pdf-proxy', async (req, res) => {
 	try {
 		const upstream = await axios.get(parsed.toString(), {
 			responseType: 'stream',
+			validateStatus: () => true,
 			headers: { Accept: 'application/pdf,*/*' },
 		})
+
+		if (upstream.status >= 400) {
+			res.status(upstream.status).json({
+				error: 'PDF file not found or unavailable upstream',
+				status: upstream.status,
+			})
+			return
+		}
 
 		const contentType = String(upstream.headers['content-type'] ?? 'application/pdf')
 		const contentLength = upstream.headers['content-length']

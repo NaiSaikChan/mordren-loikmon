@@ -53,10 +53,10 @@ watch(
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
       <AppTopBar />
 
-      <main ref="main" class="flex-1 overflow-y-auto">
+      <main ref="main" class="flex flex-col flex-1 overflow-y-auto">
         <RouterView v-slot="{ Component, route: viewRoute }">
           <Transition name="page" mode="out-in">
-            <div :key="viewRoute.fullPath" class="min-h-full">
+            <div :key="viewRoute.fullPath" class="h-full min-h-full">
               <component :is="Component" />
             </div>
           </Transition>

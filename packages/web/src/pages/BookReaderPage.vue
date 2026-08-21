@@ -19,19 +19,53 @@ const auth = useAuthStore()
 const purchasesStore = usePurchasesStore()
 
 const accessChecked = ref(false)
+const pdfAvailability = ref<boolean | null>(null)
 
 function fixUrl(url: string): string {
   if (!url) return ''
-  let u = url
-  // Some server responses double-escape URLs as JSON strings (https:\/\/host\/path).
-  // Try to decode once; if it stays the same,continue with the original value.
+
+  let u = String(url)
   try {
     const decoded = JSON.parse(`"${u}"`)
     if (typeof decoded === 'string' && decoded.startsWith('http')) u = decoded
   } catch { /* ignore */ }
-  u = u.replace(/\\/g, '/')
-  u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-  return u
+
+  u = u.replace(/\\\//g, '/')
+  if (!/^https?:\/\//i.test(u)) {
+    u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
+    return u
+  }
+
+  try {
+    const parsed = new URL(u)
+    const pathname = parsed.pathname
+      .replace(/\u202f/gi, '%E2%80%AF')
+      .replace(/ /g, '%20')
+    parsed.pathname = pathname
+    return parsed.toString()
+  } catch {
+    return u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
+  }
+}
+
+async function refreshPdfAvailability() {
+  pdfAvailability.value = null
+  const targetUrl = viewerPdfUrl.value
+  if (!targetUrl || canAccess.value !== true) {
+    pdfAvailability.value = false
+    return
+  }
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { Range: 'bytes=0-0' },
+    })
+    pdfAvailability.value = response.ok && response.status < 400
+  } catch {
+    pdfAvailability.value = false
+  }
 }
 
 const book       = computed(() => store.detail)
@@ -97,9 +131,18 @@ async function loadReaderPage() {
 
 onMounted(loadReaderPage)
 
+watch(
+  () => [viewerPdfUrl.value, canAccess.value],
+  () => {
+    void refreshPdfAvailability()
+  },
+  { immediate: true },
+)
+
 // Vue Router same-component param navigation: reload when id changes.
 watch(() => props.id, () => {
   accessChecked.value = false
+  pdfAvailability.value = null
   void loadReaderPage()
 })
 </script>
@@ -109,7 +152,7 @@ watch(() => props.id, () => {
     <!-- Header bar — no download link -->
     <div class="h-12 bg-white dark:bg-surface-900 border-b border-gray-100 dark:border-gray-800 flex items-center px-4 gap-3 shrink-0">
       <RouterLink :to="`/books/${id}`" class="btn-ghost p-2 text-sm">← {{ t('common.back') }}</RouterLink>
-      <h1 class="font-semibold text-sm text-gray-700 dark:text-gray-300 truncate flex-1">
+      <h1 class="font-semibold text-sm text-gray-700 dark:text-gray-300 truncate flex-1 pt-2">
         {{ book?.title ?? 'Book Reader' }}
       </h1>
     </div>
@@ -136,9 +179,21 @@ watch(() => props.id, () => {
       <EpubReader :url="activeEpubUrl" />
     </div>
 
+    <LoadingSpinner v-else-if="canAccess && pdfUrl && pdfAvailability === null" />
+
     <!-- PDF reader (download + print disabled) -->
-    <div v-else-if="canAccess && viewerPdfUrl" class="flex-1 overflow-hidden">
+    <div v-else-if="canAccess && viewerPdfUrl && pdfAvailability === true" class="flex-1 overflow-hidden">
       <VuePdfApp :pdf="viewerPdfUrl" :config="pdfConfig" class="w-full h-full" style="height: 100%;" />
+    </div>
+
+    <div v-else-if="canAccess && pdfUrl && pdfAvailability === false" class="flex-1 flex items-center justify-center text-center p-8">
+      <div class="max-w-md">
+        <div class="text-5xl mb-4">📄</div>
+        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">PDF not available</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          This book is linked to a missing or broken PDF file. Please report this issue so it can be fixed upstream.
+        </p>
+      </div>
     </div>
 
     <!-- Nothing available -->
