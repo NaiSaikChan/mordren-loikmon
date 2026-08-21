@@ -22,7 +22,7 @@ const articlesCount = computed(() => Number(props.author.articlescount ?? props.
       
       <!-- Info -->
       <div class="p-4">
-        <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate mb-3">
+        <h3 class="text-sm font-semibold text-gray-900 dark:text-white truncate mb-3 pt-1">
           {{ author.name }}
         </h3>
         <div class="flex gap-3 text-xs">

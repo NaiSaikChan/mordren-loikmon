@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
@@ -8,15 +8,23 @@ import type { Theme, Locale } from '@/stores/ui'
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const route = useRoute()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 const searchQuery = ref('')
 
+watch(
+  () => route.query.q,
+  (q) => {
+    searchQuery.value = typeof q === 'string' ? q : ''
+  },
+  { immediate: true },
+)
+
 function handleSearch() {
-  if (searchQuery.value.trim()) {
-    router.push({ path: '/search', query: { q: searchQuery.value } })
-    searchQuery.value = ''
-  }
+  const q = searchQuery.value.trim()
+  if (q) router.push({ path: '/search', query: { q } })
+  else if (route.path === '/search') router.push({ path: '/search' })
 }
 
 function cycleTheme() {
@@ -54,8 +62,10 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
         <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
         <input
           v-model="searchQuery"
+          type="search"
           class="input pl-9 pr-4 h-9 text-sm"
           :placeholder="t('search.placeholder')"
+          :aria-label="t('nav.search')"
         />
       </div>
     </form>

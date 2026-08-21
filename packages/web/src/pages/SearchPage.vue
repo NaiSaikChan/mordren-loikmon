@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useSearchStore } from '@/stores/search'
 import BookCard from '@/components/shared/BookCard.vue'
@@ -10,32 +10,31 @@ import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 
 const { t } = useI18n()
 const route = useRoute()
-const router = useRouter()
 const store = useSearchStore()
-const query = ref((route.query.q as string) ?? '')
+const query = computed(() => (typeof route.query.q === 'string' ? route.query.q.trim() : ''))
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-watch(query, (q) => {
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    router.replace({ query: q ? { q } : {} })
-    if (q.trim()) store.search(q.trim())
-  }, 350)
-})
-
-onMounted(() => {
-  if (query.value) store.search(query.value)
-})
+watch(
+  query,
+  (q) => {
+    if (q) store.search(q)
+    else store.clear()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="page-wrapper">
-    <div class="max-w-2xl mx-auto mb-8">
-      <div class="relative">
-        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-        <input v-model="query" class="input pl-10 h-12 text-base" :placeholder="t('search.placeholder')" autofocus />
-      </div>
+    <div v-if="query" class="mb-6">
+      <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-1">
+        {{ t('search.results') }}
+      </p>
+      <h1 class="text-xl font-bold text-gray-900 dark:text-white">
+        “{{ query }}”
+      </h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        {{ t('search.useTopBarHint') }}
+      </p>
     </div>
 
     <LoadingSpinner v-if="store.loading" />
@@ -62,7 +61,7 @@ onMounted(() => {
         </div>
       </section>
 
-      <div v-if="query && !store.loading && !store.results.books?.length && !store.results.articles?.length && !store.results.authors?.length"
+      <div v-if="!store.loading && !store.results.books?.length && !store.results.articles?.length && !store.results.authors?.length"
         class="text-center py-16 text-gray-400">
         <div class="text-5xl mb-3">🔍</div>
         <p>{{ t('search.noResults', { query }) }}</p>
@@ -71,7 +70,8 @@ onMounted(() => {
 
     <div v-else-if="!query" class="text-center py-16 text-gray-400">
       <div class="text-5xl mb-3">🔍</div>
-      <p>{{ t('search.placeholder') }}</p>
+      <p class="font-medium text-gray-600 dark:text-gray-300">{{ t('search.startTitle') }}</p>
+      <p class="text-sm mt-1">{{ t('search.startHint') }}</p>
     </div>
   </div>
 </template>

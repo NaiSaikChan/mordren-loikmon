@@ -1,64 +1,55 @@
-name: mordren-loikmon
+version: '3.8'
 
 services:
-  app:
-    image: node:20-bookworm
-    container_name: mordren-loikmon-dev
-    working_dir: /workspace
-    env_file:
-      - ./.env
-    environment:
-      NODE_ENV: development
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: "200"
-      WATCHPACK_POLLING: "true"
-      # Keep the npm cache outside the bind mount for better performance
-      npm_config_cache: /npm-cache
-    expose:
-      - "5173" # Vite dev server
-      - "4000" # Express BFF
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=traefik
-      - traefik.http.routers.loikmon-api.rule=Host(`api.loikmon.org`)
-      - traefik.http.routers.loikmon-api.entrypoints=websecure
-      - traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt
-      - traefik.http.routers.loikmon-api.service=loikmon-api-svc
-      - traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4000
-      
-      - traefik.http.routers.loikmon-app.rule=Host(`app.loikmon.org`)
-      - traefik.http.routers.loikmon-app.entrypoints=websecure
-      - traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt
-      - traefik.http.routers.loikmon-app.service=loikmon-app-svc
-      - traefik.http.services.loikmon-app-svc.loadbalancer.server.port=5173
-    volumes:
-      - ./:/workspace
-      - npm-cache:/npm-cache
-    networks:
-      - default
-      - traefik
-    command: >
-      bash -lc "
-      set -e
-      npm ci
-      npm run dev:server &
-      npm run dev -w @loikmon/web -- --host 0.0.0.0 --port 5173
-      "
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "node -e \"require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\"",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+  server:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    container_name: loikmon-server
     restart: unless-stopped
+    environment:
+      - PORT=4000
+      - NODE_ENV=production
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aar_traefik_traefik-proxy"
+      - "traefik.http.routers.loikmon-api.rule=Host(`api.loikmon.org`)"
+      - "traefik.http.routers.loikmon-api.entrypoints=websecure"
+      - "traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.loikmon-api.service=loikmon-api-svc"
+      - "traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4000"
+    networks:
+      - traefik-proxy
+      - internal
 
-volumes:
-  npm-cache:
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+      args:
+        VITE_BASE: /
+        VITE_API_BASE: /api
+    container_name: loikmon-web
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=aar_traefik_traefik-proxy"
+      - "traefik.http.routers.loikmon-app.rule=Host(`app.loikmon.org`)"
+      - "traefik.http.routers.loikmon-app.entrypoints=websecure"
+      - "traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.loikmon-app.service=loikmon-app-svc"
+      - "traefik.http.services.loikmon-app-svc.loadbalancer.server.port=80"
+    depends_on:
+      - server
+    networks:
+      - traefik-proxy
+      - internal
 
 networks:
-  traefik:
+  traefik-proxy:
     external: true
+    name: aar_traefik_traefik-proxy
+  internal:
+    driver: bridge

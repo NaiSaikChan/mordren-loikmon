@@ -8,6 +8,8 @@ import { useAuthStore } from '@/stores/auth'
 import { usePurchasesStore } from '@/stores/purchases'
 import { articles as articlesApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import ArticleAudioCard from '@/components/media/ArticleAudioCard.vue'
+import { useArticleAudio } from '@/composables/useArticleAudio'
 
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()
@@ -26,6 +28,7 @@ function decodeBase64(str: string): string {
 }
 
 const article  = computed(() => store.detail)
+const articleThumbnail = computed(() => fixUrl(article.value?.thumbnail_url ?? article.value?.thumbnail))
 const tab      = ref<'content' | 'reviews'>('content')
 const newReview  = ref('')
 const newRating  = ref(5)
@@ -47,6 +50,9 @@ const canRead = computed(() => {
   return purchasesStore.hasArticle(props.id)
 })
 
+const { track: audioTrack, play: playAudio } = useArticleAudio(article)
+const canListen = computed(() => !!audioTrack.value && canRead.value)
+
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['b','strong','i','em','u','s','h1','h2','h3','h4','h5','h6',
@@ -59,7 +65,7 @@ function sanitizeHtml(html: string): string {
 
 function fixUrl(url?: string) {
   if (!url) return ''
-  return url.replace(/\\/g, '/').replace(/ /g, '%20').replace(/\u202f/gi, '%20')
+  return url.replace(/\\/g, '/').replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
 }
 
 async function submitReview() {
@@ -106,9 +112,9 @@ onMounted(async () => {
 
     <div v-else-if="article">
       <!-- Thumbnail banner -->
-      <div v-if="fixUrl(article.thumbnail_url ?? article.thumbnail)"
+      <div v-if="articleThumbnail"
         class="w-full h-52 rounded-2xl overflow-hidden mb-6 bg-gray-100 dark:bg-surface-800">
-        <img :src="fixUrl(article.thumbnail_url ?? article.thumbnail)" :alt="article.title"
+        <img :src="articleThumbnail" :alt="article.title"
           class="w-full h-full object-cover"
           @error="($event.target as HTMLImageElement).style.display='none'" />
       </div>
@@ -122,6 +128,10 @@ onMounted(async () => {
         <span v-if="article.is_free" class="text-green-500 font-semibold">Free</span>
         <span v-else-if="article.price ?? article.amount" class="text-brand-600 font-semibold">🪙 {{ article.price ?? article.amount }}</span>
       </div>
+
+      <!-- Audiobook -->
+      <ArticleAudioCard v-if="canListen && audioTrack" :title="audioTrack.title" :artist="audioTrack.artist"
+        :cover="audioTrack.cover" :action-label="t('music.listen')" @play="playAudio" />
 
       <!-- Tabs -->
       <div class="flex gap-2 mb-6">

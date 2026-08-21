@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import { usePurchasesStore } from '@/stores/purchases'
+import logoUrl from '@/assets/logo.png'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -18,12 +19,12 @@ const navItems = computed(() => [
   { key: 'books',       icon: '📚', label: t('nav.books'),      path: '/books' },
   { key: 'articles',    icon: '📰', label: t('nav.articles'),   path: '/articles' },
   { key: 'authors',     icon: '✍️',  label: t('nav.authors'),   path: '/authors' },
-  { key: 'music',       icon: '🎵', label: t('nav.music'),      path: '/music' },
+  //{ key: 'music',       icon: '🎵', label: t('nav.music'),      path: '/music' },
   // { key: 'search',      icon: '🔍', label: t('nav.search'),     path: '/search' },
   { key: 'library',     icon: '📁', label: t('nav.library'),    path: '/library' },
   { key: 'purchases',   icon: '💳', label: t('nav.purchases'),  path: '/purchases' },
   { key: 'collections', icon: '📦', label: t('nav.collections'), path: '/collections' },
-  { key: 'inbox',       icon: '📬', label: 'Inbox',              path: '/inbox' },
+  { key: 'inbox',       icon: '📬', label: t('nav.inbox'),        path: '/inbox' },
 ])
 
 const bottomItems = computed(() => [
@@ -38,7 +39,11 @@ function isActive(path: string) {
 }
 
 function navigate(path: string) {
-  router.push(path)
+  if (route.path === path) {
+    window.dispatchEvent(new CustomEvent('loikmon:scroll-main-top'))
+  } else {
+    router.push(path)
+  }
   uiStore.closeSidebar()
 }
 
@@ -59,12 +64,12 @@ async function handleLogout() {
   >
     <!-- Logo -->
     <div class="flex items-center gap-3 px-4 py-5 border-b border-gray-100 dark:border-gray-800">
-      <div class="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center text-white text-lg">
-        📚
+      <div class="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center">
+        <img :src="logoUrl" alt="Loikmon" class="w-full h-full object-contain" />
       </div>
       <div>
-        <div class="font-bold text-gray-900 dark:text-white text-sm leading-tight">Loikmon</div>
-        <div class="text-xs text-gray-400">Mon Digital Library</div>
+        <div class="font-bold text-gray-900 dark:text-white text-sm leading-tight">{{ t('app.name') }}</div>
+        <div class="text-xs text-gray-400">{{ t('app.tagline') }}</div>
       </div>
     </div>
 
@@ -107,7 +112,7 @@ async function handleLogout() {
       </button>
       <button class="nav-link w-full text-left text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" @click="handleLogout">
         <span>🚪</span>
-        <span>Logout</span>
+        <span>{{ t('nav.logout') }}</span>
       </button>
     </div>
   </aside>

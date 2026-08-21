@@ -138,7 +138,7 @@ onMounted(async () => {
     </div>
 
     <!-- Quick nav cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+    <!-- <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
       <RouterLink v-for="item in [
         { to: '/books',    icon: '📚', label: t('nav.books'),    color: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' },
         { to: '/articles', icon: '📰', label: t('nav.articles'), color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' },
@@ -149,7 +149,7 @@ onMounted(async () => {
         <span class="text-2xl">{{ item.icon }}</span>
         <span class="text-xs font-semibold">{{ item.label }}</span>
       </RouterLink>
-    </div>
+    </div> -->
 
     <!-- Books -->
     <SectionHeader :title="t('books.title')" :viewAllPath="'/books'" />

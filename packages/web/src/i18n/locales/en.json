@@ -1,4 +1,8 @@
 {
+  "app": {
+    "name": "Loikmon",
+    "tagline": "Mon Digital Library"
+  },
   "nav": {
     "home": "Home",
     "books": "Books",
@@ -106,12 +110,16 @@
     "title": "Audio Books",
     "play": "Play",
     "pause": "Pause",
+    "listen": "Listen",
     "noMusic": "No audio books found."
   },
   "search": {
     "placeholder": "Search books, articles, authors…",
     "results": "Search results",
-    "noResults": "No results found for: {query}"
+    "noResults": "No results found for: {query}",
+    "useTopBarHint": "Use the search bar above to refine your query.",
+    "startTitle": "Search the library",
+    "startHint": "Use the search bar above to find books, articles, and authors."
   },
   "library": {
     "title": "My Library",
@@ -160,17 +168,40 @@
   },
   "settings": {
     "title": "Settings",
+    "subtitle": "Personalize Loikmon for comfortable reading, beautiful typography, and the theme that fits your eyes.",
     "theme": "Theme",
+    "appearanceTitle": "Appearance",
+    "appearanceDescription": "Choose how the interface should feel across day, night, and system preferences.",
+    "themeLight": "Light",
+    "themeLightDesc": "Bright, clean, and easy for daytime reading.",
+    "themeDark": "Dark",
+    "themeDarkDesc": "Low-light friendly with softer contrast.",
+    "themeSystem": "System",
+    "themeSystemDesc": "Follow your device appearance automatically.",
     "language": "Language",
+    "languageDescription": "Pick the language used across navigation, labels, and interface hints.",
+    "languageEnglishDesc": "Use the English interface.",
+    "languageMonDesc": "Use the Mon language interface.",
     "notifications": "Notifications",
     "account": "Account",
     "deleteAccount": "Delete Account",
     "typography": "Typography",
+    "typographyDescription": "Fine-tune the fonts and scale for a more natural reading experience.",
     "bodyFont": "Body Font",
+    "bodyFontDescription": "Used for paragraphs, lists, and long reading content.",
     "bodyTextSize": "Body Text Size",
     "headingFont": "Heading Font",
+    "headingFontDescription": "Used for page titles, section headings, and emphasis.",
     "headingSize": "Heading Size",
-    "preview": "Preview"
+    "preview": "Preview",
+    "previewTitle": "Live reading preview",
+    "previewSubtitle": "Every change updates instantly.",
+    "readingPreview": "Reading sample",
+    "previewHeading": "Welcome to Loikmon",
+    "previewBody": "Mon literature stays alive when it is easy to read, write, preserve, and share with every generation.",
+    "currentTheme": "Theme",
+    "currentLanguage": "Language",
+    "quickStatus": "Your preferences are saved automatically on this device."
   },
   "reader": {
     "notAvailable": "No readable file available for this book."

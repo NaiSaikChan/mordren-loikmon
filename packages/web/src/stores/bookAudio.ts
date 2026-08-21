@@ -19,10 +19,10 @@ function pickChapterUrl(chapter: BookAudioChapter): string {
     (rec.audio_file as string) ??
     (rec.stream_url as string) ??
     ''
-  return fixUrl(raw)
+  return normalizeAudioUrl(raw)
 }
 
-function fixUrl(url: string): string {
+export function normalizeAudioUrl(url: string): string {
   if (!url) return ''
   let u = url
   try {

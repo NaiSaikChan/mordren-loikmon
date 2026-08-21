@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { RouterView } from 'vue-router'
+import { nextTick, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { RouterView, useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppTopBar from './AppTopBar.vue'
 import AudioPlayer from '@/components/media/AudioPlayer.vue'
@@ -11,11 +11,28 @@ import { usePurchasesStore } from '@/stores/purchases'
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 const purchasesStore = usePurchasesStore()
+const route = useRoute()
+const mainEl = useTemplateRef<HTMLElement>('main')
+
+async function scrollMainToTop() {
+  await nextTick()
+  mainEl.value?.scrollTo({ top: 0, left: 0 })
+}
 
 onMounted(async () => {
+  window.addEventListener('loikmon:scroll-main-top', scrollMainToTop)
   await authStore.restore()
   if (authStore.isLoggedIn) purchasesStore.fetchAll()
 })
+
+onUnmounted(() => {
+  window.removeEventListener('loikmon:scroll-main-top', scrollMainToTop)
+})
+
+watch(
+  () => route.fullPath,
+  scrollMainToTop,
+)
 </script>
 
 <template>
@@ -36,10 +53,12 @@ onMounted(async () => {
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
       <AppTopBar />
 
-      <main class="flex-1 overflow-y-auto">
-        <RouterView v-slot="{ Component }">
+      <main ref="main" class="flex-1 overflow-y-auto">
+        <RouterView v-slot="{ Component, route: viewRoute }">
           <Transition name="page" mode="out-in">
-            <component :is="Component" />
+            <div :key="viewRoute.fullPath" class="min-h-full">
+              <component :is="Component" />
+            </div>
           </Transition>
         </RouterView>
       </main>

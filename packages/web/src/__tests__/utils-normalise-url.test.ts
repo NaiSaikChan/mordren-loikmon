@@ -11,8 +11,8 @@ function normaliseUrl(url: string | undefined | null, base = 'https://loikmon.or
   // Decode escaped slashes (`\/`) first, regardless of escaped protocol.
   let u = String(url).replace(/\\\//g, '/')
 
-  // Encode narrow no-break space (U+202F) and regular space
-  u = u.replace(/\u202f/gi, '%20').replace(/ /g, '%20')
+  // Encode narrow no-break space (U+202F) and regular space without changing filenames.
+  u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
 
   if (u.startsWith('http://') || u.startsWith('https://')) return u
   return `${base}${u.startsWith('/') ? '' : '/'}${u}`
@@ -39,7 +39,7 @@ describe('normaliseUrl()', () => {
 
   it('encodes narrow no-break space (U+202F) in absolute URL', () => {
     const dirty = 'https://loikmon.org/uploads/thumbnails/Screenshot\u202f2024.jpg'
-    expect(normaliseUrl(dirty)).toBe('https://loikmon.org/uploads/thumbnails/Screenshot%202024.jpg')
+    expect(normaliseUrl(dirty)).toBe('https://loikmon.org/uploads/thumbnails/Screenshot%E2%80%AF2024.jpg')
   })
 
   it('encodes regular space in absolute URL', () => {

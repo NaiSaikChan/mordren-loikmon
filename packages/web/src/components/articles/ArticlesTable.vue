@@ -48,6 +48,10 @@ function fmtDate(raw: unknown) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+function articleDate(article: Article): unknown {
+  return article.articledate ?? article.updated_at ?? article.created_at ?? article.date
+}
+
 function fmtRating(r: unknown) {
   const n = Number(r ?? 0)
   return n > 0 ? n.toFixed(1) : null
@@ -117,7 +121,7 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
           <!-- author, date -->
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
             <span v-if="article.authorname || article.author" class="truncate">✍️ {{ (article.authorname ?? article.author) as string }}</span>
-            <span>📅 {{ fmtDate(article.articledate ?? article.created_at ?? article.date) }}</span>
+            <span>📅 {{ fmtDate(articleDate(article)) }}</span>
           </div>
 
           <!-- view, rating -->
@@ -252,7 +256,7 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
 
           <!-- Date (sortable) -->
           <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            📅 {{ fmtDate(article.articledate ?? article.created_at ?? article.date) }}
+            📅 {{ fmtDate(articleDate(article)) }}
           </td>
 
           <!-- Views + Rating -->

@@ -80,6 +80,9 @@ export interface Article {
   cat?: string
   thumbnail?: string
   thumbnail_url?: string
+  audio?: string
+  audio_url?: string
+  articledate?: string
   content?: string
   description?: string
   body?: string
@@ -87,7 +90,11 @@ export interface Article {
   amount?: number | string
   is_free?: boolean
   created_at?: string
+  updated_at?: string
   date?: string
+  rating?: number | string
+  views?: number | string
+  total_views?: number | string
   [key: string]: unknown
 }
 

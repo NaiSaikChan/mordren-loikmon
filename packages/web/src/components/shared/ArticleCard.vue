@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import type { Article } from '@loikmon/api'
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useArticleAudio } from '@/composables/useArticleAudio'
 
 const props = defineProps<{ article: Article }>()
+const { t } = useI18n()
+const { hasAudio, play } = useArticleAudio(() => props.article)
+
+function listen(e: MouseEvent) {
+  e.preventDefault()
+  play()
+}
 
 // Format views for readability (e.g., 1000 -> 1K, 1500000 -> 1.5M)
 const formattedViews = computed(() => {
@@ -101,6 +110,11 @@ async function shareArticle(e: MouseEvent) {
 
         <!-- Actions -->
         <div class="mt-2 pt-2 border-t border-gray-100 dark:border-surface-700 flex items-center justify-end gap-1">
+          <button v-if="hasAudio"
+            class="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-gray-100 dark:hover:bg-surface-700 transition-colors text-base leading-none"
+            :title="t('music.listen')" @click="listen">
+            🎧
+          </button>
           <button
             class="p-1.5 rounded-lg text-gray-400 hover:text-brand-500 dark:hover:text-brand-400 hover:bg-gray-100 dark:hover:bg-surface-700 transition-colors text-base leading-none"
             :title="copied ? 'Link copied!' : 'Share'" @click="shareArticle">

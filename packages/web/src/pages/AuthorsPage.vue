@@ -23,7 +23,7 @@ onMounted(() => store.fetchAuthors({ page: '0' }))
 
 <template>
   <div class="page-wrapper">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">{{ t('authors.title') }}</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6 pt-1">{{ t('authors.title') }}</h1>
     <LoadingSpinner v-if="store.loading && !store.list.length" />
     <EmptyState v-else-if="!store.loading && !store.list.length" icon="✍️" :title="t('common.notFound')" />
     <div v-else>
