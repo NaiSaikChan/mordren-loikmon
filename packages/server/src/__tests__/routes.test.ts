@@ -37,6 +37,9 @@ async function handleSearch(req: Request, res: Response) {
 async function handleGetArticles(req: Request, res: Response) {
   await proxyGet(req, res, 'fetcharticles')
 }
+async function handleGetArticle(req: Request, res: Response) {
+  await proxyPost(req, res, 'getitem')
+}
 async function handleGetAuthors(req: Request, res: Response) {
   await proxyGet(req, res, 'fetchauthors')
 }
@@ -113,6 +116,14 @@ describe('BFF — route handlers', () => {
       const { req, res } = makeReqRes()
       await handleGetArticles(req, res)
       expect(proxyGet).toHaveBeenCalledWith(req, res, 'fetcharticles')
+    })
+  })
+
+  describe('POST /api/articles/getitem', () => {
+    it('calls proxyPost with "getitem"', async () => {
+      const { req, res } = makeReqRes({ type: 'article', id: 290 })
+      await handleGetArticle(req, res)
+      expect(proxyPost).toHaveBeenCalledWith(req, res, 'getitem')
     })
   })
 

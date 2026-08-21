@@ -137,6 +137,14 @@ describe('@loikmon/api — Endpoint modules (mocked Axios)', () => {
       const mockInstance = (axios.create as vi.Mock)()
       expect(mockInstance.post).toHaveBeenCalledWith('getBookChapters', { book_id: 72 })
     })
+
+    it('getArticle loads a single article via the generic item endpoint', async () => {
+      const { articles } = await import('../endpoints/articles.js')
+      await articles.getArticle(290)
+      const { default: axios } = await import('axios')
+      const mockInstance = (axios.create as vi.Mock)()
+      expect(mockInstance.post).toHaveBeenCalledWith('getitem', { type: 'article', id: 290 })
+    })
   })
 
   describe('response envelope unwrapping', () => {

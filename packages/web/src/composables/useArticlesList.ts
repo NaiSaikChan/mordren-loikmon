@@ -6,6 +6,11 @@ export const PAGE_SIZES = [10, 20, 30, 50, 100]
 
 const API_PAGE_SIZE = 10
 const MAX_ARTICLE_PAGES = 100
+const articleListCache = new Map<number, Article[]>()
+
+export function clearArticleListCache() {
+  articleListCache.clear()
+}
 
 export function getArticleDateTimestamp(article: Article): number | null {
   const raw = article.articledate ?? article.updated_at ?? article.created_at ?? article.date
@@ -32,7 +37,7 @@ export function useArticlesList() {
   const pageSize    = shallowRef(10)
   const sortOrder   = shallowRef<'asc' | 'desc'>('desc')
   const selectedCat = shallowRef(0)
-  const allArticles = shallowRef<Article[]>([])
+  const allArticles = shallowRef<Article[]>(articleListCache.get(0) ?? [])
   const loadingAll  = shallowRef(false)
   let loadId = 0
 
@@ -52,6 +57,13 @@ export function useArticlesList() {
   )
 
   async function fetchPage() {
+    const categoryKey = selectedCat.value
+    const cachedArticles = articleListCache.get(categoryKey)
+    if (cachedArticles) {
+      allArticles.value = cachedArticles
+      return
+    }
+
     const currentLoadId = ++loadId
     const byId = new Map<string | number, Article>()
     loadingAll.value = true
@@ -63,7 +75,7 @@ export function useArticlesList() {
           limit: API_PAGE_SIZE,
           type: 1,
           query: '',
-          category: selectedCat.value,
+          category: categoryKey,
         })
 
         if (currentLoadId !== loadId) return
@@ -83,7 +95,9 @@ export function useArticlesList() {
       }
 
       if (currentLoadId === loadId) {
-        allArticles.value = Array.from(byId.values())
+        const nextArticles = Array.from(byId.values())
+        articleListCache.set(categoryKey, nextArticles)
+        allArticles.value = nextArticles
       }
     } finally {
       if (currentLoadId === loadId) loadingAll.value = false

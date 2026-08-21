@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed, ref, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 import { useArticlesStore } from '@/stores/articles'
@@ -92,14 +92,17 @@ async function buyArticle() {
   }
 }
 
-onMounted(async () => {
+async function loadArticle() {
   await Promise.all([
     store.fetchDetail(props.id),
     auth.isLoggedIn ? purchasesStore.fetchAll() : Promise.resolve(),
   ])
   reviews.loadReviews(props.id, 'article')
   articlesApi.updateArticleTotalViews(props.id)
-})
+}
+
+onMounted(loadArticle)
+watch(() => props.id, loadArticle)
 </script>
 
 <template>

@@ -12,6 +12,7 @@ vi.mock('@loikmon/api', () => ({
 }))
 
 import {
+  clearArticleListCache,
   compareArticlesByDate,
   getArticleDateTimestamp,
   useArticlesList,
@@ -25,6 +26,7 @@ describe('useArticlesList', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    clearArticleListCache()
   })
 
   it('sorts articles by date across all fetched API pages', async () => {
@@ -53,6 +55,26 @@ describe('useArticlesList', () => {
     list.toggleSort()
 
     expect(list.articles.value.map((a) => a.id)).toEqual([273, 322, 324, 351])
+  })
+
+  it('reuses cached article data for the same category instead of refetching', async () => {
+    const pages: Record<number, Article[]> = {
+      0: [article(10, 'First', '2026-01-01'), article(20, 'Second', '2025-01-01')],
+      1: [],
+    }
+
+    mockFetchArticles.mockImplementation((params: Record<string, unknown>) =>
+      Promise.resolve({ data: { articles: pages[params.page as number] ?? [] } }),
+    )
+
+    const firstList = useArticlesList()
+    await firstList.fetchPage()
+    const callsAfterFirstLoad = mockFetchArticles.mock.calls.length
+
+    const secondList = useArticlesList()
+    await secondList.fetchPage()
+    expect(mockFetchArticles).toHaveBeenCalledTimes(callsAfterFirstLoad)
+    expect(secondList.articles.value.map((a) => a.id)).toEqual([10, 20])
   })
 
   it('keeps invalid or missing dates last in both sort directions', () => {

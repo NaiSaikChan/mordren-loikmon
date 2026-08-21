@@ -34,7 +34,7 @@ export const useArticlesStore = defineStore('articles', () => {
         return
       }
 
-      // 2. Call getarticle endpoint
+      // 2. Call the generic article detail endpoint
       try {
         const res  = await articlesApi.getArticle(id)
         const body = res.data as any

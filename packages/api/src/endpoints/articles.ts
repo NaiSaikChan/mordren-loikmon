@@ -6,9 +6,9 @@ export const articles = {
   fetchArticles: (params?: Record<string, unknown>) =>
     getClient().post<any>('fetcharticles', params ?? {}),
 
-  // Flutter: { articleid }
+  // Flutter: { type: 'article', id }
   getArticle: (id: string | number) =>
-    getClient().post<any>('getarticle', { articleid: id }),
+    getClient().post<any>('getitem', { type: 'article', id }),
 
   // Flutter: { articleid }
   updateArticleTotalViews: (id: string | number) =>
