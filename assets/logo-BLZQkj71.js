@@ -1,0 +1,1 @@
+var e=`/mordren-loikmon/assets/logo-CsgzhtLL.png`;export{e as t};
