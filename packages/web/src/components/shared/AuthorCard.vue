@@ -14,7 +14,7 @@ const articlesCount = computed(() => Number(props.author.articlescount ?? props.
     <div class="card overflow-hidden">
       <!-- Thumbnail -->
       <div class="w-full aspect-square overflow-hidden bg-gray-200 dark:bg-surface-700 relative">
-        <img v-if="avatarUrl" :src="avatarUrl" :alt="author.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+        <img v-if="avatarUrl" :src="avatarUrl" :alt="author.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" />
         <div v-else class="w-full h-full flex items-center justify-center bg-linear-to-br from-brand-100 to-brand-200 dark:from-brand-900/50 dark:to-brand-800/50">
           <span class="text-6xl text-brand-600 dark:text-brand-400">{{ author.name.charAt(0) }}</span>
         </div>

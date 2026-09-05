@@ -64,6 +64,8 @@
     "purchase": "Purchase",
     "chapters": "Chapters",
     "related": "Related Books",
+    "authorBooks": "More Books by This Author",
+    "youMayLike": "You May Also Like",
     "pages": "{count} pages",
     "rating": "Rating",
     "noBooks": "No books found.",

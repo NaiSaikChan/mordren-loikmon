@@ -34,6 +34,9 @@ export default defineConfig({
         // running the experimental rolldown bundler. Object form is not accepted.
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('vue3-pdf-app')) return 'pdf-viewer'
+            if (id.includes('epubjs')) return 'epub-reader'
+            if (id.includes('dompurify')) return 'dompurify'
             if (['vue', 'vue-router', 'pinia'].some((m) => id.includes(m))) return 'vendor'
             if (id.includes('vue-i18n')) return 'i18n'
             if (id.includes('axios')) return 'http'

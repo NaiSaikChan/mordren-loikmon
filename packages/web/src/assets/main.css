@@ -268,11 +268,22 @@
   }
 
   .content-grid {
-    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4;
+    @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4;
+  }
+
+  .content-grid > * {
+    @apply min-w-0;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 280px;
   }
 
   .authors-grid {
     @apply grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4;
+  }
+
+  .authors-grid > * {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 200px;
   }
 
   .section-title {
@@ -282,6 +293,15 @@
   /* Skeleton loader */
   .skeleton {
     @apply animate-pulse bg-gray-200 rounded dark:bg-gray-700;
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
   }
 
   /* Active nav link */

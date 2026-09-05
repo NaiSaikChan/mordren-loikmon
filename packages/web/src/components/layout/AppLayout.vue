@@ -37,6 +37,14 @@ watch(
 
 <template>
   <div class="flex h-full bg-surface-50 dark:bg-surface-950">
+    <!-- Skip link for keyboard accessibility -->
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:outline-none"
+    >
+      Skip to main content
+    </a>
+
     <!-- Sidebar -->
     <AppSidebar />
 
@@ -53,7 +61,7 @@ watch(
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
       <AppTopBar />
 
-      <main ref="main" class="flex flex-col flex-1 overflow-y-auto">
+      <main ref="main" id="main-content" class="flex flex-col flex-1 overflow-y-auto" tabindex="-1">
         <RouterView v-slot="{ Component, route: viewRoute }">
           <Transition name="page" mode="out-in">
             <div :key="viewRoute.fullPath" class="h-full min-h-full">

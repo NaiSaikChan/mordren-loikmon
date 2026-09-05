@@ -7,9 +7,21 @@ import { useAuthStore } from '@/stores/auth'
 import { usePurchasesStore } from '@/stores/purchases'
 import { books as booksApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
-import EpubReader from '@/components/shared/EpubReader.vue'
-import VuePdfApp from 'vue3-pdf-app'
-import 'vue3-pdf-app/dist/icons/main.css'
+import { defineAsyncComponent } from 'vue'
+
+const EpubReader = defineAsyncComponent({
+  loader: () => import('@/components/shared/EpubReader.vue'),
+  loadingComponent: LoadingSpinner,
+})
+
+const VuePdfApp = defineAsyncComponent({
+  loader: async () => {
+    await import('vue3-pdf-app/dist/icons/main.css')
+    const mod = await import('vue3-pdf-app')
+    return (mod as any).default ?? mod
+  },
+  loadingComponent: LoadingSpinner,
+})
 
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()

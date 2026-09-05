@@ -282,6 +282,8 @@ describe('purchases store', () => {
         'Gold Pack',
         '500',
         file,
+        undefined,
+        undefined,
       )
     })
 

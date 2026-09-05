@@ -5,8 +5,18 @@ export const misc = {
   initApp: (email?: string) =>
     getClient().post<any>('initapp', { email: email ?? '', lastseeninbox: 0 }),
 
-  overview: (email?: string) =>
-    getClient().post<any>('overview', { email: email ?? '', lastseeninbox: 0 }),
+  overview: (params: string | {
+    email?: string
+    author?: string | number
+    bookid?: string | number
+  } = {}) => {
+    const options = typeof params === 'string' ? { email: params } : params
+    return getClient().post<any>('overview', {
+      email: options.email ?? '',
+      author: options.author ?? '',
+      bookid: options.bookid ?? '',
+    })
+  },
 
   // Collections — correct endpoint names from API doc
   fetchCollections: (page = 0) =>

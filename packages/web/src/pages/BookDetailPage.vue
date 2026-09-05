@@ -6,9 +6,11 @@ import { useReviewsStore } from '@/stores/reviews'
 import { useAuthStore } from '@/stores/auth'
 import { usePurchasesStore } from '@/stores/purchases'
 import { useBookAudioStore } from '@/stores/bookAudio'
-import { books as booksApi } from '@loikmon/api'
+import { books as booksApi, misc } from '@loikmon/api'
+import type { Book } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import BookCard from '@/components/shared/BookCard.vue'
+import BookCarousel from '@/components/shared/BookCarousel.vue'
 
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()
@@ -17,6 +19,8 @@ const reviews = useReviewsStore()
 const auth   = useAuthStore()
 const purchasesStore = usePurchasesStore()
 const audioStore = useBookAudioStore()
+const authorBooks = ref<Book[]>([])
+const booksYouLike = ref<Book[]>([])
 
 // Review content is stored as Base64 (encoded by the mobile app before submission)
 function decodeBase64(str: string): string {
@@ -115,6 +119,36 @@ async function redeemBookCoupon() {
   }
 }
 
+async function loadOverviewBooks() {
+  authorBooks.value = []
+  booksYouLike.value = []
+  if (!book.value) return
+
+  const authorId = book.value.author_id ?? book.value.author ?? book.value.authorid
+
+  try {
+    const res = await misc.overview({
+      email: auth.user?.email,
+      author: authorId as string | number | undefined,
+      bookid: props.id,
+    })
+    const body = res.data as any
+    const data = body.data ?? body
+    const currentBookId = String(props.id)
+    const responseAuthorBooks = body.authorbooks ?? data.authorbooks
+    const responseBooksYouLike = body.booksyoulike ?? data.booksyoulike
+
+    authorBooks.value = (Array.isArray(responseAuthorBooks) ? responseAuthorBooks : []).filter(
+      (item: Book) => String(item.id) !== currentBookId,
+    )
+    booksYouLike.value = (Array.isArray(responseBooksYouLike) ? responseBooksYouLike : []).filter(
+      (item: Book) => String(item.id) !== currentBookId,
+    )
+  } catch {
+    // The existing related-books request remains the fallback below.
+  }
+}
+
 function startAudioPlayer() {
   if (!audioStore.tracks.length) return
   window.dispatchEvent(new CustomEvent('loikmon:playAudioTrack', {
@@ -125,6 +159,7 @@ function startAudioPlayer() {
 async function loadBook() {
   coverError.value = false
   await store.fetchDetail(props.id)
+  await loadOverviewBooks()
   await reviews.loadReviews(props.id, 'book')
   booksApi.updateTotalViews(props.id)
   if (book.value) store.fetchRelated(props.id)
@@ -157,6 +192,9 @@ watch(() => props.id, loadBook)
                 :src="cover" 
                 :alt="book.title"
                 class="w-full h-full object-cover"
+                loading="eager"
+                fetchpriority="high"
+                decoding="async"
                 @error="coverError = true" />
               <div v-else class="w-full h-full flex items-center justify-center text-5xl">📚</div>
             </div>
@@ -268,13 +306,28 @@ watch(() => props.id, loadBook)
           </p>
         </div>
 
-        <!-- Related books -->
-        <div v-if="store.related.length">
-          <h2 class="section-title">{{ t('books.related') }}</h2>
-          <div class="content-grid">
-            <BookCard v-for="b in store.related.slice(0, 6)" :key="b.id" :book="b" />
-          </div>
-        </div>
+        <!-- Books from the overview response -->
+        <BookCarousel
+          v-if="authorBooks.length"
+          :title="t('books.authorBooks')"
+          :books="authorBooks"
+          class="mb-8"
+        />
+
+        <BookCarousel
+          v-if="booksYouLike.length"
+          :title="t('books.youMayLike')"
+          :books="booksYouLike"
+          class="mb-8"
+        />
+
+        <!-- Fallback for older API responses -->
+        <BookCarousel
+          v-if="!authorBooks.length && !booksYouLike.length && store.related.length"
+          :title="t('books.related')"
+          :books="store.related"
+          class="mb-8"
+        />
       </div>
 
       <!-- Reviews tab -->
@@ -283,9 +336,11 @@ watch(() => props.id, loadBook)
         <div v-if="auth.isLoggedIn" class="card p-5 mb-6">
           <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">{{ t('books.writeReview') }}</h3>
           <!-- Star rating -->
-          <div class="flex gap-1 mb-3">
+          <div class="flex gap-1 mb-3" role="group" aria-label="Rating selection">
             <button v-for="s in 5" :key="s"
-              :class="['text-2xl transition-transform hover:scale-110', s <= newRating ? 'text-yellow-400' : 'text-gray-300']"
+              type="button"
+              :aria-label="`${s} star${s > 1 ? 's' : ''}`"
+              :class="['text-2xl transition-transform hover:scale-110 cursor-pointer', s <= newRating ? 'text-yellow-400' : 'text-gray-300']"
               @click="newRating = s">★</button>
           </div>
           <textarea v-model="newReview" class="input w-full h-24 resize-none" :placeholder="t('books.reviewPlaceholder')" />

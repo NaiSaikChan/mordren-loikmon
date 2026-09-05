@@ -67,7 +67,9 @@ async function shareArticle(e: MouseEvent) {
         class="w-28 h-28 sm:w-36 sm:h-28 md:w-56 md:h-auto object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0 flex items-center justify-center bg-linear-to-br">
         <img v-if="article.thumbnail_url || article.thumbnail"
           :src="(article.thumbnail_url ?? article.thumbnail) as string" :alt="article.title"
-          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" loading="lazy" />
+          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+          loading="lazy"
+          decoding="async" />
         <span v-else class="text-2xl">📰</span>
       </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useBooksStore } from '@/stores/books'
 import { useArticlesStore } from '@/stores/articles'
@@ -22,6 +22,7 @@ const sliders   = ref<any[]>([])
 const leagues   = ref<any[]>([])
 const initDone  = ref(false)
 const currentSlideIndex = ref(0)
+let autoRotateTimer: ReturnType<typeof setInterval> | null = null
 
 const currentSlide = computed(() => sliders.value[currentSlideIndex.value] || null)
 
@@ -67,10 +68,16 @@ onMounted(async () => {
 
   // Auto-rotate sliders every 5 seconds
   if (sliders.value.length > 1) {
-    const autoRotate = setInterval(() => {
+    autoRotateTimer = setInterval(() => {
       nextSlide()
     }, 5000)
-    return () => clearInterval(autoRotate)
+  }
+})
+
+onUnmounted(() => {
+  if (autoRotateTimer) {
+    clearInterval(autoRotateTimer)
+    autoRotateTimer = null
   }
 })
 </script>
@@ -85,7 +92,9 @@ onMounted(async () => {
           <button
             v-for="(slider, idx) in sliders"
             :key="slider.id"
+            type="button"
             :aria-current="idx === currentSlideIndex ? 'true' : 'false'"
+            :aria-label="slider.name || `Slide ${idx + 1}`"
             class="absolute inset-0 w-full h-full cursor-pointer transition-opacity duration-500"
             :class="idx === currentSlideIndex ? 'opacity-100 visible' : 'opacity-0 invisible'"
             @click="handleSliderClick(slider)"
@@ -95,7 +104,9 @@ onMounted(async () => {
               :src="slider.thumbnail"
               :alt="slider.name || `Slider ${idx + 1}`"
               class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-              loading="lazy"
+              :loading="idx === 0 ? 'eager' : 'lazy'"
+              :fetchpriority="idx === 0 ? 'high' : 'auto'"
+              decoding="async"
             />
             <div v-else class="w-full h-full flex items-center justify-center bg-gray-300 dark:bg-surface-600 text-gray-400">
               📸
@@ -106,17 +117,21 @@ onMounted(async () => {
         <!-- Navigation Buttons -->
         <button
           v-if="sliders.length > 1"
-          class="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+          type="button"
+          class="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors cursor-pointer"
           @click.stop="prevSlide"
           :title="t('common.previous') || 'Previous'"
+          :aria-label="t('common.previous') || 'Previous slide'"
         >
           ←
         </button>
         <button
           v-if="sliders.length > 1"
-          class="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+          type="button"
+          class="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors cursor-pointer"
           @click.stop="nextSlide"
           :title="t('common.next') || 'Next'"
+          :aria-label="t('common.next') || 'Next slide'"
         >
           →
         </button>
@@ -126,7 +141,8 @@ onMounted(async () => {
           <button
             v-for="(_, idx) in sliders"
             :key="`indicator-${idx}`"
-            class="w-2 h-2 rounded-full transition-all"
+            type="button"
+            class="w-2 h-2 rounded-full transition-all cursor-pointer"
             :class="idx === currentSlideIndex
               ? 'bg-white w-6'
               : 'bg-white/50 hover:bg-white/75'"

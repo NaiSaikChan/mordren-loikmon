@@ -54,5 +54,19 @@ router.beforeEach((to) => {
   }
 })
 
+router.afterEach((to) => {
+  const baseTitle = 'Mordren Loikmon'
+  const routeName = String(to.name || '')
+  if (routeName && routeName !== 'home') {
+    const formatted = routeName
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+    document.title = `${formatted} | ${baseTitle}`
+  } else {
+    document.title = baseTitle
+  }
+})
+
 export default router
 

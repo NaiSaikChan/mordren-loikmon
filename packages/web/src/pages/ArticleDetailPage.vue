@@ -119,6 +119,9 @@ watch(() => props.id, loadArticle)
         class="w-full h-52 rounded-2xl overflow-hidden mb-6 bg-gray-100 dark:bg-surface-800">
         <img :src="articleThumbnail" :alt="article.title"
           class="w-full h-full object-cover"
+          loading="eager"
+          fetchpriority="high"
+          decoding="async"
           @error="($event.target as HTMLImageElement).style.display='none'" />
       </div>
 
@@ -172,9 +175,11 @@ watch(() => props.id, loadArticle)
       <div v-if="tab === 'reviews'">
         <div v-if="auth.isLoggedIn" class="card p-5 mb-6">
           <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-3">Write a Review</h3>
-          <div class="flex gap-1 mb-3">
+          <div class="flex gap-1 mb-3" role="group" aria-label="Rating selection">
             <button v-for="s in 5" :key="s"
-              :class="['text-2xl transition-transform hover:scale-110', s <= newRating ? 'text-yellow-400' : 'text-gray-300']"
+              type="button"
+              :aria-label="`${s} star${s > 1 ? 's' : ''}`"
+              :class="['text-2xl transition-transform hover:scale-110 cursor-pointer', s <= newRating ? 'text-yellow-400' : 'text-gray-300']"
               @click="newRating = s">★</button>
           </div>
           <textarea v-model="newReview" class="input w-full h-24 resize-none" placeholder="Share your thoughts..." />

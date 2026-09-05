@@ -182,52 +182,6 @@ function setLocale(value: Locale) {
             <div>
               <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ t('settings.bodyFont') }}</h3>
-                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.bodyFontDescription') }}</p>
-                </div>
-                <span v-if="activeBodyFont" class="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
-                  {{ activeBodyFont.label }}
-                </span>
-              </div>
-
-              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                <button
-                  v-for="font in UI_FONT_OPTIONS"
-                  :key="font.id"
-                  type="button"
-                  :style="{ fontFamily: font.stack }"
-                  :class="[
-                    'rounded-2xl border px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
-                    uiStore.bodyFont === font.id
-                      ? 'border-brand-500 bg-brand-50 text-brand-800 shadow-sm dark:bg-brand-900/30 dark:text-brand-200'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-brand-200 hover:shadow-sm dark:border-gray-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-brand-800',
-                  ]"
-                  @click="uiStore.setBodyFont(font.id)"
-                >
-                  {{ font.label }}
-                </button>
-              </div>
-            </div>
-
-            <RangeControl
-              :label="t('settings.bodyTextSize')"
-              :display-value="`${currentFontSize.label} (${currentFontSize.px}px)`"
-              :value="currentFontSizeIndex"
-              :max="BODY_FONT_SIZES.length - 1"
-              :min-label="BODY_FONT_SIZES[0].label"
-              :max-label="BODY_FONT_SIZES[BODY_FONT_SIZES.length - 1].label"
-              decrease-label="Decrease body font size"
-              increase-label="Increase body font size"
-              @decrease="decreaseFontSize"
-              @increase="increaseFontSize"
-              @change="handleFontSizeChange"
-            />
-
-            <div class="h-px bg-linear-to-r from-transparent via-gray-200 to-transparent dark:via-gray-800" />
-
-            <div>
-              <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
-                <div>
                   <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ t('settings.headingFont') }}</h3>
                   <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.headingFontDescription') }}</p>
                 </div>
@@ -267,6 +221,52 @@ function setLocale(value: Locale) {
               @decrease="decreaseHeaderScale"
               @increase="increaseHeaderScale"
               @change="handleHeaderScaleChange"
+            />
+
+            <div class="h-px bg-linear-to-r from-transparent via-gray-200 to-transparent dark:via-gray-800" />
+
+            <div>
+              <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <h3 class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ t('settings.bodyFont') }}</h3>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('settings.bodyFontDescription') }}</p>
+                </div>
+                <span v-if="activeBodyFont" class="rounded-full bg-brand-50 px-3 py-1 text-xs font-bold text-brand-600 dark:bg-brand-900/30 dark:text-brand-300">
+                  {{ activeBodyFont.label }}
+                </span>
+              </div>
+
+              <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <button
+                  v-for="font in UI_FONT_OPTIONS"
+                  :key="font.id"
+                  type="button"
+                  :style="{ fontFamily: font.stack }"
+                  :class="[
+                    'rounded-2xl border px-3 py-2.5 text-left text-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500',
+                    uiStore.bodyFont === font.id
+                      ? 'border-brand-500 bg-brand-50 text-brand-800 shadow-sm dark:bg-brand-900/30 dark:text-brand-200'
+                      : 'border-gray-200 bg-white text-gray-700 hover:border-brand-200 hover:shadow-sm dark:border-gray-800 dark:bg-surface-900 dark:text-gray-300 dark:hover:border-brand-800',
+                  ]"
+                  @click="uiStore.setBodyFont(font.id)"
+                >
+                  {{ font.label }}
+                </button>
+              </div>
+            </div>
+
+            <RangeControl
+              :label="t('settings.bodyTextSize')"
+              :display-value="`${currentFontSize.label} (${currentFontSize.px}px)`"
+              :value="currentFontSizeIndex"
+              :max="BODY_FONT_SIZES.length - 1"
+              :min-label="BODY_FONT_SIZES[0].label"
+              :max-label="BODY_FONT_SIZES[BODY_FONT_SIZES.length - 1].label"
+              decrease-label="Decrease body font size"
+              increase-label="Increase body font size"
+              @decrease="decreaseFontSize"
+              @increase="increaseFontSize"
+              @change="handleFontSizeChange"
             />
           </div>
         </SettingsSection>
