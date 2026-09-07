@@ -171,7 +171,7 @@ onUnmounted(() => {
     <SectionHeader :title="t('books.title')" :viewAllPath="'/books'" />
     <LoadingSpinner v-if="booksStore.loading && !booksStore.list.length" />
     <div v-else class="content-grid mb-8">
-      <BookCard v-for="book in booksStore.list.slice(0, 12)" :key="book.id" :book="book" />
+      <BookCard v-for="book in booksStore.list.slice(0, 10)" :key="book.id" :book="book" />
     </div>
 
     <!-- Articles -->

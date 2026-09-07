@@ -593,16 +593,44 @@ async function render(url: string) {
 
     // Inject custom @font-face declarations into each rendered iframe section
     const fontFaceCSS = buildFontFaceCSS()
-    if (fontFaceCSS) {
-      rendition.on('rendered', (_section: any, view: any) => {
-        try {
-          const doc: Document = view?.document ?? view?.window?.document
-          if (!doc?.head) return
+    rendition.on('rendered', (_section: any, view: any) => {
+      try {
+        const doc: Document = view?.document ?? view?.window?.document
+        if (!doc?.head) return
+        if (fontFaceCSS) {
           doc.getElementById('__epub-fonts__')?.remove()
           const st = doc.createElement('style')
           st.id = '__epub-fonts__'
           st.textContent = fontFaceCSS
           doc.head.appendChild(st)
+        }
+        if (!doc.getElementById('__epub-protection__')) {
+          const protection = doc.createElement('style')
+          protection.id = '__epub-protection__'
+          protection.textContent = `
+            html, body, body * {
+              user-select: none !important;
+              -webkit-user-select: none !important;
+              -webkit-touch-callout: none !important;
+            }
+          `
+          doc.head.appendChild(protection)
+          const blockCopy = (event: Event) => {
+            event.preventDefault()
+            window.parent.dispatchEvent(new CustomEvent('loikmon:copy-blocked'))
+          }
+          const blockShortcut = (event: KeyboardEvent) => {
+            if ((event.ctrlKey || event.metaKey) && ['c', 'x', 'a', 's', 'p'].includes(event.key.toLowerCase())) {
+              event.preventDefault()
+              event.stopPropagation()
+              window.parent.dispatchEvent(new CustomEvent('loikmon:copy-blocked'))
+            }
+          }
+          for (const eventName of ['copy', 'cut', 'contextmenu', 'dragstart', 'selectstart']) {
+            doc.addEventListener(eventName, blockCopy, true)
+          }
+          doc.addEventListener('keydown', blockShortcut, true)
+        }
           // Ensure content doesn't sit under the side nav buttons — add padding
           try {
             doc.getElementById('__epub-adjust__')?.remove()
@@ -619,8 +647,7 @@ async function render(url: string) {
             doc.head.appendChild(adj)
           } catch { /* ignore adjust errors */ }
         } catch { /* ignore */ }
-      })
-    }
+    })
 
     // Generate locations for progress tracking in the background
     if (typeof book?.generateLocations === 'function') {

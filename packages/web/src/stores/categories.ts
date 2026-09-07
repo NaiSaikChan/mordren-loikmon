@@ -6,10 +6,10 @@ export const useCategoriesStore = defineStore('categories', () => {
   const list = ref<any[]>([])
   const loading = ref(false)
 
-  async function fetchCategories() {
+  async function fetchCategories(type: 'book' | 'article' = 'book', page = 0) {
     loading.value = true
     try {
-      const res = await catApi.fetchCategories()
+      const res = await catApi.fetchCategories(type, page)
       const body = res.data as any
       list.value = body.categories ?? []
     } finally { loading.value = false }

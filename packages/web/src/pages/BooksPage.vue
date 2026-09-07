@@ -140,7 +140,7 @@ watch(page, async () => {
 }, { immediate: false })
 
 onMounted(async () => {
-  await Promise.all([catStore.fetchCategories(), loadBooks()])
+  await Promise.all([catStore.fetchCategories('book', 0), loadBooks()])
 })
 </script>
 
@@ -192,4 +192,3 @@ onMounted(async () => {
     </div>
   </div>
 </template>
-

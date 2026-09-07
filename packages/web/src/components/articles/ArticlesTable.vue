@@ -62,6 +62,13 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
   const isFree = article.is_free || price === 0
   return { isFree, amount: isFree ? null : price }
 }
+
+function hasAudio(article: Article): boolean {
+  return Boolean(
+    (typeof article.audio_url === 'string' && article.audio_url.trim()) ||
+    (typeof article.audio === 'string' && article.audio.trim()),
+  )
+}
 </script>
 
 <template>
@@ -91,7 +98,7 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
         <div class="flex-1 flex flex-col min-w-0">
           <!-- title -->
           <RouterLink :to="`/articles/${article.id}`" class="block group">
-            <p class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors leading-snug">
+            <p class="article-title text-xs text-gray-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors leading-snug pt-1">
               {{ article.title }}
             </p>
           </RouterLink>
@@ -115,6 +122,14 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
               class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full"
             >
               🪙 {{ getArticlePrice(article).amount }} coins
+            </span>
+            <span
+              v-if="hasAudio(article)"
+              class="px-2 py-0.5 bg-purple-500 text-white text-xs font-semibold rounded-full"
+              title="Audio available"
+              aria-label="Audio available"
+            >
+              🎧
             </span>
           </div>
 
@@ -220,7 +235,7 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
           <!-- Title + Category -->
           <td class="px-4 py-3 max-w-xs">
             <RouterLink :to="`/articles/${article.id}`" class="block group">
-              <p class="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-brand-600 w-70 dark:group-hover:text-brand-400 transition-colors leading-snug">
+              <p class="article-title font-semibold text-gray-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors leading-snug">
                 {{ article.title }}
               </p>
             </RouterLink>
@@ -242,6 +257,14 @@ function getArticlePrice(article: Article): { isFree: boolean; amount: number | 
                 class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full"
               >
                 🪙 {{ getArticlePrice(article).amount }} coins
+              </span>
+              <span
+                v-if="hasAudio(article)"
+                class="px-2 py-0.5 bg-purple-500 text-white text-xs font-semibold rounded-full"
+                title="Audio available"
+                aria-label="Audio available"
+              >
+                🎧
               </span>
             </div>
           </td>

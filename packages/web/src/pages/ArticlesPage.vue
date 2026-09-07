@@ -24,7 +24,7 @@ const paginationTotalPages = computed(() => {
 })
 
 onMounted(async () => {
-  await Promise.all([catStore.fetchCategories(), fetchPage()])
+  await Promise.all([catStore.fetchCategories('article', 0), fetchPage()])
 })
 </script>
 
@@ -68,6 +68,6 @@ onMounted(async () => {
         @update:page-size="changePageSize"
       />
     </template>
+
   </div>
 </template>
-

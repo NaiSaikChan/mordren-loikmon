@@ -145,6 +145,22 @@ describe('@loikmon/api — Endpoint modules (mocked Axios)', () => {
       const mockInstance = (axios.create as vi.Mock)()
       expect(mockInstance.post).toHaveBeenCalledWith('getitem', { type: 'article', id: 290 })
     })
+
+    it('fetchCategories sends the book category payload by default', async () => {
+      const { categories } = await import('../endpoints/categories.js')
+      await categories.fetchCategories('book', 0)
+      const { default: axios } = await import('axios')
+      const mockInstance = (axios.create as vi.Mock)()
+      expect(mockInstance.post).toHaveBeenCalledWith('fetchcategories', { type: 'book', page: 0 })
+    })
+
+    it('fetchCategories sends the article category payload when requested', async () => {
+      const { categories } = await import('../endpoints/categories.js')
+      await categories.fetchCategories('article', 0)
+      const { default: axios } = await import('axios')
+      const mockInstance = (axios.create as vi.Mock)()
+      expect(mockInstance.post).toHaveBeenCalledWith('fetchcategories', { type: 'article', page: 0 })
+    })
   })
 
   describe('response envelope unwrapping', () => {

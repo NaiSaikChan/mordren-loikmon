@@ -10,6 +10,7 @@ import { articles as articlesApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import ArticleAudioCard from '@/components/media/ArticleAudioCard.vue'
 import { useArticleAudio } from '@/composables/useArticleAudio'
+import { useContentProtection } from '@/composables/useContentProtection'
 
 const props = defineProps<{ id: string }>()
 const { t } = useI18n()
@@ -36,6 +37,8 @@ const submitting = ref(false)
 const reviewMsg  = ref('')
 const isPurchasing = ref(false)
 const purchaseMsg  = ref('')
+const protectedContent = ref<HTMLElement | null>(null)
+const { toastVisible, toastMessage, devToolsDetected, watermarkText } = useContentProtection(protectedContent)
 
 const isPaid = computed(() => {
   if (!article.value) return false
@@ -148,7 +151,7 @@ watch(() => props.id, loadArticle)
       </div>
 
       <!-- Content -->
-      <div v-if="tab === 'content'" class="card p-6">
+      <div v-if="tab === 'content'" class="card relative p-6">
         <!-- Locked: paid article not yet purchased -->
         <div v-if="!canRead" class="text-center py-10">
           <div class="text-4xl mb-3">🔒</div>
@@ -166,9 +169,12 @@ watch(() => props.id, loadArticle)
         </div>
         <!-- Content available -->
         <div v-else
-          class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed"
+          ref="protectedContent"
+          class="protected-content prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 leading-relaxed"
           v-html="sanitizeHtml(article.content ?? article.description ?? article.body ?? 'No content available.')">
         </div>
+        <div class="protected-watermark" aria-hidden="true">{{ watermarkText }}</div>
+        <div class="protected-print-message">Printing is disabled for protected content.</div>
       </div>
 
       <!-- Reviews -->
@@ -190,7 +196,6 @@ watch(() => props.id, loadArticle)
             </button>
           </div>
         </div>
-
         <div v-if="reviews.list.length" class="space-y-4">
           <div v-for="r in reviews.list" :key="r.id" class="card p-4">
             <div class="flex items-start gap-3">
@@ -214,6 +219,10 @@ watch(() => props.id, loadArticle)
     <div v-else class="text-center py-20 text-gray-400">
       <div class="text-5xl mb-3">📰</div>
       <p>{{ t('common.notFound') }}</p>
+    </div>
+    <div v-if="toastVisible" class="protected-toast" role="status">{{ toastMessage }}</div>
+    <div v-if="devToolsDetected" class="protected-warning" role="alert">
+      Protected content tools detected. Please close developer tools to continue reading.
     </div>
   </div>
 </template>

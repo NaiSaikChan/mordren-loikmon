@@ -49,12 +49,29 @@ describe('useArticlesList', () => {
     const list = useArticlesList()
     await list.fetchPage()
 
-    expect(mockFetchArticles).toHaveBeenCalledTimes(3)
+    await vi.waitFor(() => expect(mockFetchArticles).toHaveBeenCalledTimes(3))
     expect(list.articles.value.map((a) => a.id)).toEqual([351, 324, 322, 273])
 
     list.toggleSort()
 
     expect(list.articles.value.map((a) => a.id)).toEqual([273, 322, 324, 351])
+  })
+
+  it('renders the first page before loading the remaining cache pages', async () => {
+    mockFetchArticles.mockImplementation((params: Record<string, unknown>) =>
+      Promise.resolve({
+        data: {
+          articles: params.page === 0 ? [article(1, 'First page')] : [article(2, 'Later page')],
+        },
+      }),
+    )
+
+    const list = useArticlesList()
+    await list.fetchPage()
+
+    expect(mockFetchArticles).toHaveBeenCalledTimes(1)
+    expect(list.articles.value.map((a) => a.id)).toEqual([1])
+    await vi.waitFor(() => expect(mockFetchArticles).toHaveBeenCalledTimes(3))
   })
 
   it('reuses cached article data for the same category instead of refetching', async () => {
@@ -69,6 +86,7 @@ describe('useArticlesList', () => {
 
     const firstList = useArticlesList()
     await firstList.fetchPage()
+    await vi.waitFor(() => expect(mockFetchArticles).toHaveBeenCalledTimes(2))
     const callsAfterFirstLoad = mockFetchArticles.mock.calls.length
 
     const secondList = useArticlesList()
@@ -103,6 +121,7 @@ describe('useArticlesList', () => {
 
     const list = useArticlesList()
     await list.fetchPage()
+    await vi.waitFor(() => expect(mockFetchArticles).toHaveBeenCalledTimes(3))
 
     list.changePageSize(2)
     expect(list.articles.value.map((a) => a.id)).toEqual([3, 2])

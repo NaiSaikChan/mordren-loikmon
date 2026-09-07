@@ -7,9 +7,13 @@ export const PAGE_SIZES = [10, 20, 30, 50, 100]
 const API_PAGE_SIZE = 10
 const MAX_ARTICLE_PAGES = 100
 const articleListCache = new Map<number, Article[]>()
+const articleListCacheComplete = new Set<number>()
+const articleListBackgroundLoads = new Map<number, Promise<void>>()
 
 export function clearArticleListCache() {
   articleListCache.clear()
+  articleListCacheComplete.clear()
+  articleListBackgroundLoads.clear()
 }
 
 export function getArticleDateTimestamp(article: Article): number | null {
@@ -61,47 +65,85 @@ export function useArticlesList() {
     const cachedArticles = articleListCache.get(categoryKey)
     if (cachedArticles) {
       allArticles.value = cachedArticles
+      if (!articleListCacheComplete.has(categoryKey)) {
+        void continueLoading(categoryKey, cachedArticles)
+      }
       return
     }
 
     const currentLoadId = ++loadId
-    const byId = new Map<string | number, Article>()
     loadingAll.value = true
 
     try {
-      for (let apiPage = 0; apiPage < MAX_ARTICLE_PAGES; apiPage += 1) {
-        const count = await store.fetchArticles({
-          page: apiPage,
-          limit: API_PAGE_SIZE,
-          type: 1,
-          query: '',
-          category: categoryKey,
-        })
+      const count = await store.fetchArticles({
+        page: 0,
+        limit: API_PAGE_SIZE,
+        type: 1,
+        query: '',
+        category: categoryKey,
+      })
+      if (currentLoadId !== loadId) return
 
-        if (currentLoadId !== loadId) return
+      const firstPage = [...store.list]
+      articleListCache.set(categoryKey, firstPage)
+      allArticles.value = firstPage
 
-        const batch = [...store.list]
-        if (count === 0 || batch.length === 0) break
-
-        let added = 0
-        for (const article of batch) {
-          if (!byId.has(article.id)) {
-            byId.set(article.id, article)
-            added += 1
-          }
-        }
-
-        if (added === 0) break
-      }
-
-      if (currentLoadId === loadId) {
-        const nextArticles = Array.from(byId.values())
-        articleListCache.set(categoryKey, nextArticles)
-        allArticles.value = nextArticles
+      // Render the first page immediately; complete the cache without blocking the UI.
+      loadingAll.value = false
+      if (count > 0 && firstPage.length > 0) {
+        void continueLoading(categoryKey, firstPage)
+      } else {
+        articleListCacheComplete.add(categoryKey)
       }
     } finally {
       if (currentLoadId === loadId) loadingAll.value = false
     }
+  }
+
+  function continueLoading(categoryKey: number, initialArticles: Article[]) {
+    const existingLoad = articleListBackgroundLoads.get(categoryKey)
+    if (existingLoad) return existingLoad
+
+    const load = (async () => {
+      const byId = new Map<string | number, Article>(
+        initialArticles.map(article => [article.id, article]),
+      )
+
+      try {
+        for (let apiPage = 1; apiPage < MAX_ARTICLE_PAGES; apiPage += 1) {
+          // Yield between pages so scrolling and interactions remain responsive.
+          await new Promise<void>(resolve => setTimeout(resolve, 0))
+          const count = await store.fetchArticles({
+            page: apiPage,
+            limit: API_PAGE_SIZE,
+            type: 1,
+            query: '',
+            category: categoryKey,
+          })
+          const batch = [...store.list]
+          if (count === 0 || batch.length === 0) break
+
+          let added = 0
+          for (const article of batch) {
+            if (!byId.has(article.id)) {
+              byId.set(article.id, article)
+              added += 1
+            }
+          }
+          if (added === 0) break
+
+          const nextArticles = Array.from(byId.values())
+          articleListCache.set(categoryKey, nextArticles)
+          if (selectedCat.value === categoryKey) allArticles.value = nextArticles
+        }
+        articleListCacheComplete.add(categoryKey)
+      } finally {
+        articleListBackgroundLoads.delete(categoryKey)
+      }
+    })()
+
+    articleListBackgroundLoads.set(categoryKey, load)
+    return load
   }
 
   function goToPage(p: number) {

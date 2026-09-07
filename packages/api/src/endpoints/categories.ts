@@ -1,8 +1,8 @@
 import { getClient } from '../client.js'
 
 export const categories = {
-  fetchCategories: () =>
-    getClient().post<any>('fetchcategories', {}),
+  fetchCategories: (type: 'book' | 'article' = 'book', page = 0) =>
+    getClient().post<any>('fetchcategories', { type, page }),
 
   // Flutter: { author, type:'book', page:0 }
   fetchAuthorCategories: (authorId: string | number, type = 'book', page = 0) =>

@@ -8,6 +8,7 @@ import { usePurchasesStore } from '@/stores/purchases'
 import { books as booksApi } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import { defineAsyncComponent } from 'vue'
+import { useContentProtection } from '@/composables/useContentProtection'
 
 const EpubReader = defineAsyncComponent({
   loader: () => import('@/components/shared/EpubReader.vue'),
@@ -29,6 +30,8 @@ const store = useBooksStore()
 const route = useRoute()
 const auth = useAuthStore()
 const purchasesStore = usePurchasesStore()
+const protectedReader = ref<HTMLElement | null>(null)
+const { toastVisible, toastMessage, devToolsDetected, watermarkText } = useContentProtection(protectedReader)
 
 const accessChecked = ref(false)
 const pdfAvailability = ref<boolean | null>(null)
@@ -187,15 +190,19 @@ watch(() => props.id, () => {
     </div>
 
     <!-- EPUB reader (epubjs) -->
-    <div v-else-if="canAccess && activeEpubUrl" class="flex-1 overflow-hidden">
+    <div v-else-if="canAccess && activeEpubUrl" ref="protectedReader" class="protected-content protected-reader flex-1 overflow-hidden">
       <EpubReader :url="activeEpubUrl" />
+      <div class="protected-watermark" aria-hidden="true">{{ watermarkText }}</div>
+      <div class="protected-print-message">Printing is disabled for protected content.</div>
     </div>
 
     <LoadingSpinner v-else-if="canAccess && pdfUrl && pdfAvailability === null" />
 
     <!-- PDF reader (download + print disabled) -->
-    <div v-else-if="canAccess && viewerPdfUrl && pdfAvailability === true" class="flex-1 overflow-hidden">
+    <div v-else-if="canAccess && viewerPdfUrl && pdfAvailability === true" ref="protectedReader" class="protected-content protected-reader flex-1 overflow-hidden">
       <VuePdfApp :pdf="viewerPdfUrl" :config="pdfConfig" class="w-full h-full" style="height: 100%;" />
+      <div class="protected-watermark" aria-hidden="true">{{ watermarkText }}</div>
+      <div class="protected-print-message">Printing is disabled for protected content.</div>
     </div>
 
     <div v-else-if="canAccess && pdfUrl && pdfAvailability === false" class="flex-1 flex items-center justify-center text-center p-8">
@@ -214,6 +221,10 @@ watch(() => props.id, () => {
         <div class="text-5xl mb-3">📚</div>
         <p>{{ t('reader.notAvailable') }}</p>
       </div>
+    </div>
+    <div v-if="toastVisible" class="protected-toast" role="status">{{ toastMessage }}</div>
+    <div v-if="devToolsDetected" class="protected-warning" role="alert">
+      Protected content tools detected. Please close developer tools to continue reading.
     </div>
   </div>
 </template>
