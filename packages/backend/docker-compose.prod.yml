@@ -1,0 +1,108 @@
+# ============================================================================
+# Loikmon backend — production stack (backend + MySQL + MinIO)
+# Integrates with an existing Traefik reverse proxy (external `traefik` net).
+#
+#   docker compose -f packages/backend/docker-compose.prod.yml up -d --build
+#
+# Prereqs on the VPS:
+#   docker network create traefik   # once, shared with the web/server stack
+#   cp packages/backend/.env.example packages/backend/.env  # then fill secrets
+# ============================================================================
+name: loikmon-backend
+
+services:
+  backend:
+    build:
+      context: ../..                       # repo root (needs workspace manifests)
+      dockerfile: packages/backend/Dockerfile
+    container_name: loikmon-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      MINIO_ENDPOINT: minio
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    expose:
+      - "4001"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - "traefik.http.routers.loikmon-api.rule=Host(`${API_DOMAIN:-api.loikmon.com}`)"
+      - traefik.http.routers.loikmon-api.entrypoints=websecure
+      - traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-api.service=loikmon-api-svc
+      - traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4001
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4001/health',(r)=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
+    networks:
+      - traefik
+      - internal
+
+  mysql:
+    image: mysql:8.4
+    container_name: loikmon-mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=caching_sha2_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: ${DB_NAME:-loikmon}
+      MYSQL_USER: ${DB_USER:-loikmon}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - internal
+
+  minio:
+    image: minio/minio:latest
+    container_name: loikmon-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?set MINIO_ACCESS_KEY in .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?set MINIO_SECRET_KEY in .env}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    labels:
+      # Optional: expose the images bucket publicly via Traefik at cdn.<domain>.
+      - traefik.enable=true
+      - traefik.docker.network=traefik
+      - "traefik.http.routers.loikmon-cdn.rule=Host(`${CDN_DOMAIN:-cdn.loikmon.com}`)"
+      - traefik.http.routers.loikmon-cdn.entrypoints=websecure
+      - traefik.http.routers.loikmon-cdn.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-cdn.service=loikmon-cdn-svc
+      - traefik.http.services.loikmon-cdn-svc.loadbalancer.server.port=9000
+    networks:
+      - traefik
+      - internal
+
+volumes:
+  mysql_data:
+  minio_data:
+
+networks:
+  traefik:
+    external: true
+  internal:
+    driver: bridge

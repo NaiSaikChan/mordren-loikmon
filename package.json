@@ -2,7 +2,7 @@
   "name": "mordren-loikmon",
   "private": true,
   "version": "1.0.0",
-  "description": "Loikmon eBook & Audio Platform — Vue 3 + Node.js + Expo rebuild",
+  "description": "Loikmon eBook & Audio Platform \u2014 Vue 3 + Node.js + Expo rebuild",
   "scripts": {
     "dev:web": "npm run dev -w @loikmon/web",
     "dev:server": "npm run dev -w @loikmon/server",
@@ -14,7 +14,8 @@
   "workspaces": [
     "packages/api",
     "packages/server",
-    "packages/web"
+    "packages/web",
+    "packages/backend"
   ],
   "dependencies": {
     "@fontsource/padauk": "^5.2.8"
