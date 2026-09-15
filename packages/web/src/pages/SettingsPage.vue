@@ -7,6 +7,7 @@ import type { Locale, Theme } from '@/stores/ui'
 import ChoiceCard from '@/components/settings/ChoiceCard.vue'
 import RangeControl from '@/components/settings/RangeControl.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import AccountSection from '@/components/settings/AccountSection.vue'
 
 const { t, locale } = useI18n()
 const uiStore = useUiStore()
@@ -136,6 +137,8 @@ function setLocale(value: Locale) {
 
     <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       <div class="space-y-6">
+        <AccountSection />
+
         <SettingsSection
           icon="🎨"
           :title="t('settings.appearanceTitle')"

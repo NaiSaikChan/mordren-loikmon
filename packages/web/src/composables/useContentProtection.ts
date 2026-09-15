@@ -1,13 +1,17 @@
 import { computed, onMounted, onUnmounted, ref, watch, type Ref } from 'vue'
+import i18n from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
 
 const COPY_MESSAGE = 'Copying content is not permitted.'
 const PRINT_MESSAGE = 'Printing is disabled for protected content.'
 
+const copyMessage = () => i18n.global.t('reader.copyBlocked')
+const printMessage = () => i18n.global.t('reader.printBlocked')
+
 export function useContentProtection(target: Ref<HTMLElement | null>) {
   const auth = useAuthStore()
   const toastVisible = ref(false)
-  const toastMessage = ref(COPY_MESSAGE)
+  const toastMessage = ref(copyMessage())
   const devToolsDetected = ref(false)
   let toastTimer: ReturnType<typeof setTimeout> | null = null
   let devToolsTimer: ReturnType<typeof setInterval> | null = null
@@ -17,7 +21,7 @@ export function useContentProtection(target: Ref<HTMLElement | null>) {
     return `Loikmon • ${user?.name || user?.email || `User ${user?.id ?? 'guest'}`}`
   })
 
-  function notifyCopyBlocked(message = COPY_MESSAGE) {
+  function notifyCopyBlocked(message = copyMessage()) {
     toastMessage.value = message
     toastVisible.value = true
     if (toastTimer) clearTimeout(toastTimer)
@@ -37,7 +41,7 @@ export function useContentProtection(target: Ref<HTMLElement | null>) {
     if (['c', 'x', 'a', 's', 'p'].includes(event.key.toLowerCase())) {
       event.preventDefault()
       event.stopPropagation()
-      notifyCopyBlocked(event.key.toLowerCase() === 'p' ? PRINT_MESSAGE : COPY_MESSAGE)
+      notifyCopyBlocked(event.key.toLowerCase() === 'p' ? printMessage() : copyMessage())
     }
   }
 

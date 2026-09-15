@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
 
 // When building for GitHub Pages the app lives at /<repo-name>/
-// In dev it runs at root (proxy to local BFF on :4000)
+// In dev it runs at root and proxies /api to the local backend (packages/backend) on :4001
 const isProd = process.env.NODE_ENV === 'production'
 const base = process.env.VITE_BASE ?? (isProd ? '/mordren-loikmon/' : '/')
 
@@ -19,8 +19,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // /api/v1 (REST) and /api/auth (Better Auth email links) → packages/backend
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'http://localhost:4001',
         changeOrigin: true,
       },
     },

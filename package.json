@@ -8,13 +8,17 @@
     "dev:server": "npm run dev -w @loikmon/server",
     "build:web": "npm run build -w @loikmon/web",
     "build:server": "npm run build -w @loikmon/server",
-    "build:api": "npm run build -w @loikmon/api"
+    "build:api": "npm run build -w @loikmon/api",
+    "dev:backend": "npm run dev -w @loikmon/backend",
+    "build:backend": "npm run build -w @loikmon/backend",
+    "test:backend": "npm run test -w @loikmon/backend"
   },
   "packageManager": "npm@10.9.8",
   "workspaces": [
     "packages/api",
     "packages/server",
-    "packages/web"
+    "packages/web",
+    "packages/backend"
   ],
   "dependencies": {
     "@fontsource/padauk": "^5.2.8"

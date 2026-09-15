@@ -1,366 +1,42 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native'
-import { Stack, router, useLocalSearchParams } from 'expo-router'
+import { useState } from 'react'
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { Stack, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { purchases as purchasesApi, reviews as reviewsApi, type Review } from '@loikmon/api'
 import { Screen } from '@/components/Screen'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EmptyState } from '@/components/EmptyState'
 import { PrimaryButton } from '@/components/PrimaryButton'
+import { PaywallCard } from '@/components/PaywallCard'
+import { PriceBadge } from '@/components/PriceBadge'
+import { ReviewsSection } from '@/components/Reviews'
 import { useArticleDetail } from '@/hooks/useArticles'
+import { useReviews } from '@/hooks/useReviews'
 import { useAuth } from '@/context/AuthContext'
+import { useAudio } from '@/context/AudioContext'
 import { useLibrary } from '@/context/LibraryContext'
 import { useI18n } from '@/context/I18nContext'
-import { usePurchases } from '@/hooks/usePurchases'
 import { useTypography } from '@/context/TypographyContext'
+import { accessAction } from '@/lib/access'
+import { articleToTrack } from '@/lib/audio'
+import { firstParam, stripHtml } from '@/lib/normalize'
 import { fixUrl } from '@/lib/url'
 
-/**
- * Produces a plain-text fallback from an article's HTML body.
- * Script/style blocks are removed entirely (their contents must never surface),
- * then remaining tags are stripped. The result is rendered inside a <Text>, so
- * no markup can execute — this is purely for readability.
- */
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .trim()
-}
-
-function getReviewList(payload: unknown): Review[] {
-  if (Array.isArray(payload)) return payload as Review[]
-  if (!payload || typeof payload !== 'object') return []
-
-  const body = payload as Record<string, unknown>
-  if (Array.isArray(body.reviews)) return body.reviews as Review[]
-  if (Array.isArray(body.list)) return body.list as Review[]
-  if (body.data) return getReviewList(body.data)
-
-  return []
-}
-
-function getReview(payload: unknown): Review | null {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
-  const review = payload as Review
-  return review.id ? review : review.content || review.comment ? review : null
-}
-
-// Review content is stored as Base64 (encoded before submission)
-function decodeBase64(str: string): string {
-  const input = String(str ?? '').trim()
-  if (!input) return ''
-
-  const normalized = input.replace(/\s+/g, '')
-  const looksBase64 =
-    normalized.length >= 8 &&
-    normalized.length % 4 === 0 &&
-    /^[A-Za-z0-9+/]+={0,2}$/.test(normalized)
-
-  if (!looksBase64) return str
-
-  const decodeUtf8 = (base64Text: string): string | null => {
-    try {
-      if (typeof atob === 'function') {
-        const binary = atob(base64Text)
-        const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0))
-
-        if (typeof TextDecoder !== 'undefined') {
-          return new TextDecoder('utf-8').decode(bytes)
-        }
-
-        return decodeURIComponent(
-          Array.from(bytes)
-            .map((b) => `%${b.toString(16).padStart(2, '0')}`)
-            .join(''),
-        )
-      }
-    } catch {
-      // fall through to Buffer path
-    }
-
-    try {
-      if (typeof Buffer !== 'undefined') {
-        return Buffer.from(base64Text, 'base64').toString('utf8')
-      }
-    } catch {
-      // noop
-    }
-
-    return null
-  }
-
-  try {
-    const once = decodeUtf8(normalized)
-    if (!once) return str
-
-    const maybeSecondPass = once.replace(/\s+/g, '')
-    const looksBase64Again =
-      maybeSecondPass.length >= 8 &&
-      maybeSecondPass.length % 4 === 0 &&
-      /^[A-Za-z0-9+/]+={0,2}$/.test(maybeSecondPass)
-
-    if (looksBase64Again) {
-      const twice = decodeUtf8(maybeSecondPass)
-      if (twice) return twice
-    }
-
-    return once
-  } catch {
-    return str
-  }
-}
-
-function ReviewStars({
-  rating,
-  onChange,
-  size = 28,
-}: {
-  rating: number
-  onChange?: (next: number) => void
-  size?: number
-}) {
-  return (
-    <View className="flex-row gap-1">
-      {Array.from({ length: 5 }).map((_, index) => {
-        const value = index + 1
-        const filled = value <= rating
-        const star = (
-          <Ionicons
-            name={filled ? 'star' : 'star-outline'}
-            size={size}
-            color={filled ? '#f59e0b' : '#cbd5e1'}
-          />
-        )
-
-        if (!onChange) {
-          return <View key={value}>{star}</View>
-        }
-
-        return (
-          <Pressable key={value} onPress={() => onChange(value)} hitSlop={8}>
-            {star}
-          </Pressable>
-        )
-      })}
-    </View>
-  )
-}
-
-function ReviewCard({
-  review,
-  bodyTextStyle,
-  headerTextStyle,
-  highlighted = false,
-}: {
-  review: Review
-  bodyTextStyle: ReturnType<typeof useTypography>['bodyTextStyle']
-  headerTextStyle: ReturnType<typeof useTypography>['headerTextStyle']
-  highlighted?: boolean
-}) {
-  const author = review.author_name ?? review.username ?? 'Anonymous'
-  const content = decodeBase64(review.content ?? review.comment ?? '')
-  const rating = Number(review.rating ?? 0)
-
-  return (
-    <View
-      className={`rounded-2xl border p-4 ${
-        highlighted
-          ? 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/20'
-          : 'border-surface-200 bg-white dark:border-surface-700 dark:bg-surface-800'
-      }`}
-    >
-      <View className="flex-row items-start justify-between gap-3">
-        <View className="flex-1">
-          <Text className="text-sm font-semibold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-            {author}
-          </Text>
-          <Text className="mt-1 text-sm leading-6 text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
-            {content}
-          </Text>
-        </View>
-        <Text className="text-xs text-surface-400" style={bodyTextStyle}>
-          {review.created_at ? new Date(review.created_at).toLocaleDateString() : ''}
-        </Text>
-      </View>
-      <View className="mt-3 flex-row items-center justify-between">
-        <ReviewStars rating={rating} size={16} />
-        {highlighted ? (
-          <View className="rounded-full bg-brand-500 px-2 py-0.5">
-            <Text className="text-[10px] font-semibold text-white" style={bodyTextStyle}>
-              You
-            </Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  )
-}
-
 export default function ArticleDetailScreen() {
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>()
-  const articleId = Array.isArray(id) ? id[0] : id
+  const params = useLocalSearchParams<{ id?: string | string[] }>()
+  const articleId = firstParam(params.id)
   const { t } = useI18n()
   const { article, loading, error } = useArticleDetail(articleId)
-  const { user, isLoggedIn, refreshUser } = useAuth()
+  const reviews = useReviews('article', articleId)
+  const { isLoggedIn } = useAuth()
+  const { play, toggle, current, isPlaying } = useAudio()
   const { isBookmarked, toggleArticle } = useLibrary()
-  const { articles: purchasedArticles, reload: reloadPurchases } = usePurchases()
   const { bodyTextStyle, headerTextStyle } = useTypography()
   const { width } = useWindowDimensions()
   const [activeTab, setActiveTab] = useState<'content' | 'reviews'>('content')
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [userReview, setUserReview] = useState<Review | null>(null)
-  const [reviewsLoading, setReviewsLoading] = useState(false)
-  const [submittingReview, setSubmittingReview] = useState(false)
-  const [reviewMessage, setReviewMessage] = useState('')
-  const [newReview, setNewReview] = useState('')
-  const [newRating, setNewRating] = useState(5)
-  const [purchasing, setPurchasing] = useState(false)
-  const [purchaseMessage, setPurchaseMessage] = useState('')
 
   const isTablet = width >= 768
   const contentMaxWidth = isTablet ? 1080 : undefined
   const bannerHeight = isTablet ? 300 : 224
-
-  const thumb = article ? fixUrl((article.thumbnail_url as string) ?? (article.thumbnail as string) ?? '') : ''
-  const body = article ? String(article.content ?? article.body ?? article.description ?? '') : ''
-  const bookmarked = article ? isBookmarked('article', article.id) : false
-  const category = article ? ((article.categoryname as string) ?? (article.category as string) ?? '') : ''
-  const descriptionPreview = article ? String(article.description ?? article.body ?? '') : ''
-  const descriptionPreviewText = descriptionPreview ? stripHtml(descriptionPreview) : ''
-  const price = Number(article?.price ?? article?.amount ?? 0)
-  const isPaid = !!article && !article.is_free && price > 0
-  const canRead = useMemo(() => {
-    if (!article) return false
-    if (!isPaid) return true
-    return purchasedArticles.some((item) => String(item.id) === String(article.id))
-  }, [article, isPaid, purchasedArticles])
-
-  const displayedReviews = useMemo(() => {
-    const seen = new Set<string>()
-    const items: Review[] = []
-
-    if (userReview) {
-      const key = String(userReview.id)
-      seen.add(key)
-      items.push(userReview)
-    }
-
-    for (const review of reviews) {
-      const key = String(review.id)
-      if (seen.has(key)) continue
-      seen.add(key)
-      items.push(review)
-    }
-
-    return items
-  }, [reviews, userReview])
-
-  const loadReviews = useCallback(async () => {
-    if (!articleId) {
-      setReviewsLoading(false)
-      setReviews([])
-      setUserReview(null)
-      return
-    }
-    setReviewsLoading(true)
-    try {
-      const res = await reviewsApi.loadRecentReviews(articleId, 'article', user?.email)
-      const body = res.data as Record<string, unknown>
-      setReviews(getReviewList(body.reviews ?? body.data ?? body.list))
-      setUserReview(getReview(body.userreview ?? body.userReview ?? body.data))
-    } catch {
-      setReviews([])
-      setUserReview(null)
-    } finally {
-      setReviewsLoading(false)
-    }
-  }, [articleId, user?.email])
-
-  useEffect(() => {
-    void loadReviews()
-  }, [loadReviews])
-
-  const onPurchase = async () => {
-    if (!article) return
-    if (!isLoggedIn || !user?.email) {
-      router.push('/(auth)/login')
-      return
-    }
-
-    setPurchasing(true)
-    setPurchaseMessage('')
-    try {
-      const res = await purchasesApi.purchaseArticle(user.email, article.id, price)
-      const body = res.data as Record<string, unknown>
-      if (body.status === 'error' || body.status === 'fail') {
-        setPurchaseMessage(String(body.message ?? ''))
-      } else {
-        const coinRes = await purchasesApi.getUserCoins(user.email).catch(() => ({ data: {} }))
-        const coins = Number((coinRes.data as Record<string, unknown>).coins ?? user.coins ?? 0)
-        await refreshUser({ ...user, coins })
-        await reloadPurchases()
-        setPurchaseMessage('Purchase successful! You can now read this article.')
-      }
-    } catch {
-      setPurchaseMessage('Purchase failed. Please check your coin balance.')
-    } finally {
-      setPurchasing(false)
-    }
-  }
-
-  const onSubmitReview = async () => {
-    if (!article || !newReview.trim()) return
-    if (!isLoggedIn || !user?.email) {
-      router.push('/(auth)/login')
-      return
-    }
-
-    setSubmittingReview(true)
-    setReviewMessage('')
-    try {
-      const res = await reviewsApi.submitReview({
-        itmid: article.id,
-        type: 'article',
-        content: newReview,
-        rating: newRating,
-        email: user.email,
-      })
-      const body = res.data as Record<string, unknown>
-      const created = getReview(body.review ?? body.data ?? body.userreview)
-      if (created) {
-        setUserReview(created)
-        setReviews((prev) => {
-          const next = prev.filter((item) => String(item.id) !== String(created.id))
-          return [created, ...next]
-        })
-      } else {
-        await loadReviews()
-      }
-      setNewReview('')
-      setReviewMessage('Review submitted!')
-      setActiveTab('reviews')
-    } catch {
-      setReviewMessage('Failed to submit review')
-    } finally {
-      setSubmittingReview(false)
-    }
-  }
 
   if (loading) {
     return (
@@ -380,6 +56,23 @@ export default function ArticleDetailScreen() {
     )
   }
 
+  const thumb = fixUrl(article.thumbnail_url || article.thumbnail)
+  const bookmarked = isBookmarked('article', article.id)
+  const category = article.categoryname ?? ''
+  const dateValue = article.articledate ?? article.published_at ?? article.date
+  // Body and audio are only present when the server granted access.
+  const action = article.locked ? accessAction(article.access, isLoggedIn) : 'open'
+  const excerpt = stripHtml(article.excerpt || article.description)
+  const body = stripHtml(article.content)
+  const track = articleToTrack(article)
+  const isCurrentTrack = Boolean(track && current?.url === track.url)
+
+  const onListen = () => {
+    if (!track) return
+    if (isCurrentTrack) void toggle()
+    else void play(track, [track])
+  }
+
   return (
     <Screen edges={[]}>
       <Stack.Screen
@@ -387,26 +80,18 @@ export default function ArticleDetailScreen() {
           title: '',
           headerRight: () => (
             <Pressable onPress={() => toggleArticle(article)} hitSlop={8}>
-              <Ionicons
-                name={bookmarked ? 'bookmark' : 'bookmark-outline'}
-                size={22}
-                color="#2563eb"
-              />
+              <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#2563eb" />
             </Pressable>
           ),
         }}
       />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView
-          contentContainerStyle={{
-            paddingBottom: 32,
-            width: '100%',
-            alignSelf: 'center',
-            maxWidth: contentMaxWidth,
-          }}
-        >
+        <ScrollView contentContainerStyle={{ paddingBottom: 32, width: '100%', alignSelf: 'center', maxWidth: contentMaxWidth }}>
           <View className={`${isTablet ? 'px-6 pt-6' : 'px-4 pt-4'}`}>
-            <View className={`overflow-hidden rounded-3xl bg-surface-200 dark:bg-surface-800 shadow-sm ${isTablet ? 'mb-6' : 'mb-4'}`} style={{ height: bannerHeight }}>
+            <View
+              className={`overflow-hidden rounded-3xl bg-surface-200 dark:bg-surface-800 shadow-sm ${isTablet ? 'mb-6' : 'mb-4'}`}
+              style={{ height: bannerHeight }}
+            >
               {thumb ? (
                 <Image source={{ uri: thumb }} className="h-full w-full" resizeMode="cover" />
               ) : (
@@ -416,54 +101,49 @@ export default function ArticleDetailScreen() {
               )}
             </View>
 
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="flex-1 pb-4">
-                <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                  {article.title}
-                </Text>
-                <View className="mt-3 flex-row flex-wrap justify-start gap-3">
-                  {article.author ? (
-                    <View className="rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-1 items-center justify-center">
-                      <Text className="text-xs font-medium text-blue-700 dark:text-blue-200 pt-1" style={bodyTextStyle}>
-                        {t('common.by')} {String(article.authorname)}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {category ? (
-                    <View className="rounded-full bg-purple-100 dark:bg-purple-900 px-3 py-1 items-center justify-center">
-                      <Text className="text-xs font-medium text-purple-700 dark:text-purple-200 pt-1" style={bodyTextStyle}>
-                        {category}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {article.created_at || article.date ? (
-                    <View className="rounded-full bg-orange-100 dark:bg-orange-900 px-3 py-1 items-center justify-center">
-                      <Text className="text-xs font-medium text-orange-700 dark:text-orange-200 pt-1" style={bodyTextStyle}>
-                        {new Date(String(article.articledate ?? article.date ?? '')).toLocaleDateString()}
-                      </Text>
-                    </View>
-                  ) : null}
-                  {isPaid ? (
-                    <View className="rounded-full bg-amber-100 dark:bg-amber-900 px-3 py-1 items-center justify-center">
-                      <Text className="text-xs font-medium text-amber-700 dark:text-amber-200 pt-1" style={bodyTextStyle}>
-                        🪙 {price} coins
-                      </Text>
-                    </View>
-                  ) : (
-                    <View className="rounded-full bg-emerald-100 dark:bg-emerald-900 px-3 py-1 items-center justify-center">
-                      <Text className="text-xs font-medium text-emerald-700 dark:text-emerald-200 pt-1" style={bodyTextStyle}>
-                        Free
-                      </Text>
-                    </View>
-                  )}
-                </View>
+            <View className="pb-4">
+              <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                {article.title}
+              </Text>
+              <View className="mt-3 flex-row flex-wrap items-center justify-start gap-3">
+                {article.authorname ? (
+                  <View className="rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-1 items-center justify-center">
+                    <Text className="text-xs font-medium text-blue-700 dark:text-blue-200 pt-1" style={bodyTextStyle}>
+                      {t('common.by')} {article.authorname}
+                    </Text>
+                  </View>
+                ) : null}
+                {category ? (
+                  <View className="rounded-full bg-purple-100 dark:bg-purple-900 px-3 py-1 items-center justify-center">
+                    <Text className="text-xs font-medium text-purple-700 dark:text-purple-200 pt-1" style={bodyTextStyle}>
+                      {category}
+                    </Text>
+                  </View>
+                ) : null}
+                {dateValue ? (
+                  <View className="rounded-full bg-orange-100 dark:bg-orange-900 px-3 py-1 items-center justify-center">
+                    <Text className="text-xs font-medium text-orange-700 dark:text-orange-200 pt-1" style={bodyTextStyle}>
+                      {new Date(dateValue).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ) : null}
+                <PriceBadge item={article} />
               </View>
+              {track ? (
+                <View className="mt-4">
+                  <PrimaryButton
+                    label={`${isCurrentTrack && isPlaying ? '⏸' : '🎧'} ${t('articles.listen')}`}
+                    onPress={onListen}
+                    labelStyle={headerTextStyle}
+                  />
+                </View>
+              ) : null}
             </View>
 
             <View className="flex-row rounded-2xl bg-surface-200 dark:bg-surface-800 p-1">
               {([
-                { id: 'content' as const, label: 'Content' },
-                { id: 'reviews' as const, label: `Reviews (${displayedReviews.length})` },
+                { id: 'content' as const, label: t('articles.content') },
+                { id: 'reviews' as const, label: t('books.reviewsTab', { count: reviews.count }) },
               ] as const).map((tab) => {
                 const selected = activeTab === tab.id
                 return (
@@ -473,9 +153,7 @@ export default function ArticleDetailScreen() {
                     className={`flex-1 rounded-xl px-4 py-2.5 ${selected ? 'bg-white dark:bg-surface-700' : ''}`}
                   >
                     <Text
-                      className={`text-center text-sm font-medium ${
-                        selected ? 'text-surface-900 dark:text-surface-50' : 'text-surface-500 dark:text-surface-400'
-                      }`}
+                      className={`text-center text-sm font-medium ${selected ? 'text-surface-900 dark:text-surface-50' : 'text-surface-500 dark:text-surface-400'}`}
                       style={selected ? headerTextStyle : bodyTextStyle}
                     >
                       {tab.label}
@@ -486,159 +164,37 @@ export default function ArticleDetailScreen() {
             </View>
           </View>
 
-          {activeTab === 'content' ? (
-            <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
-              {!canRead ? (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                  {descriptionPreviewText.trim() ? (
-                    <View className="mb-5 rounded-xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900">
-                      <Text
-                        className="mb-2 text-base font-semibold text-surface-900 dark:text-surface-50"
-                        style={headerTextStyle}
-                      >
-                        Description Preview
-                      </Text>
-                      <Text
-                        className="leading-7 text-surface-700 dark:text-surface-200"
-                        style={bodyTextStyle}
-                      >
-                        {descriptionPreviewText}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  <View className="items-center py-6">
-                    <Text className="text-5xl">🔒</Text>
-                    <Text className="mt-3 text-center text-lg font-semibold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                      This article requires purchase
+          <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
+            {activeTab === 'reviews' ? (
+              <ReviewsSection reviews={reviews} itemType="article" />
+            ) : action !== 'open' ? (
+              <PaywallCard
+                action={action}
+                title={action === 'subscribe' ? t('articles.lockedTitle') : undefined}
+                hint={action === 'login' ? t('articles.loginHint') : undefined}
+              >
+                {excerpt ? (
+                  <View className="mb-5 rounded-xl border border-surface-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-900">
+                    <Text className="mb-2 text-base font-semibold text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                      {t('articles.preview')}
                     </Text>
-                    <Text className="mt-2 text-center text-sm text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
-                      🪙 {price} coins for full access
+                    <Text className="leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
+                      {excerpt}
                     </Text>
-
-                    <View className="mt-5 w-full items-center">
-                      {isLoggedIn ? (
-                        <PrimaryButton
-                          label={purchasing ? `Purchasing…` : `🪙 Buy for ${price} coins`}
-                          loading={purchasing}
-                          onPress={onPurchase}
-                          labelClassName="text-base"
-                          labelStyle={headerTextStyle}
-                        />
-                      ) : (
-                        <PrimaryButton
-                          label="🔐 Login to Read"
-                          onPress={() => router.push('/(auth)/login')}
-                          labelClassName="text-base"
-                          labelStyle={headerTextStyle}
-                        />
-                      )}
-                    </View>
-
-                    {purchaseMessage ? (
-                      <Text
-                        className={`mt-3 text-center text-sm ${purchaseMessage.includes('successful') ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}
-                        style={bodyTextStyle}
-                      >
-                        {purchaseMessage}
-                      </Text>
-                    ) : null}
                   </View>
-                </View>
-              ) : (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                  <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                    Content
-                  </Text>
-                  <Text className="leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
-                    {stripHtml(body) || 'No content available.'}
-                  </Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View className={`${isTablet ? 'px-6' : 'px-4'} mt-6`}>
-              {isLoggedIn ? (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                  <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                    Write a Review
-                  </Text>
-
-                  <View className="mb-4">
-                    <ReviewStars rating={newRating} onChange={setNewRating} />
-                  </View>
-
-                  <TextInput
-                    value={newReview}
-                    onChangeText={setNewReview}
-                    placeholder="Share your thoughts..."
-                    placeholderTextColor="#94a3b8"
-                    multiline
-                    textAlignVertical="top"
-                    className="rounded-xl border border-surface-200 bg-surface-50 px-4 py-3 text-surface-900 dark:border-surface-700 dark:bg-surface-900 dark:text-surface-50"
-                    style={[bodyTextStyle, { minHeight: 120, textAlignVertical: 'top' }]}
-                  />
-
-                  <View className="mt-3 flex-row items-center justify-between gap-3">
-                    <Text className="flex-1 text-sm text-emerald-600 dark:text-emerald-400" style={bodyTextStyle}>
-                      {reviewMessage}
-                    </Text>
-                    <PrimaryButton
-                      label={submittingReview ? 'Submitting…' : 'Submit Review'}
-                      loading={submittingReview}
-                      onPress={onSubmitReview}
-                      labelClassName="text-base"
-                      labelStyle={headerTextStyle}
-                    />
-                  </View>
-                </View>
-              ) : (
-                <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                  <Text className="text-center text-surface-700 dark:text-surface-300" style={bodyTextStyle}>
-                    Login to write a review.
-                  </Text>
-                  <View className="mt-3 items-center">
-                    <PrimaryButton
-                      label={t('auth.login')}
-                      onPress={() => router.push('/(auth)/login')}
-                      labelClassName="text-base"
-                      labelStyle={headerTextStyle}
-                    />
-                  </View>
-                </View>
-              )}
-
-              <View className="mt-6">
+                ) : null}
+              </PaywallCard>
+            ) : (
+              <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
                 <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                  Reviews ({displayedReviews.length})
+                  {t('articles.content')}
                 </Text>
-
-                {reviewsLoading ? (
-                  <LoadingSpinner />
-                ) : displayedReviews.length > 0 ? (
-                  <View className="gap-3">
-                    {displayedReviews.map((review) => (
-                      <ReviewCard
-                        key={String(review.id)}
-                        review={review}
-                        highlighted={String(userReview?.id ?? '') === String(review.id)}
-                        bodyTextStyle={bodyTextStyle}
-                        headerTextStyle={headerTextStyle}
-                      />
-                    ))}
-                  </View>
-                ) : (
-                  <View className="items-center mt-6 pt-3 gap-3">
-                    <EmptyState
-                      icon="💬"
-                      title="No reviews yet"
-                      subtitle="Be the first one to share what you think about this article."
-                    />
-                  </View>
-                )}
+                <Text className="leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
+                  {body || excerpt || t('articles.noContent')}
+                </Text>
               </View>
-            </View>
-          )}
+            )}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>

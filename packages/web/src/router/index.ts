@@ -1,55 +1,67 @@
 import { useAuthStore } from '@/stores/auth'
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+
+export const routes: RouteRecordRaw[] = [
+  // ─── Auth (standalone pages, outside the app shell) ────────────────
+  {
+    path: '/auth',
+    name: 'auth',
+    component: () => import('@/pages/AuthPage.vue'),
+  },
+  {
+    // The backend emails password-reset links to `${APP_WEB_URL}/auth/reset-password?token=…`
+    path: '/auth/reset-password',
+    name: 'reset-password',
+    component: () => import('@/pages/ResetPasswordPage.vue'),
+  },
+
+  // ─── Main app shell ────────────────────────────────────────────────
+  {
+    path: '/',
+    component: () => import('@/components/layout/AppLayout.vue'),
+    children: [
+      { path: '',           name: 'home',              component: () => import('@/pages/HomePage.vue') },
+      { path: 'books',      name: 'books',             component: () => import('@/pages/BooksPage.vue') },
+      { path: 'books/:id',  name: 'book-detail',       component: () => import('@/pages/BookDetailPage.vue'),   props: true },
+      { path: 'books/:id/read', name: 'book-reader',   component: () => import('@/pages/BookReaderPage.vue'),   props: true },
+      { path: 'articles',   name: 'articles',          component: () => import('@/pages/ArticlesPage.vue') },
+      { path: 'articles/:id', name: 'article-detail',  component: () => import('@/pages/ArticleDetailPage.vue'), props: true },
+      { path: 'authors',    name: 'authors',           component: () => import('@/pages/AuthorsPage.vue') },
+      { path: 'authors/:id', name: 'author-detail',    component: () => import('@/pages/AuthorDetailPage.vue'), props: true },
+      { path: 'audiobooks', name: 'audiobooks',        component: () => import('@/pages/AudiobooksPage.vue') },
+      { path: 'music',      redirect: { name: 'audiobooks' } },
+      { path: 'search',     name: 'search',            component: () => import('@/pages/SearchPage.vue') },
+      { path: 'library',    name: 'library',           component: () => import('@/pages/LibraryPage.vue'), meta: { requiresAuth: true } },
+      { path: 'subscription', name: 'subscription',    component: () => import('@/pages/SubscriptionPage.vue') },
+      // Old bookmark: coin purchases were replaced by subscriptions.
+      { path: 'purchases',  redirect: { name: 'subscription' } },
+      { path: 'categories', name: 'categories',        component: () => import('@/pages/CategoriesPage.vue') },
+      { path: 'categories/:id', name: 'category-detail', component: () => import('@/pages/CategoryDetailPage.vue'), props: true },
+      { path: 'collections', name: 'collections',      component: () => import('@/pages/CollectionsPage.vue') },
+      { path: 'collections/:id', name: 'collection-detail', component: () => import('@/pages/CollectionDetailPage.vue'), props: true },
+      { path: 'inbox',      name: 'inbox',             component: () => import('@/pages/InboxPage.vue') },
+      { path: 'settings',   name: 'settings',          component: () => import('@/pages/SettingsPage.vue') },
+      { path: 'about',      name: 'about',             component: () => import('@/pages/AboutPage.vue') },
+      { path: 'faq',        name: 'faq',               component: () => import('@/pages/FaqPage.vue') },
+    ],
+  },
+
+  // ─── 404 ──────────────────────────────────────────────────────────
+  { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/pages/NotFoundPage.vue') },
+]
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   scrollBehavior: () => ({ top: 0 }),
-  routes: [
-    // ─── Auth (still accessible but no longer forced) ──────────────────
-    {
-      path: '/auth',
-      name: 'auth',
-      component: () => import('@/pages/AuthPage.vue'),
-    },
-
-    // ─── Main app shell ────────────────────────────────────────────────
-    {
-      path: '/',
-      component: () => import('@/components/layout/AppLayout.vue'),
-      children: [
-        { path: '',           name: 'home',              component: () => import('@/pages/HomePage.vue') },
-        { path: 'books',      name: 'books',             component: () => import('@/pages/BooksPage.vue') },
-        { path: 'books/:id',  name: 'book-detail',       component: () => import('@/pages/BookDetailPage.vue'),   props: true },
-        { path: 'books/:id/read', name: 'book-reader',   component: () => import('@/pages/BookReaderPage.vue'),   props: true },
-        { path: 'articles',   name: 'articles',          component: () => import('@/pages/ArticlesPage.vue') },
-        { path: 'articles/:id', name: 'article-detail',  component: () => import('@/pages/ArticleDetailPage.vue'), props: true },
-        { path: 'authors',    name: 'authors',           component: () => import('@/pages/AuthorsPage.vue') },
-        { path: 'authors/:id', name: 'author-detail',   component: () => import('@/pages/AuthorDetailPage.vue'), props: true },
-        { path: 'music',      name: 'music',             component: () => import('@/pages/MusicPage.vue') },
-        { path: 'music/albums/:id', name: 'album-detail', component: () => import('@/pages/AlbumDetailPage.vue'), props: true },
-        { path: 'search',     name: 'search',            component: () => import('@/pages/SearchPage.vue') },
-        { path: 'library',    name: 'library',           component: () => import('@/pages/LibraryPage.vue'), meta: { requiresAuth: true } },
-        { path: 'purchases',  name: 'purchases',         component: () => import('@/pages/PurchasesPage.vue'), meta: { requiresAuth: true } },
-        { path: 'categories', name: 'categories',        component: () => import('@/pages/CategoriesPage.vue') },
-        { path: 'categories/:id', name: 'category-detail', component: () => import('@/pages/CategoryDetailPage.vue'), props: true },
-        { path: 'collections', name: 'collections',      component: () => import('@/pages/CollectionsPage.vue') },
-        { path: 'collections/:id', name: 'collection-detail', component: () => import('@/pages/CollectionDetailPage.vue'), props: true },
-        { path: 'inbox',      name: 'inbox',             component: () => import('@/pages/InboxPage.vue') },
-        { path: 'settings',   name: 'settings',          component: () => import('@/pages/SettingsPage.vue') },
-        { path: 'about',      name: 'about',             component: () => import('@/pages/AboutPage.vue') },
-        { path: 'faq',        name: 'faq',               component: () => import('@/pages/FaqPage.vue') },
-      ],
-    },
-
-    // ─── 404 ──────────────────────────────────────────────────────────
-    { path: '/:pathMatch(.*)*', name: 'not-found', component: () => import('@/pages/NotFoundPage.vue') },
-  ],
+  routes,
 })
 
-
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  if (!to.meta?.requiresAuth) return
   const auth = useAuthStore()
-  if (to.meta?.requiresAuth && !auth.isLoggedIn) {
+  // On a fresh page load the stored token is still being validated with auth.me().
+  await auth.ensureRestored()
+  if (!auth.isLoggedIn) {
     return { name: 'auth', query: { redirect: to.fullPath } }
   }
 })
@@ -69,4 +81,3 @@ router.afterEach((to) => {
 })
 
 export default router
-

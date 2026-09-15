@@ -6,6 +6,7 @@ import { Screen } from '@/components/Screen'
 import { useTheme, type ThemePref } from '@/context/ThemeContext'
 import { useI18n } from '@/context/I18nContext'
 import { useAuth } from '@/context/AuthContext'
+import { AccountSettings } from '@/components/AccountSettings'
 import {
   FONT_OPTIONS,
   MON_SAFE_FONT_IDS,
@@ -112,7 +113,7 @@ function SectionCard({
 export default function SettingsScreen() {
   const { pref, setPref } = useTheme()
   const { t, locale, setLocale, locales } = useI18n()
-  const { isLoggedIn, user, logout } = useAuth()
+  const { isLoggedIn } = useAuth()
   const { bodyFont, headerFont, bodyFontFamily, headerFontFamily, setBodyFont, setHeaderFont } =
     useTypography()
 
@@ -298,34 +299,7 @@ export default function SettingsScreen() {
 
         <SectionCard icon="person-circle-outline" title={t('settings.account')} titleStyle={titleStyle}>
           {isLoggedIn ? (
-            <View className="rounded-2xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900/40">
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1 pr-4">
-                  <Text className="text-base font-semibold text-surface-900 dark:text-surface-50" style={bodyStyle}>
-                    {user?.name}
-                  </Text>
-                  <Text className="mt-0.5 text-sm text-surface-500 dark:text-surface-400" style={bodyStyle}>
-                    {user?.email}
-                  </Text>
-                </View>
-                <View className="h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-                  <Ionicons name="checkmark-done" size={16} color="#059669" />
-                </View>
-              </View>
-
-              <Pressable
-                onPress={() => {
-                  void logout()
-                  router.replace('/(tabs)')
-                }}
-                className="mt-4 flex-row items-center justify-center rounded-xl border border-red-200 bg-red-50 py-2.5 dark:border-red-900/30 dark:bg-red-900/20"
-              >
-                <Ionicons name="log-out-outline" size={17} color="#ef4444" />
-                <Text className="ml-2 font-semibold text-red-500" style={bodyStyle}>
-                  {t('nav.logout')}
-                </Text>
-              </Pressable>
-            </View>
+            <AccountSettings textStyle={bodyStyle} />
           ) : (
             <Pressable
               onPress={() => router.push('/(auth)/login')}

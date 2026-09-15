@@ -1,24 +1,24 @@
 import { getClient } from '../client.js'
+import type { Article, Author, AuthorsResponse, Book, Id } from '../types.js'
+
+type AuthorDetailResponse = { status: 'ok'; author: Author; books: Book[]; articles: Article[] }
+type FollowResponse = { status: 'ok'; is_following: boolean; followers_count: number }
 
 export const authors = {
-  // Fetch all authors with proper body format
-  fetchAuthors: (params?: Record<string, unknown>) =>
-    getClient().post<any>('fetchauthors', {
-      type: 'book',
-      page: String(params?.page ?? '0'),
-      limit: String(params?.limit ?? '20'),
-      query: String(params?.query ?? ''),
-      email: String(params?.email ?? ''),
-    }),
+  fetchAuthors: (params: { page?: number; limit?: number; q?: string } = {}) =>
+    getClient().get<AuthorsResponse>('authors', { params }),
 
-  // Flutter: { author }
-  getAuthorData: (id: string | number, email?: string) =>
-    getClient().post<any>('get_author_data', { author: id, email: email || ''}),
+  /** Author profile with their books and articles. */
+  getAuthor: (id: Id | string) => getClient().get<AuthorDetailResponse>(`authors/${id}`),
 
-  // Alias kept for store compatibility
-  getAuthor: (id: string | number, email?: string) =>
-    getClient().post<any>('get_author_data', { author: id, email: email || ''}),
+  /** @deprecated alias of getAuthor */
+  getAuthorData: (id: Id | string) => getClient().get<AuthorDetailResponse>(`authors/${id}`),
 
-  followUnfollow: (authorId: string | number, email?: string) =>
-    getClient().post<any>('followunfollow', { author: authorId, ...(email ? { email } : {}) }),
+  follow: (id: Id | string) => getClient().put<FollowResponse>(`authors/${id}/follow`),
+
+  unfollow: (id: Id | string) => getClient().delete<FollowResponse>(`authors/${id}/follow`),
+
+  /** Toggle helper: pass the current state. */
+  followUnfollow: (id: Id | string, isFollowing: boolean) =>
+    isFollowing ? getClient().delete<FollowResponse>(`authors/${id}/follow`) : getClient().put<FollowResponse>(`authors/${id}/follow`),
 }

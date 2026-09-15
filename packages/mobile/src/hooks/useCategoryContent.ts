@@ -1,68 +1,72 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { books as booksApi, articles as articlesApi } from '@loikmon/api'
-import type { Book, Article } from '@loikmon/api'
-import { parseBooks, parseArticles } from '@/lib/normalize'
-import { matchesCategory, deduplicateById } from '@/lib/categoryFilter'
+import { categories as catApi, errorMessage } from '@loikmon/api'
+import { applyCategoryPage, categoryHasMore, emptyCategoryState, type CategoryPageState } from '@/lib/pagination'
 
-/** Loads 3 pages of books + articles for a category, filtering client-side. */
-export function useCategoryContent(categoryId: string) {
-  const [books, setBooks] = useState<Book[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
+const PAGE_SIZE = 20
+
+/** Books and articles of a category, filtered server-side (`categories.getCategory`). */
+export function useCategoryContent(categoryId: string | undefined) {
+  const [state, setState] = useState<CategoryPageState>(emptyCategoryState)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const generation = useRef(0)
 
-  const load = useCallback(async (id: string) => {
+  const load = useCallback(
+    async (page: number) => {
+      if (!categoryId) return
+      const gen = generation.current
+      setError(null)
+      try {
+        const { data } = await catApi.getCategory(categoryId, { page, limit: PAGE_SIZE })
+        if (gen !== generation.current) return
+        setState((prev) => applyCategoryPage(prev, page, data))
+      } catch (err) {
+        if (gen === generation.current) setError(errorMessage(err, 'Failed to load category'))
+      }
+    },
+    [categoryId],
+  )
+
+  const refresh = useCallback(async () => {
+    generation.current++
     setLoading(true)
-    setBooks([])
-    setArticles([])
-
-    const seenBooks = new Set<string>()
-    const seenArticles = new Set<string>()
-    const accBooks: Book[] = []
-    const accArticles: Article[] = []
-
     try {
-      await Promise.all(
-        [0, 1, 2].map((p) =>
-          Promise.all([
-            booksApi.fetchBooks({ category: id, page: String(p) })
-              .then((res) => {
-                const parsed = parseBooks(res.data)
-                for (const b of parsed) {
-                  const key = String(b.id)
-                  if (matchesCategory(b as any, id) && !seenBooks.has(key)) {
-                    seenBooks.add(key)
-                    accBooks.push(b)
-                  }
-                }
-              })
-              .catch(() => {}),
-            articlesApi.fetchArticles({ category: id, page: String(p), limit: '50' })
-              .then((res) => {
-                const parsed = parseArticles(res.data)
-                for (const a of parsed) {
-                  const key = String(a.id)
-                  if (matchesCategory(a as any, id) && !seenArticles.has(key)) {
-                    seenArticles.add(key)
-                    accArticles.push(a)
-                  }
-                }
-              })
-              .catch(() => {}),
-          ])
-        )
-      )
+      await load(1)
     } finally {
-      setBooks([...accBooks])
-      setArticles([...accArticles])
       setLoading(false)
     }
-  }, [])
+  }, [load])
 
   useEffect(() => {
-    if (categoryId) void load(categoryId)
-  }, [categoryId, load])
+    setState(emptyCategoryState)
+    void refresh()
+  }, [refresh])
 
-  const refresh = useCallback(() => load(categoryId), [categoryId, load])
+  const loadMore = useCallback(async () => {
+    const current = stateRef.current
+    if (loadingMore || !categoryHasMore(current)) return
+    setLoadingMore(true)
+    try {
+      await load(current.page + 1)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [load, loadingMore])
 
-  return { books, articles, loading, refresh }
+  return {
+    category: state.category,
+    books: state.books,
+    articles: state.articles,
+    booksTotal: state.booksTotal,
+    articlesTotal: state.articlesTotal,
+    hasMore: categoryHasMore(state),
+    loading,
+    loadingMore,
+    error,
+    refresh,
+    loadMore,
+  }
 }

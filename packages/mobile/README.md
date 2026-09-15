@@ -1,6 +1,6 @@
 # @loikmon/mobile
 
-Loikmon eBook & Audio mobile app — **Expo (managed) + React Native + TypeScript**.
+Loikmon eBook & Audio mobile app — **Expo SDK 57 + expo-router + React Native + TypeScript**.
 
 > ⚠️ This package is a **standalone Expo app** with its own `package-lock.json`.
 > It is **not** part of the root npm workspace, on purpose. Run `npm`/`npx`
@@ -8,77 +8,158 @@ Loikmon eBook & Audio mobile app — **Expo (managed) + React Native + TypeScrip
 
 ## Features
 
-- 🔐 Auth — login, sign up, forgot password (session persisted in SecureStore)
-- 📚 eBooks — browse, purchase (coins) and read PDF/EPUB
-- 🎵 Audio — audiobooks with a global mini player
-- 📰 Articles — news & articles with categories
-- 👤 Authors — profiles and catalogs
-- 🔍 Search — full-text search across books + articles
-- 📁 Library — personal bookshelf & bookmarks (offline, AsyncStorage)
-- 🛒 Purchases — coin balance, packages, coupons
-- 🌙 Dark mode — system-aware with manual override
-- 🌐 i18n — English & Mon (ဘာသာမန်)
-- 🖥️ Responsive — auto-column grids for phones & tablets
+- 🔐 Auth — sign in, sign up (with email verification), forgot password, change password, delete account
+- 💎 Loikmon Premium — auto-renewing subscriptions ($4 / month, $10 / 3 months, $20 / 6 months, $45 / year)
+  bought with **Apple In-App Purchase (StoreKit 2)** and **Google Play Billing** via [`expo-iap`](https://github.com/hyodotdev/openiap/tree/main/libraries/expo-iap).
+  An active subscription unlocks every book, article and audiobook.
+- 📚 eBooks — browse and read PDF/EPUB (short-lived signed file URLs)
+- 🎵 Audio — audiobooks with preview chapters and a global mini player
+- 📰 Articles — full text and narration for subscribers, excerpt for everyone
+- 👤 Authors (follow/unfollow) · 🔍 Search · 📁 Library bookmarks (offline, AsyncStorage)
+- 🌙 Dark mode · 🌐 English & Mon (ဘာသာမန်) · 🖥️ Responsive grids for phones & tablets
 
 ## Architecture
 
 ```
 packages/mobile/
 ├─ app/                     # expo-router (file-based navigation)
-│  ├─ _layout.tsx           # providers (theme, i18n, auth, audio, library)
+│  ├─ _layout.tsx           # providers: theme, i18n, typography, auth, subscription, library, audio
 │  ├─ (auth)/               # login / register / forgot-password (modal stack)
-│  ├─ (tabs)/               # Home · Books · Articles · Search · Library
-│  ├─ book/[id].tsx         # book detail + purchase + chapters + related
-│  ├─ article/[id].tsx      # article reader
-│  ├─ author/[id].tsx       # author profile + catalog
-│  ├─ authors.tsx           # authors list
-│  ├─ audio.tsx             # audiobooks list
-│  ├─ purchases.tsx         # coins, packages, coupons, purchased items
-│  ├─ settings.tsx          # theme + language + account
-│  └─ reader.tsx            # PDF/EPUB WebView reader
+│  ├─ (tabs)/               # Home · Books · Articles · Categories · Library (+ hidden Search)
+│  ├─ book/[id].tsx         # book detail, access-gated Read/Listen, reviews, related
+│  ├─ articles/[id].tsx     # article (content/audio when unlocked, excerpt + paywall otherwise)
+│  ├─ audiobook/[id].tsx    # audiobook player (locked chapters never play)
+│  ├─ reader.tsx            # PDF/EPUB reader — takes `id` + `format`, fetches a signed URL
+│  ├─ subscribe.tsx         # paywall: plans, status, restore, manage, store disclosures
+│  └─ settings.tsx          # theme, language, typography, account
 └─ src/
-   ├─ services/             # api client config + storage (AsyncStorage/SecureStore)
-   ├─ lib/                  # pure helpers (url, normalize, user, audio, format) — unit-tested
-   ├─ context/              # Auth · Theme · I18n · Audio · Library providers
-   ├─ hooks/                # data hooks (books, articles, authors, search, purchases)
-   ├─ components/           # reusable UI (cards, grid, forms, mini player, reader)
-   └─ i18n/                 # en/mon locale JSON + translate()
+   ├─ services/api.ts       # configures @loikmon/api (base URL, bearer token, sign-out on 401)
+   ├─ context/              # Auth · Subscription (owns the single useIAP) · Theme · I18n · Audio · Library
+   ├─ hooks/                # data hooks (1-based pagination via usePaginatedList)
+   ├─ lib/                  # pure, unit-tested helpers (iap, access, pagination, url, audio, ...)
+   ├─ components/           # UI (cards, PaywallCard, Reviews, DocumentReader, MiniPlayer, ...)
+   └─ i18n/                 # en / mon locale JSON (same key set, enforced by a test)
 ```
 
-**Data flow:** screens → hooks → `@loikmon/api` (shared axios client, reused from
-the web app) → normalizers in `src/lib/normalize.ts` → typed models. State is kept
-in React Context (auth/theme/i18n/audio/library); server data lives in per-screen
-hooks. **Styling** uses NativeWind (Tailwind CSS) with a shared `brand`/`surface`
-palette and class-based dark mode.
+**Data flow:** screens → hooks → `@loikmon/api` (shared axios client, `/api/v1`) →
+typed responses. The **server decides access**: book details carry `access`,
+files come from `books.getFileUrl()` (signed, short-lived), chapters and article
+bodies are returned without media URLs when locked. List badges use `isLocked()`
+for display only.
 
-## Setup (npm / npx only)
+## Setup
 
 ```bash
 cd packages/mobile
-npm install
-npx expo start            # then press i (iOS), a (Android), or scan the QR in Expo Go
-# or:
-npm run ios
-npm run android
-npm run web
+npm install --legacy-peer-deps   # the dependency tree has pre-existing optional peer conflicts
 ```
 
-Optional API override — copy `.env.example` to `.env.local` and set
-`EXPO_PUBLIC_API_BASE`. Defaults to `https://loikmon.org/webapis/`.
+### Development build (required)
+
+In-app purchases use native StoreKit / Play Billing code, so **Expo Go cannot run
+this app**. Use a development build (`expo-dev-client` is installed):
+
+```bash
+# Local builds (Xcode / Android Studio required)
+npx expo prebuild --clean        # regenerate android/ & ios/ after adding native modules (expo-iap)
+npx expo run:android             # or: npm run android
+npx expo run:ios                 # or: npm run ios   (macOS only)
+
+# Then start Metro for the dev client
+npx expo start --dev-client
+```
+
+Or build in the cloud with EAS:
+
+```bash
+npm i -g eas-cli
+eas build:configure              # creates eas.json (not committed yet)
+eas build --profile development --platform android   # installable dev client (APK)
+eas build --profile development --platform ios       # device build (needs an Apple developer account)
+```
+
+> `android/` is a gitignored prebuild output. If it already exists from before
+> `expo-iap` was added, run `npx expo prebuild --clean` — `expo run:android`
+> does not re-apply config plugins to an existing native project.
+
+### API base URL
+
+Resolution order: `EXPO_PUBLIC_API_BASE` → `app.json` `expo.extra.apiBaseUrl` →
+`https://api.loikmon.org/api/v1`. Copy `.env.example` to `.env.local` to override.
+
+Local backend (`packages/backend`, port 4001):
+
+| Target            | `EXPO_PUBLIC_API_BASE`              |
+| ----------------- | ----------------------------------- |
+| Android emulator  | `http://10.0.2.2:4001/api/v1`       |
+| iOS simulator     | `http://localhost:4001/api/v1`      |
+| Physical device   | `http://<your-LAN-IP>:4001/api/v1`  |
+
+Signed file/audio URLs point at the backend's object storage public URL, so for
+emulator testing configure the backend's storage public URL with a host the
+device can reach (e.g. `http://10.0.2.2:9000`). Plain-HTTP URLs only work in
+debug builds.
+
+## Subscriptions (expo-iap)
+
+- `SubscriptionProvider` (`src/context/SubscriptionContext.tsx`) owns the **only**
+  `useIAP` instance and therefore the only purchase listener.
+- Plans come from `subscriptions.fetchPlans()`; store products are loaded with
+  `fetchProducts({ skus: storeSkus(plans, platform), type: 'subs' })` and the
+  localised store price is shown (fallback: `formatPlanPrice`).
+- **Purchase:** sign-in required → `account_token` from `subscriptions.getStatus()` →
+  `requestPurchase` with `appAccountToken` (iOS) / `obfuscatedAccountId` (Android)
+  → purchase event → `processPurchase()` verifies the proof with the backend
+  (`purchaseToken` = StoreKit 2 JWS on iOS; product id + token on Android) →
+  **only after a successful verification** `finishTransaction({ isConsumable: false })`.
+- **Retry:** if verification fails transiently (network, `STORE_UNAVAILABLE`, 5xx,
+  not signed in yet) the transaction stays unfinished and its key is persisted;
+  on the next launch and every return to the foreground the app re-verifies
+  (iOS re-delivers unfinished transactions; Android queries unacknowledged purchases).
+- **Restore purchases:** `getAvailablePurchases()` → `subscriptions.restore(proofs)` → refresh.
+- `PURCHASE_ALREADY_LINKED` shows a clear message (the store account's subscription
+  belongs to another Loikmon account). User-cancelled purchases are silent.
+
+### Store setup checklist
+
+**App Store Connect** (`org.loikmon.mobile`)
+1. Agreements, Tax and Banking: accept the Paid Apps agreement.
+2. Create one subscription group (e.g. *Loikmon Premium*) with four auto-renewable
+   subscriptions matching the backend plans' `apple_product_id`s
+   (`org.loikmon.mobile.premium.monthly`, `…quarterly`, `…semiannual`, `…yearly`):
+   durations 1 / 3 / 6 / 12 months, prices $4 / $10 / $20 / $45, localisations,
+   review screenshot. Rank them in the group.
+3. Enable App Store Server Notifications V2 pointing at the backend webhook, and
+   configure the backend's App Store Server API key.
+4. Add Sandbox testers (Users and Access → Sandbox) and sign in on the device
+   under Settings → App Store → Sandbox Account.
+5. App Privacy + the Terms of Use / Privacy Policy links (the paywall links
+   `https://loikmon.org/terms` and `https://loikmon.org/privacy`).
+
+**Google Play Console** (`org.loikmon.mobile`)
+1. Upload a build containing the Billing permission (added by the `expo-iap`
+   plugin) to an internal testing track — products can only be created after that.
+2. Monetize → Subscriptions → create product **`loikmon_premium`** with four
+   **auto-renewing** base plans: `monthly` (P1M, $4), `quarterly` (P3M, $10),
+   `semiannual` (P6M, $20), `yearly` (P1Y, $45). Activate them.
+3. Configure Real-time developer notifications (Pub/Sub) and the service account
+   the backend uses for the Play Developer API.
+4. Setup → License testing: add tester Google accounts (test cards, fast renewals),
+   and add them to the internal testing track; install the app from the Play test link.
 
 ## Validation
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm test            # jest (pure logic: url, normalize, user, audio, format, i18n)
+npm test            # jest (pure logic: iap, access, pagination, url, audio, i18n, ...)
+npx expo config --type public   # config plugins resolve
 npm run lint        # expo lint
 ```
 
 ## Notes
 
-- The shared `@loikmon/api` client sends POST bodies as `text/plain` wrapped in a
-  `{ data: … }` envelope; this is reused verbatim so mobile and web hit the API
-  identically. Metro is configured (see `metro.config.js`) to resolve the
-  workspace package from the repo root.
-- The reader renders PDFs natively in the WebView (iOS) / via Google Docs viewer
-  (Android) and EPUBs with epub.js inside the WebView.
+- Metro is configured (`metro.config.js`) to resolve the TypeScript source of
+  `@loikmon/api` (`file:../api`, ESM-style `.js` specifiers).
+- The reader renders PDFs natively in the WebView (iOS) / via the Google Docs
+  viewer with a fully encoded signed URL (Android), and EPUBs with epub.js. EPUBs
+  are cached per book id + format, and a signed URL that expired is re-requested once.

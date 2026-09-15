@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { categories as catApi } from '@loikmon/api'
+import { categories as catApi, errorMessage } from '@loikmon/api'
 import type { Category } from '@loikmon/api'
 
-export function useCategories() {
+export function useCategories(type?: 'book' | 'article') {
   const [items, setItems] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -11,17 +11,18 @@ export function useCategories() {
     setLoading(true)
     setError(null)
     try {
-      const res = await catApi.fetchCategories()
-      const body = res.data as any
-      setItems(body.categories ?? [])
+      const { data } = await catApi.fetchCategories(type)
+      setItems(data.categories ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load categories')
+      setError(errorMessage(err, 'Failed to load categories'))
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [type])
 
-  useEffect(() => { void fetch() }, [fetch])
+  useEffect(() => {
+    void fetch()
+  }, [fetch])
 
   return { items, loading, error, refresh: fetch }
 }

@@ -12,11 +12,12 @@ import type { Category } from '@loikmon/api'
 const ITEM_MIN_WIDTH = 160
 
 function CategoryItem({ cat, itemWidth }: { cat: Category; itemWidth: number }) {
+  const { t } = useI18n()
   const { headerTextStyle, bodyTextStyle } = useTypography()
 
   return (
     <Pressable
-      onPress={() => router.push(`/category/${cat.id}` as any)}
+      onPress={() => router.push({ pathname: '/category/[id]', params: { id: String(cat.id) } })}
       style={{ width: itemWidth, padding: 6 }}
       accessibilityRole="button"
       accessibilityLabel={String(cat.name)}
@@ -34,9 +35,9 @@ function CategoryItem({ cat, itemWidth }: { cat: Category; itemWidth: number }) 
         >
           {cat.name}
         </Text>
-        {(cat as any).books_count ? (
+        {cat.books_count ? (
           <Text className="text-xs text-surface-400" style={bodyTextStyle}>
-            {(cat as any).books_count} books
+            {t('authors.books', { count: cat.books_count })}
           </Text>
         ) : null}
       </View>

@@ -4,13 +4,12 @@ import { RouterView, useRoute } from 'vue-router'
 import AppSidebar from './AppSidebar.vue'
 import AppTopBar from './AppTopBar.vue'
 import AudioPlayer from '@/components/media/AudioPlayer.vue'
-import { useAuthStore } from '@/stores/auth'
+import PaywallDialog from '@/components/shared/PaywallDialog.vue'
 import { useUiStore } from '@/stores/ui'
-import { usePurchasesStore } from '@/stores/purchases'
+import { usePaywallStore } from '@/stores/paywall'
 
-const authStore = useAuthStore()
 const uiStore = useUiStore()
-const purchasesStore = usePurchasesStore()
+const paywall = usePaywallStore()
 const route = useRoute()
 const mainEl = useTemplateRef<HTMLElement>('main')
 
@@ -19,10 +18,9 @@ async function scrollMainToTop() {
   mainEl.value?.scrollTo({ top: 0, left: 0 })
 }
 
-onMounted(async () => {
+onMounted(() => {
+  // The session itself is restored once in main.ts (auth.me()).
   window.addEventListener('loikmon:scroll-main-top', scrollMainToTop)
-  await authStore.restore()
-  if (authStore.isLoggedIn) purchasesStore.fetchAll()
 })
 
 onUnmounted(() => {
@@ -31,7 +29,10 @@ onUnmounted(() => {
 
 watch(
   () => route.fullPath,
-  scrollMainToTop,
+  () => {
+    paywall.close()
+    void scrollMainToTop()
+  },
 )
 </script>
 
@@ -74,6 +75,9 @@ watch(
 
     <!-- Global audio player -->
     <AudioPlayer />
+
+    <!-- Global paywall (locked audio, list actions) -->
+    <PaywallDialog />
   </div>
 </template>
 

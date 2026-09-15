@@ -9,8 +9,11 @@
  *   ─ Large arc/semicircle decorative shape behind playback controls
  *   ─ Playback controls: skip-back-15  play/pause  skip-forward-15
  *   ─ Seek bar with current / total time
- *   ─ Lyrics / description text area
- *   ─ Footer: < Chapter N of M >  |  Page N/total
+ *   ─ Chapter playlist (locked chapters show a lock and open the paywall)
+ *   ─ Footer: < Chapter N of M >
+ *
+ * Chapters come from `books.getChapters`: locked chapters have no audio URL
+ * and are never queued or played.
  */
 import { useCallback, useEffect, useRef } from 'react'
 import {
@@ -28,10 +31,15 @@ import {
 import { router, useLocalSearchParams, Stack } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import type { BookChapter } from '@loikmon/api'
 import { useAudio } from '@/context/AudioContext'
+import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { useBookAudioChapters } from '@/hooks/useBookAudioChapters'
 import { useBookDetail } from '@/hooks/useBooks'
+import { accessAction } from '@/lib/access'
 import type { AudioTrack } from '@/lib/audio'
+import { firstParam } from '@/lib/normalize'
 import { pickCover } from '@/lib/url'
 
 const GOLD = '#C9922A'
@@ -138,19 +146,23 @@ function ControlBtn({
   )
 }
 
+function chapterLabel(chapter: BookChapter, index: number): string {
+  return (chapter.chapter_title || chapter.title || '').trim() || `#${chapter.chapter_number || index + 1}`
+}
+
 export default function AudiobookPlayerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const params = useLocalSearchParams<{ id: string }>()
+  const id = firstParam(params.id)
+  const { t } = useI18n()
+  const { isLoggedIn } = useAuth()
 
-  const { book } = useBookDetail(id)
-  const cover = book ? pickCover(book as unknown as Record<string, unknown>) : ''
+  const { book } = useBookDetail(id, { trackView: false })
+  const cover = book ? pickCover(book) : ''
   const title = book?.title ?? ''
-  const rec = book as Record<string, unknown> | undefined
-  const chapterNumber = (rec?.chapter_number as string | number) ?? (rec?.chapter as string | number) ?? ''
-  const chapterTitle = (rec?.chapter_title as string) ?? (rec?.title as string) ?? ''
-  const author = (rec?.authorname as string) ?? (rec?.author as string) ?? ''
-  const pageCount = (rec?.pages as string | number) ?? (rec?.pagecount as string | number)
+  const author = book?.authorname ?? ''
 
-  const { tracks, loading: chaptersLoading } = useBookAudioChapters(book?.id, title)
+  const { chapters, tracks, access, lockedCount, loading: chaptersLoading } = useBookAudioChapters(id, book ?? undefined)
+  const sortedChapters = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number)
 
   const {
     current,
@@ -167,29 +179,19 @@ export default function AudiobookPlayerScreen() {
     previous,
   } = useAudio()
 
+  // Signed URLs change on every fetch, so identify the book's queue by book id.
+  const isThisBook = current?.sourceType === 'book' && String(current.sourceBookId) === String(id)
+
   useEffect(() => {
     if (tracks.length > 0 && !current) {
       void play(tracks[0], tracks)
     }
   }, [tracks, current, play])
 
-  const isThisBook =
-    current !== null &&
-    queue.length > 0 &&
-    tracks.length > 0 &&
-    queue[0].url === tracks[0]?.url
-
   const displayIndex = isThisBook ? currentIndex : 0
   const chapterCount = isThisBook ? queue.length : tracks.length
   const currentTrack = isThisBook ? current : (tracks[0] ?? null)
-  const playlistTracks = tracks.length > 0 ? tracks : queue
-
-  const chapterLabel =
-    currentTrack?.title?.split('\u2013').pop()?.trim() ??
-    currentTrack?.title ??
-    `Chapter ${displayIndex + 1}`
-
-  const chapterDisplayTitle = currentTrack?.chapterTitle ?? (chapterTitle || chapterLabel)
+  const chapterDisplayTitle = currentTrack?.chapterTitle ?? currentTrack?.title ?? ''
 
   const onSkipBack = useCallback(
     () => void seek(Math.max(0, positionMillis - 15_000)),
@@ -210,11 +212,16 @@ export default function AudiobookPlayerScreen() {
   }, [positionMillis, seek, previous])
 
   const onSelectChapter = useCallback(
-    (track: AudioTrack) => {
-      if (tracks.length === 0) return
+    (chapter: BookChapter) => {
+      const track: AudioTrack | undefined = tracks.find((item) => String(item.id) === String(chapter.id))
+      if (!track || chapter.locked) {
+        // Locked: never play — send the viewer to sign in or subscribe.
+        router.push(accessAction(access, isLoggedIn) === 'login' ? '/(auth)/login' : '/subscribe')
+        return
+      }
       void play(track, tracks)
     },
-    [play, tracks],
+    [play, tracks, access, isLoggedIn],
   )
 
   return (
@@ -232,7 +239,7 @@ export default function AudiobookPlayerScreen() {
           style={styles.readBtn}
         >
           <Ionicons name="book-outline" size={15} color={GOLD} />
-          <Text style={styles.readBtnText}>Read</Text>
+          <Text style={styles.readBtnText}>{t('audio.read')}</Text>
         </Pressable>
       </View>
 
@@ -258,30 +265,32 @@ export default function AudiobookPlayerScreen() {
             {title}
           </Text>
           <Text style={styles.bookAuthor} numberOfLines={1}>
-            {author ? `By ${author}` : ''}
+            {author ? `${t('common.by')} ${author}` : ''}
           </Text>
-          <Text style={styles.nowPlayingText} numberOfLines={1}>
-            Now Playing: {chapterDisplayTitle}
-          </Text>
+          {chapterDisplayTitle ? (
+            <Text style={styles.nowPlayingText} numberOfLines={1}>
+              {t('audio.nowPlaying', { title: chapterDisplayTitle })}
+            </Text>
+          ) : null}
         </View>
 
         {/* Arc + Controls */}
         <View style={styles.arcWrapper}>
           <View style={styles.arc} />
           <View style={styles.controls}>
-            {chaptersLoading ? (
+            {chaptersLoading && chapters.length === 0 ? (
               <ActivityIndicator color={GOLD} size="large" />
             ) : (
               <>
-                <ControlBtn icon="play-back-outline" size={28} onPress={onSkipBack} />
+                <ControlBtn icon="play-back-outline" size={28} onPress={onSkipBack} disabled={!isThisBook} />
                 <ControlBtn
                   icon={isPlaying && isThisBook ? 'pause' : 'play'}
                   size={30}
                   onPress={onToggle}
                   primary
-                  disabled={isLoading}
+                  disabled={isLoading || tracks.length === 0}
                 />
-                <ControlBtn icon="play-forward-outline" size={28} onPress={onSkipForward} />
+                <ControlBtn icon="play-forward-outline" size={28} onPress={onSkipForward} disabled={!isThisBook} />
               </>
             )}
           </View>
@@ -294,24 +303,34 @@ export default function AudiobookPlayerScreen() {
           onSeek={seek}
         />
 
+        {/* Locked chapters notice */}
+        {lockedCount > 0 ? (
+          <Pressable
+            onPress={() => router.push(accessAction(access, isLoggedIn) === 'login' ? '/(auth)/login' : '/subscribe')}
+            style={styles.lockBanner}
+          >
+            <Ionicons name="lock-closed" size={16} color={GOLD} />
+            <Text style={styles.lockBannerText}>{t('audio.lockedHint', { count: lockedCount })}</Text>
+            <Ionicons name="chevron-forward" size={16} color={GOLD} />
+          </Pressable>
+        ) : null}
+
         {/* Chapter playlist */}
         <View style={styles.playlistBox}>
-          <Text style={styles.sectionTitle}>Playlist</Text>
-          {playlistTracks.length === 0 ? (
-            <Text style={styles.emptyPlaylistText}>No chapters available yet.</Text>
+          <Text style={styles.sectionTitle}>{t('audio.playlist')}</Text>
+          {sortedChapters.length === 0 ? (
+            <Text style={styles.emptyPlaylistText}>{chaptersLoading ? t('common.loading') : t('audio.noChapters')}</Text>
           ) : (
-            playlistTracks.map((track, idx) => {
-              const active = currentTrack?.url === track.url
-              const itemLabel =
-                track.chapterTitle ??
-                track.title?.split('\u2013').pop()?.trim() ??
-                `Chapter ${idx + 1}`
+            sortedChapters.map((chapter, idx) => {
+              const locked = chapter.locked || !chapter.audio_url
+              const active = !locked && isThisBook && String(current?.id) === String(chapter.id)
 
               return (
                 <Pressable
-                  key={`${String(track.id)}-${idx}`}
-                  onPress={() => onSelectChapter(track)}
-                  style={[styles.playlistItem, active && styles.playlistItemActive]}
+                  key={`${String(chapter.id)}-${idx}`}
+                  onPress={() => onSelectChapter(chapter)}
+                  style={[styles.playlistItem, active && styles.playlistItemActive, locked && styles.playlistItemLocked]}
+                  accessibilityState={{ disabled: locked }}
                 >
                   <View style={[styles.playlistIndex, active && styles.playlistIndexActive]}>
                     <Text style={[styles.playlistIndexText, active && styles.playlistIndexTextActive]}>
@@ -320,19 +339,25 @@ export default function AudiobookPlayerScreen() {
                   </View>
                   <View style={styles.playlistTextWrap}>
                     <Text
-                      style={[styles.playlistTitle, active && styles.playlistTitleActive]}
+                      style={[styles.playlistTitle, active && styles.playlistTitleActive, locked && styles.playlistTitleLocked]}
                       numberOfLines={1}
                     >
-                      {itemLabel}
+                      {chapterLabel(chapter, idx)}
                     </Text>
                     <Text style={styles.playlistMeta} numberOfLines={1}>
-                      {active ? (isPlaying ? 'Playing' : 'Paused') : 'Tap to play'}
+                      {locked
+                        ? t('audio.locked')
+                        : active
+                          ? isPlaying
+                            ? t('audio.playing')
+                            : t('audio.paused')
+                          : t('audio.tapToPlay')}
                     </Text>
                   </View>
                   <Ionicons
-                    name={active && isPlaying ? 'pause-circle' : 'play-circle'}
-                    size={26}
-                    color={active ? GOLD : '#B8A88D'}
+                    name={locked ? 'lock-closed' : active && isPlaying ? 'pause-circle' : 'play-circle'}
+                    size={locked ? 20 : 26}
+                    color={locked ? TEXT_LIGHT : active ? GOLD : '#B8A88D'}
                   />
                 </Pressable>
               )
@@ -346,35 +371,32 @@ export default function AudiobookPlayerScreen() {
         <Pressable
           onPress={onPrev}
           hitSlop={12}
-          disabled={displayIndex <= 0}
+          disabled={!isThisBook || displayIndex <= 0}
           style={styles.footerArrow}
         >
           <Ionicons
             name="chevron-back"
             size={20}
-            color={displayIndex <= 0 ? TEXT_LIGHT : TEXT_DARK}
+            color={!isThisBook || displayIndex <= 0 ? TEXT_LIGHT : TEXT_DARK}
           />
         </Pressable>
 
         <View style={styles.footerCenter}>
           <Text style={styles.footerChapter}>
-            Chapter {displayIndex + 1} of {chapterCount || '\u2014'}
+            {t('audio.chapterOf', { current: chapterCount ? displayIndex + 1 : 0, total: chapterCount || '—' })}
           </Text>
-          {pageCount ? (
-            <Text style={styles.footerPage}>Page {pageCount}</Text>
-          ) : null}
         </View>
 
         <Pressable
           onPress={next}
           hitSlop={12}
-          disabled={displayIndex >= chapterCount - 1}
+          disabled={!isThisBook || displayIndex >= chapterCount - 1}
           style={styles.footerArrow}
         >
           <Ionicons
             name="chevron-forward"
             size={20}
-            color={displayIndex >= chapterCount - 1 ? TEXT_LIGHT : TEXT_DARK}
+            color={!isThisBook || displayIndex >= chapterCount - 1 ? TEXT_LIGHT : TEXT_DARK}
           />
         </Pressable>
       </View>
@@ -545,6 +567,31 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ECE3D4',
   },
+  playlistItemLocked: {
+    opacity: 0.7,
+  },
+  playlistTitleLocked: {
+    color: TEXT_MID,
+  },
+  lockBanner: {
+    width: SW - 30,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E9C177',
+    backgroundColor: '#FDF2DD',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  lockBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#8C744A',
+    fontWeight: '600',
+  },
   playlistItemActive: {
     backgroundColor: '#FDF2DD',
     borderColor: '#E9C177',
@@ -617,4 +664,3 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 })
-

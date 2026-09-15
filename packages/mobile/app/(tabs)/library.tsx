@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { View, Text, Pressable, ScrollView } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -11,14 +10,36 @@ import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
 
-type Tab = 'bookmarks' | 'purchased'
+function PremiumPrompt() {
+  const { t } = useI18n()
+  const { headerTextStyle, bodyTextStyle } = useTypography()
+  return (
+    <Pressable
+      onPress={() => router.push('/subscribe')}
+      className="mx-4 mt-3 flex-row items-center rounded-2xl bg-brand-600 p-4"
+      accessibilityRole="button"
+    >
+      <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/20">
+        <Ionicons name="diamond-outline" size={20} color="#ffffff" />
+      </View>
+      <View className="ml-3 flex-1">
+        <Text className="text-base text-white" style={headerTextStyle}>
+          {t('library.premiumTitle')}
+        </Text>
+        <Text className="mt-0.5 text-xs text-brand-100" style={bodyTextStyle}>
+          {t('library.premiumHint')}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+    </Pressable>
+  )
+}
 
 export default function LibraryScreen() {
   const { t } = useI18n()
   const { books, articles } = useLibrary()
-  const { isLoggedIn } = useAuth()
-  const [tab, setTab] = useState<Tab>('bookmarks')
-  const { headerTextStyle, bodyTextStyle } = useTypography()
+  const { entitlement } = useAuth()
+  const { headerTextStyle } = useTypography()
 
   const empty = books.length === 0 && articles.length === 0
 
@@ -30,33 +51,9 @@ export default function LibraryScreen() {
         </Text>
       </View>
 
-      {/* Segmented control */}
-      <View className="mx-4 mt-3 flex-row rounded-xl bg-surface-200 dark:bg-surface-800 p-1">
-        {(['bookmarks', 'purchased'] as Tab[]).map((key) => (
-          <Pressable
-            key={key}
-            onPress={() => setTab(key)}
-            className={`flex-1 rounded-lg py-2 ${
-              tab === key ? 'bg-white dark:bg-surface-700' : ''
-            }`}
-          >
-            <Text
-              className={`text-center text-sm font-medium ${
-                tab === key
-                  ? 'text-surface-900 dark:text-surface-50'
-                  : 'text-surface-500 dark:text-surface-400'
-              }`}
-              style={bodyTextStyle}
-            >
-              {t(key === 'bookmarks' ? 'library.bookmarks' : 'library.purchased')}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      {!entitlement?.active ? <PremiumPrompt /> : null}
 
-      {tab === 'purchased' ? (
-        <PurchasedTab isLoggedIn={isLoggedIn} />
-      ) : empty ? (
+      {empty ? (
         <EmptyState icon="🔖" title={t('library.empty')} subtitle={t('library.emptyHint')} />
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
@@ -79,34 +76,5 @@ export default function LibraryScreen() {
         </ScrollView>
       )}
     </Screen>
-  )
-}
-
-function PurchasedTab({ isLoggedIn }: { isLoggedIn: boolean }) {
-  const { t } = useI18n()
-  const { bodyTextStyle } = useTypography()
-  if (!isLoggedIn) {
-    return (
-      <View className="flex-1 items-center justify-center px-8">
-        <EmptyState icon="🔐" title={t('auth.login')} subtitle={t('purchases.noPurchases')} />
-        <Pressable
-          onPress={() => router.push('/(auth)/login')}
-          className="mt-2 rounded-xl bg-brand-600 px-6 py-3"
-        >
-          <Text className="text-white" style={bodyTextStyle}>{t('auth.signIn')}</Text>
-        </Pressable>
-      </View>
-    )
-  }
-  return (
-    <Pressable
-      onPress={() => router.push('/purchases')}
-      className="m-4 flex-row items-center justify-between rounded-xl bg-white dark:bg-surface-800 p-4"
-    >
-      <Text className="text-surface-900 dark:text-surface-50" style={bodyTextStyle}>
-        {t('purchases.title')}
-      </Text>
-      <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
-    </Pressable>
   )
 }

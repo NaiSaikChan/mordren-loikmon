@@ -1,92 +1,93 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { books as booksApi } from '@loikmon/api'
-import type { BookAudioChapter } from '@loikmon/api'
+import { computed, ref, shallowRef } from 'vue'
+import { books as booksApi, errorMessage } from '@loikmon/api'
+import type { AccessInfo, BookChapter, Id } from '@loikmon/api'
+import { lockReasonFromAccess, lockReasonFromError, type LockReason } from '@/utils/access'
+
+/** Where a track's (short-lived, signed) URL comes from, so the player can request a fresh one. */
+export type AudioSource =
+  | { kind: 'book'; bookId: Id | string; chapterId: Id | string }
+  | { kind: 'article'; articleId: Id | string }
 
 export interface AudioTrack {
   id: string | number
   title: string
   artist?: string
+  /** Signed audio URL; empty when the track is locked. */
   url: string
   cover?: string
+  /** Locked chapters cannot be played without a subscription (or signing in). */
+  locked?: boolean
+  lockReason?: LockReason
+  source?: AudioSource
 }
 
-function pickChapterUrl(chapter: BookAudioChapter): string {
-  const rec = chapter as Record<string, unknown>
-  const raw =
-    (rec.audio_url as string) ??
-    (rec.audio as string) ??
-    (rec.audio_file as string) ??
-    (rec.stream_url as string) ??
-    ''
-  return normalizeAudioUrl(raw)
+export interface BookAudioMeta {
+  title?: string
+  author?: string
+  cover?: string | null
 }
 
-export function normalizeAudioUrl(url: string): string {
-  if (!url) return ''
-  let u = url
-  try {
-    const decoded = JSON.parse(`"${u}"`)
-    if (typeof decoded === 'string' && decoded.startsWith('http')) u = decoded
-  } catch { /* ignore */ }
-  u = u.replace(/\\/g, '/')
-  u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-  if (u.startsWith('http://') || u.startsWith('https://')) return u
-  return `https://loikmon.org${u.startsWith('/') ? '' : '/'}${u}`
-}
-
-function toChapterTrack(
-  chapter: BookAudioChapter,
-  bookTitle?: string,
-): AudioTrack | null {
-  const rec = chapter as Record<string, unknown>
-  const url = pickChapterUrl(chapter)
-  if (!url) return null
-  const title = (rec.chapter_title as string) ?? (rec.title as string) ?? 'Chapter'
+export function chapterToTrack(
+  chapter: BookChapter,
+  meta: BookAudioMeta = {},
+  lockReason: LockReason = 'subscription_required',
+): AudioTrack {
+  const chapterTitle = chapter.title || chapter.chapter_title || `Chapter ${chapter.chapter_number}`
+  const locked = chapter.locked || !chapter.audio_url
   return {
-    id: (rec.id as string | number) ?? url,
-    title: bookTitle ? `${bookTitle} – ${title}` : title,
-    artist: '',
-    url,
-    cover: '',
+    id: chapter.id,
+    title: meta.title ? `${meta.title} – ${chapterTitle}` : chapterTitle,
+    artist: meta.author ?? '',
+    url: locked ? '' : (chapter.audio_url ?? ''),
+    cover: meta.cover ?? '',
+    locked,
+    lockReason: locked ? lockReason : undefined,
+    source: { kind: 'book', bookId: chapter.book_id, chapterId: chapter.id },
   }
 }
 
 export const useBookAudioStore = defineStore('bookAudio', () => {
-  const loading = ref(false)
-  const error = ref<string | null>(null)
-  const chapters = ref<BookAudioChapter[]>([])
+  const loading  = ref(false)
+  const error    = ref<string | null>(null)
+  const bookId   = ref<string | null>(null)
+  const chapters = ref<BookChapter[]>([])
+  const access   = shallowRef<AccessInfo | null>(null)
+  const meta     = shallowRef<BookAudioMeta>({})
 
-  const bookTitle = ref<string | undefined>(undefined)
+  /** Why locked chapters are locked (defaults to subscription). */
+  const lockReason = computed<LockReason>(() => lockReasonFromAccess(access.value) ?? 'subscription_required')
 
-  const tracks = computed<AudioTrack[]>(() =>
-    Array.from(chapters.value ?? [])
-      .map((c) => toChapterTrack(c, bookTitle.value))
-      .filter((t): t is AudioTrack => t !== null),
-  )
+  /** Every chapter in order, locked ones included (they render with a lock and open the paywall). */
+  const tracks = computed<AudioTrack[]>(() => chapters.value.map((c) => chapterToTrack(c, meta.value, lockReason.value)))
+  const playableTracks = computed(() => tracks.value.filter((t) => !t.locked && t.url))
+  const lockedCount = computed(() => tracks.value.filter((t) => t.locked).length)
 
-  async function fetchChapters(bookId: string | number, title?: string) {
+  async function fetchChapters(id: Id | string, info: BookAudioMeta = {}) {
     loading.value = true
     error.value = null
-    bookTitle.value = title
+    bookId.value = String(id)
+    meta.value = info
     try {
-      const res = await booksApi.getAudioChapters(bookId)
-      const payload = res.data as Record<string, unknown>
-      const data = payload.data as unknown
-      const list: BookAudioChapter[] =
-        Array.isArray(data) ? data :
-        (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).chapters))
-          ? (data as Record<string, unknown>).chapters as BookAudioChapter[] :
-        Array.isArray(payload.chapters) ? payload.chapters as BookAudioChapter[] :
-        []
-      chapters.value = list
+      const { data } = await booksApi.getChapters(id)
+      chapters.value = data.chapters ?? []
+      access.value = data.access ?? null
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load audiobook'
       chapters.value = []
+      const reason = lockReasonFromError(err)
+      access.value = reason ? { granted: false, reason } : null
+      error.value = errorMessage(err, 'Failed to load audiobook')
     } finally {
       loading.value = false
     }
   }
 
-  return { loading, error, chapters, tracks, fetchChapters }
+  function clear() {
+    bookId.value = null
+    chapters.value = []
+    access.value = null
+    error.value = null
+  }
+
+  return { loading, error, bookId, chapters, access, tracks, playableTracks, lockedCount, lockReason, fetchChapters, clear }
 })

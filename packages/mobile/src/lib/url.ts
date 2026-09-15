@@ -1,27 +1,24 @@
 /**
  * URL helpers for Loikmon media assets.
  *
- * The loikmon.org API returns cover/thumbnail URLs that may:
- *  - be relative (need the origin prepended),
- *  - contain backslashes (escaped forward slashes),
- *  - contain raw spaces or narrow no-break spaces (U+202F) that break RN <Image>.
+ * The backend returns absolute URLs: public covers/avatars from object storage
+ * and short-lived *signed* URLs for book files and audio. Signed URLs carry an
+ * already percent-encoded query string (X-Amz-Credential=…%2F…,
+ * response-content-disposition=…%27%27…) and must reach the network exactly as
+ * received — re-encoding a single character invalidates the signature.
  *
- * `fixUrl` mirrors the logic used by the web app's BookCard component so both
- * clients render the same assets consistently.
- */
-/**
- * Media asset origin (host without the `/webapis/` API path).
- *
- * This is separate from the API *base* URL used for endpoints (configured in
- * `services/api.ts`): endpoints hit `.../webapis/`, whereas cover/audio assets
- * are served from the site root. `initApiClient()` calls `setMediaOrigin()` to
- * keep this aligned with a custom `EXPO_PUBLIC_API_BASE` when one is provided.
+ * `fixUrl` therefore only repairs what is unambiguously broken and keeps
+ * handling legacy values:
+ *  - JSON-escaped slashes (`https:\/\/host\/path`),
+ *  - raw spaces / narrow no-break spaces (U+202F), which are never valid in a URL,
+ *  - relative paths (prefixed with the media origin).
+ * Existing `%XX` escapes are never touched.
  */
 export const DEFAULT_ORIGIN = 'https://loikmon.org'
 
 let _origin = DEFAULT_ORIGIN
 
-/** Override the media asset origin (e.g. derived from the configured API base). */
+/** Override the origin used to resolve legacy relative media paths. */
 export function setMediaOrigin(origin: string): void {
   if (origin) _origin = origin.replace(/\/+$/, '')
 }
@@ -31,34 +28,47 @@ export function getMediaOrigin(): string {
   return _origin
 }
 
+const ABSOLUTE_SCHEME = /^(https?|file|content|data|blob|asset|ph):/i
+
+/** True for pre-signed object-storage URLs (S3/MinIO query-string signatures). */
+export function isSignedUrl(url: string | null | undefined): boolean {
+  if (!url) return false
+  return /[?&](X-Amz-Signature|X-Amz-Credential|Signature|sig|token)=/i.test(url)
+}
+
 export function fixUrl(url: string | undefined | null, base = _origin): string {
   if (!url) return ''
 
-  let u = String(url)
+  let u = String(url).trim()
+  if (!u) return ''
 
-  // Some server responses double-encode URLs as JSON strings (https:\/\/host\/path).
-  // Try to decode once; if it stays valid, use the decoded value.
-  try {
-    const decoded = JSON.parse(`"${u}"`)
-    if (typeof decoded === 'string' && decoded.startsWith('http')) u = decoded
-  } catch { /* ignore */ }
+  // Legacy responses double-encoded URLs as JSON strings (https:\/\/host\/path).
+  if (u.includes('\\')) {
+    try {
+      const decoded = JSON.parse(`"${u}"`)
+      if (typeof decoded === 'string' && /^https?:\/\//i.test(decoded)) u = decoded
+    } catch {
+      /* not a JSON-escaped string */
+    }
+    u = u.replace(/\\\//g, '/')
+  }
 
-  // Fallback for literal backslashes that were not JSON-decoded.
-  u = u.replace(/\\\//g, '/')
+  // Characters that can never appear raw in a URL. `%` is deliberately left
+  // alone so already-encoded (signed) query strings stay byte-for-byte intact.
+  u = u.replace(/\u202f/g, '%E2%80%AF').replace(/ /g, '%20')
 
-  // Encode narrow no-break space (U+202F) and regular spaces.
-  u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-  if (u.startsWith('http://') || u.startsWith('https://')) return u
+  if (ABSOLUTE_SCHEME.test(u)) return u
+  if (u.startsWith('//')) return `https:${u}`
   return `${base}${u.startsWith('/') ? '' : '/'}${u}`
 }
 
-/** Pick the first non-empty cover-like field from a book/media record. */
-export function pickCover(item: Record<string, unknown>): string {
-  const candidate =
-    (item.thumbnail as string) ??
-    (item.coverphoto as string) ??
-    (item.cover_url as string) ??
-    (item.cover as string) ??
-    ''
+/** Pick the first non-empty cover-like field from a book/article record. */
+export function pickCover(item: {
+  thumbnail?: string | null
+  coverphoto?: string | null
+  cover_url?: string | null
+  thumbnail_url?: string | null
+}): string {
+  const candidate = item.thumbnail || item.cover_url || item.coverphoto || item.thumbnail_url || ''
   return fixUrl(candidate)
 }

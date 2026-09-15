@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { onMounted, computed, ref, watch } from 'vue'
-import { useBooksStore } from '@/stores/books'
+import { computed, defineAsyncComponent, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from '@/stores/auth'
-import { usePurchasesStore } from '@/stores/purchases'
 import { books as booksApi } from '@loikmon/api'
-import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
-import { defineAsyncComponent } from 'vue'
+import { useBooksStore } from '@/stores/books'
+import { useAuthStore } from '@/stores/auth'
+import { useBookFile, type BookFormat } from '@/composables/useBookFile'
 import { useContentProtection } from '@/composables/useContentProtection'
+import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import Paywall from '@/components/shared/Paywall.vue'
 
 const EpubReader = defineAsyncComponent({
   loader: () => import('@/components/shared/EpubReader.vue'),
@@ -29,89 +29,27 @@ const { t } = useI18n()
 const store = useBooksStore()
 const route = useRoute()
 const auth = useAuthStore()
-const purchasesStore = usePurchasesStore()
 const protectedReader = ref<HTMLElement | null>(null)
 const { toastVisible, toastMessage, devToolsDetected, watermarkText } = useContentProtection(protectedReader)
 
-const accessChecked = ref(false)
-const pdfAvailability = ref<boolean | null>(null)
+// The file URL is never read from the book object: it is a short-lived signed
+// URL issued by `books.getFileUrl` only to viewers with access.
+const bookFile = useBookFile(() => props.id)
 
-function fixUrl(url: string): string {
-  if (!url) return ''
+/** URL handed to the EPUB reader; refreshed URLs are passed back through `refreshUrl` instead of re-rendering. */
+const epubUrl = ref<string | null>(null)
+const pdfData = shallowRef<ArrayBuffer | null>(null)
+const pdfLoading = ref(false)
+const pdfFailed = ref(false)
+let loadToken = 0
 
-  let u = String(url)
-  try {
-    const decoded = JSON.parse(`"${u}"`)
-    if (typeof decoded === 'string' && decoded.startsWith('http')) u = decoded
-  } catch { /* ignore */ }
-
-  u = u.replace(/\\\//g, '/')
-  if (!/^https?:\/\//i.test(u)) {
-    u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-    return u
-  }
-
-  try {
-    const parsed = new URL(u)
-    const pathname = parsed.pathname
-      .replace(/\u202f/gi, '%E2%80%AF')
-      .replace(/ /g, '%20')
-    parsed.pathname = pathname
-    return parsed.toString()
-  } catch {
-    return u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-  }
-}
-
-async function refreshPdfAvailability() {
-  pdfAvailability.value = null
-  const targetUrl = viewerPdfUrl.value
-  if (!targetUrl || canAccess.value !== true) {
-    pdfAvailability.value = false
-    return
-  }
-
-  try {
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      cache: 'no-store',
-      headers: { Range: 'bytes=0-0' },
-    })
-    pdfAvailability.value = response.ok && response.status < 400
-  } catch {
-    pdfAvailability.value = false
-  }
-}
-
-const book       = computed(() => store.detail)
-const pdfUrl     = computed(() => fixUrl(store.detail?.pdf ?? store.detail?.pdffile ?? ''))
-const epubUrl    = computed(() => fixUrl(store.detail?.epub ?? ''))
-const formatParam = computed(() => route.query.format as string | undefined)
-// When ?format=pdf is requested, suppress the epub viewer so the PDF viewer renders
-const activeEpubUrl = computed(() => formatParam.value === 'pdf' ? '' : epubUrl.value)
-
-// Access is granted when: book is free/no price, OR user purchased it
-const canAccess = computed(() => {
-  if (!accessChecked.value || !book.value) return null // still loading
-  if (book.value.is_free) return true
-  const price = Number(book.value.price ?? 0)
-  if (price <= 0) return true
-  if (!auth.isLoggedIn) return false
-  return purchasesStore.hasBook(props.id)
+const book = computed(() => (store.detail && String(store.detail.id) === String(props.id) ? store.detail : null))
+const requestedFormat = computed<BookFormat | undefined>(() => {
+  const f = route.query.format
+  return f === 'pdf' || f === 'epub' ? f : undefined
 })
-const viewerPdfUrl = computed(() => {
-  if (!pdfUrl.value) return ''
-
-  // GitHub Pages is a static deploy with no backend, so /api/misc/pdf-proxy
-  // returns 404 there. loikmon.org serves PDFs with Access-Control-Allow-Origin: *
-  // and accepts byte-range requests, so direct loading works in production.
-  // Dev still uses the local BFF proxy for cross-origin consistency.
-  if (import.meta.env.DEV && /^https?:\/\//i.test(pdfUrl.value)) {
-    return `/api/misc/pdf-proxy?url=${encodeURIComponent(pdfUrl.value)}`
-  }
-
-  return pdfUrl.value
-})
+const format = computed(() => bookFile.file.value?.format ?? null)
+const notAvailable = computed(() => bookFile.error.value?.code === 'NOT_FOUND')
 
 // Disable download and print from the built-in PDF.js toolbar
 // (print can be used as a download workaround — disable both)
@@ -127,38 +65,42 @@ const pdfConfig = {
   },
 }
 
-async function loadReaderPage() {
-  const bookFetch = (!store.detail || String(store.detail.id) !== String(props.id))
-    ? store.fetchDetail(props.id)
-    : Promise.resolve()
-
-  await Promise.all([bookFetch, auth.isLoggedIn ? purchasesStore.fetchAll() : Promise.resolve()])
-
-  // Ensure this backend hook runs before mounting the reader view.
+async function loadPdf(token: number) {
+  pdfLoading.value = true
+  pdfFailed.value = false
   try {
-    await booksApi.updateTotalViews(props.id)
+    const bytes = await bookFile.fetchBytes()
+    if (token === loadToken) pdfData.value = bytes
   } catch {
-    // Keep the page usable even if tracking call fails.
+    // A lost subscription surfaces as a lock reason from the re-requested URL.
+    if (token === loadToken && !bookFile.lockReason.value) pdfFailed.value = true
+  } finally {
+    if (token === loadToken) pdfLoading.value = false
   }
-
-  accessChecked.value = true
 }
 
-onMounted(loadReaderPage)
+async function loadReader() {
+  const token = ++loadToken
+  epubUrl.value = null
+  pdfData.value = null
+  pdfFailed.value = false
 
-watch(
-  () => [viewerPdfUrl.value, canAccess.value],
-  () => {
-    void refreshPdfAvailability()
-  },
-  { immediate: true },
-)
+  if (!book.value) void store.fetchDetail(props.id)
+  void booksApi.updateTotalViews(props.id).catch(() => undefined)
 
-// Vue Router same-component param navigation: reload when id changes.
-watch(() => props.id, () => {
-  accessChecked.value = false
-  pdfAvailability.value = null
-  void loadReaderPage()
+  const file = await bookFile.request(requestedFormat.value)
+  if (token !== loadToken || !file) return
+  if (file.format === 'epub') epubUrl.value = file.url
+  else await loadPdf(token)
+}
+
+onMounted(loadReader)
+
+// Same component, different book / format, or the session changed (signed in, subscribed).
+watch(() => [props.id, requestedFormat.value], () => { void loadReader() })
+watch(() => [auth.token, Boolean(auth.entitlement?.active)] as const, (next, prev) => {
+  // A different session, or an entitlement change while the book is locked.
+  if (next[0] !== prev[0] || (next[1] !== prev[1] && bookFile.lockReason.value)) void loadReader()
 })
 </script>
 
@@ -168,51 +110,68 @@ watch(() => props.id, () => {
     <div class="h-12 bg-white dark:bg-surface-900 border-b border-gray-100 dark:border-gray-800 flex items-center px-4 gap-3 shrink-0">
       <RouterLink :to="`/books/${id}`" class="btn-ghost p-2 text-sm">← {{ t('common.back') }}</RouterLink>
       <h1 class="font-semibold text-sm text-gray-700 dark:text-gray-300 truncate flex-1 pt-2">
-        {{ book?.title ?? 'Book Reader' }}
+        {{ book?.title ?? t('reader.title') }}
       </h1>
+      <span v-if="format" class="text-xs font-semibold uppercase text-gray-400">{{ format }}</span>
     </div>
 
-    <LoadingSpinner v-if="(store.loading && !book) || !accessChecked" />
+    <LoadingSpinner v-if="bookFile.loading.value && !bookFile.file.value" />
 
-    <!-- Access denied: book requires purchase -->
-    <div v-else-if="canAccess === false"
-      class="flex-1 flex items-center justify-center text-center p-8">
-      <div>
-        <div class="text-5xl mb-4">🔒</div>
-        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">Purchase Required</p>
-        <p class="text-sm text-gray-400 mb-6">
-          {{ auth.isLoggedIn ? 'You need to purchase this book to read it.' : 'Login and purchase this book to read it.' }}
-        </p>
-        <RouterLink :to="`/books/${props.id}`" class="btn-primary inline-flex">
-          ← View Book
+    <!-- Access denied by the server: sign in or subscribe -->
+    <div v-else-if="bookFile.lockReason.value" class="flex-1 flex items-center justify-center p-8">
+      <Paywall
+        :reason="bookFile.lockReason.value"
+        class="max-w-lg w-full"
+        @unlocked="loadReader"
+      >
+        <RouterLink :to="`/books/${props.id}`" class="mt-4 inline-block text-sm text-brand-600 hover:underline">
+          ← {{ t('books.viewBook') }}
         </RouterLink>
+      </Paywall>
+    </div>
+
+    <!-- No such file for this book -->
+    <div v-else-if="notAvailable" class="flex-1 flex items-center justify-center text-gray-400 text-center p-8" data-testid="reader-not-available">
+      <div>
+        <div class="text-5xl mb-3">📚</div>
+        <p>{{ t('reader.notAvailable') }}</p>
+      </div>
+    </div>
+
+    <!-- Other errors (network, server) -->
+    <div v-else-if="bookFile.error.value || pdfFailed" class="flex-1 flex items-center justify-center text-center p-8">
+      <div class="max-w-md">
+        <div class="text-5xl mb-4">⚠️</div>
+        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">{{ t('reader.loadFailed') }}</p>
+        <p v-if="bookFile.error.value" class="text-sm text-gray-500 dark:text-gray-400 mb-4">{{ bookFile.error.value.message }}</p>
+        <button type="button" class="btn-primary" @click="loadReader">{{ t('common.retry') }}</button>
       </div>
     </div>
 
     <!-- EPUB reader (epubjs) -->
-    <div v-else-if="canAccess && activeEpubUrl" ref="protectedReader" class="protected-content protected-reader flex-1 overflow-hidden">
-      <EpubReader :url="activeEpubUrl" />
+    <div
+      v-else-if="format === 'epub' && epubUrl"
+      ref="protectedReader"
+      class="protected-content protected-reader flex-1 overflow-hidden"
+      data-testid="reader-epub"
+    >
+      <EpubReader :url="epubUrl" :book-id="props.id" :refresh-url="bookFile.refresh" />
       <div class="protected-watermark" aria-hidden="true">{{ watermarkText }}</div>
-      <div class="protected-print-message">Printing is disabled for protected content.</div>
+      <div class="protected-print-message">{{ t('reader.printBlocked') }}</div>
     </div>
 
-    <LoadingSpinner v-else-if="canAccess && pdfUrl && pdfAvailability === null" />
+    <LoadingSpinner v-else-if="format === 'pdf' && (pdfLoading || !pdfData)" />
 
     <!-- PDF reader (download + print disabled) -->
-    <div v-else-if="canAccess && viewerPdfUrl && pdfAvailability === true" ref="protectedReader" class="protected-content protected-reader flex-1 overflow-hidden">
-      <VuePdfApp :pdf="viewerPdfUrl" :config="pdfConfig" class="w-full h-full" style="height: 100%;" />
+    <div
+      v-else-if="format === 'pdf' && pdfData"
+      ref="protectedReader"
+      class="protected-content protected-reader flex-1 overflow-hidden"
+      data-testid="reader-pdf"
+    >
+      <VuePdfApp :pdf="pdfData" :config="pdfConfig" class="w-full h-full" style="height: 100%;" />
       <div class="protected-watermark" aria-hidden="true">{{ watermarkText }}</div>
-      <div class="protected-print-message">Printing is disabled for protected content.</div>
-    </div>
-
-    <div v-else-if="canAccess && pdfUrl && pdfAvailability === false" class="flex-1 flex items-center justify-center text-center p-8">
-      <div class="max-w-md">
-        <div class="text-5xl mb-4">📄</div>
-        <p class="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">PDF not available</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">
-          This book is linked to a missing or broken PDF file. Please report this issue so it can be fixed upstream.
-        </p>
-      </div>
+      <div class="protected-print-message">{{ t('reader.printBlocked') }}</div>
     </div>
 
     <!-- Nothing available -->
@@ -224,7 +183,7 @@ watch(() => props.id, () => {
     </div>
     <div v-if="toastVisible" class="protected-toast" role="status">{{ toastMessage }}</div>
     <div v-if="devToolsDetected" class="protected-warning" role="alert">
-      Protected content tools detected. Please close developer tools to continue reading.
+      {{ t('reader.devTools') }}
     </div>
   </div>
 </template>

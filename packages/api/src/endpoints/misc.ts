@@ -1,46 +1,17 @@
 import { getClient } from '../client.js'
+import type { Collection, FaqItem, HomeResponse, Id, InboxMessage, Pagination } from '../types.js'
 
 export const misc = {
-  // Dashboard: { email, lastseeninbox:0 }
-  initApp: (email?: string) =>
-    getClient().post<any>('initapp', { email: email ?? '', lastseeninbox: 0 }),
+  /** Home screen: sliders, latest/popular/recommended/audio books, articles, authors. */
+  home: () => getClient().get<HomeResponse>('home'),
 
-  overview: (params: string | {
-    email?: string
-    author?: string | number
-    bookid?: string | number
-  } = {}) => {
-    const options = typeof params === 'string' ? { email: params } : params
-    return getClient().post<any>('overview', {
-      email: options.email ?? '',
-      author: options.author ?? '',
-      bookid: options.bookid ?? '',
-    })
-  },
+  fetchCollections: (page = 1, limit = 20) =>
+    getClient().get<{ status: 'ok'; collections: Collection[]; total: number; pagination: Pagination }>('collections', { params: { page, limit } }),
 
-  // Collections — correct endpoint names from API doc
-  fetchCollections: (page = 0) =>
-    getClient().post<any>('fetch_collections', { page: String(page) }),
+  fetchSingleCollection: (id: Id | string) => getClient().get<{ status: 'ok'; collection: Collection }>(`collections/${id}`),
 
-  fetchSingleCollection: (collectionId: string | number) =>
-    getClient().post<any>('fetchSingleCollection', { collection_id: collectionId }),
+  fetchFaqs: () => getClient().get<{ status: 'ok'; faqs: FaqItem[] }>('faqs'),
 
-  fetchLeagues: () =>
-    getClient().post<any>('fetchleagues', {}),
-
-  // FAQs — GET per API doc
-  fetchFaqs: () =>
-    getClient().get<any>('fetchfaqs'),
-
-  // Countries — GET per API doc
-  loadCountries: () =>
-    getClient().get<any>('loadcountries'),
-
-  // Banks — POST { country }
-  loadBanks: (countryId: string | number) =>
-    getClient().post<any>('loadbanks', { country: countryId }),
-
-  // Inbox/Notifications — POST { email, lastseeninbox }
-  fetchInbox: (email?: string, lastSeen = 0) =>
-    getClient().post<any>('initapp', { email: email ?? '', lastseeninbox: lastSeen }),
+  /** Broadcast announcements plus messages for the signed-in user. */
+  fetchInbox: () => getClient().get<{ status: 'ok'; notifications: InboxMessage[] }>('notifications'),
 }

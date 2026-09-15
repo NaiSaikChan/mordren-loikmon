@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
-import { type AudioTrack, toTrack } from '@/lib/audio'
+import type { AudioTrack } from '@/lib/audio'
 
-export { toTrack, type AudioTrack }
+export type { AudioTrack }
 
 interface AudioContextValue {
   current: AudioTrack | null

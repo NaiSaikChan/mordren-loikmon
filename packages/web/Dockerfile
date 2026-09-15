@@ -2,9 +2,13 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 ARG VITE_BASE=/
-ARG VITE_API_BASE=/api
+ARG VITE_API_BASE=/api/v1
+ARG VITE_PLAY_STORE_URL=
+ARG VITE_APP_STORE_URL=
 ENV VITE_BASE=$VITE_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
+ENV VITE_PLAY_STORE_URL=$VITE_PLAY_STORE_URL
+ENV VITE_APP_STORE_URL=$VITE_APP_STORE_URL
 COPY package.json package-lock.json ./
 COPY packages/api/package.json ./packages/api/
 COPY packages/web/package.json ./packages/web/

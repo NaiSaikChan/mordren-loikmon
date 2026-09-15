@@ -6,7 +6,7 @@ import { fixUrl } from '@/lib/url'
 
 export function AuthorCard({ author }: { author: Author }) {
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const avatar = fixUrl((author.thumbnail as string) ?? (author.avatar as string) ?? '')
+  const avatar = fixUrl(author.avatar_url || author.thumbnail)
   return (
     <Link href={`/author/${author.id}`} asChild>
       <Pressable className="mb-3 flex-row items-center rounded-xl bg-white dark:bg-surface-800 p-3">

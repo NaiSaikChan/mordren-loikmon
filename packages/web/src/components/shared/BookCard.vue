@@ -1,28 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Book } from '@loikmon/api'
+import AccessBadge from './AccessBadge.vue'
 
 const props = defineProps<{ book: Book }>()
 
-function fixUrl(url: string): string {
-  if (!url) return ''
-  let u = url.replace(/\\/g, '/')
-  u = u.replace(/\u202f/gi, '%E2%80%AF').replace(/ /g, '%20')
-  return u
-}
-
-const cover = computed(() => {
-  const b = props.book
-  return fixUrl(b.thumbnail ?? b.coverphoto ?? b.cover_url ?? b.cover ?? '')
-})
-
-const authorDisplay = computed(() =>
-  props.book.authorname ?? props.book.author ?? ''
-)
-const isFree = computed(() => {
-  const p = props.book.amount ?? props.book.price
-  return props.book.is_free || !p || Number(p) === 0
-})
+const cover = computed(() => props.book.thumbnail ?? props.book.cover_url ?? props.book.coverphoto ?? '')
+const rating = computed(() => Number(props.book.rating ?? 0))
 </script>
 
 <template>
@@ -39,19 +23,21 @@ const isFree = computed(() => {
           @error="($event.target as HTMLImageElement).style.display='none'"
         />
         <div v-else class="w-full h-full flex items-center justify-center text-4xl">📚</div>
+        <span
+          v-if="book.has_audio"
+          class="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white"
+          aria-hidden="true"
+        >🎧</span>
       </div>
       <div class="p-3">
         <h3 class="text-xs font-semibold text-gray-900 dark:text-white line-clamp-2 leading-snug mb-1.5 pt-1">
           {{ book.title }}
         </h3>
-        <p v-if="authorDisplay" class="text-xs text-gray-400 truncate leading-tight mb-3 pt-1">{{ authorDisplay }}</p>
+        <p v-if="book.authorname" class="text-xs text-gray-400 truncate leading-tight mb-3 pt-1">{{ book.authorname }}</p>
         <div class="flex items-center justify-between gap-1 pt-1">
-          <span v-if="isFree" class="badge-green">Free</span>
-          <span v-else class="text-xs font-semibold text-brand-600 dark:text-brand-400 truncate">
-            {{ book.amount ?? book.price }} coins
-          </span>
-          <div v-if="book.rating" class="flex items-center gap-0.5 text-xs text-yellow-500 shrink-0">
-            ⭐ {{ Number(book.rating).toFixed(1) }}
+          <AccessBadge :item="book" />
+          <div v-if="rating > 0" class="flex items-center gap-0.5 text-xs text-yellow-500 shrink-0">
+            ⭐ {{ rating.toFixed(1) }}
           </div>
         </div>
       </div>

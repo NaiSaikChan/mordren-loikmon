@@ -153,4 +153,36 @@ describe('EpubReader', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }))
     expect(mockPrev).toHaveBeenCalled()
   })
+
+  // ── Signed URLs ───────────────────────────────────────────────────────────
+  it('stores the reading position per book id, not per (changing) signed URL', async () => {
+    localStorage.setItem('epub-cfi-book-42', 'epubcfi(/6/4)')
+    mount(EpubReader, {
+      props: { url: 'https://storage.loikmon.org/books/42.epub?sig=new', bookId: 42 },
+      attachTo: document.body,
+    })
+    await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(mockDisplay).toHaveBeenCalledWith('epubcfi(/6/4)')
+    localStorage.removeItem('epub-cfi-book-42')
+  })
+
+  it('asks for a fresh signed URL once when storage rejects the expired one', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 403, statusText: 'Forbidden', arrayBuffer: vi.fn() })
+      .mockResolvedValueOnce({ ok: true, status: 200, statusText: 'OK', arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)) })
+    vi.stubGlobal('fetch', fetchMock)
+    const refreshUrl = vi.fn().mockResolvedValue('https://storage.loikmon.org/books/42.epub?sig=fresh')
+
+    mount(EpubReader, {
+      props: { url: 'https://storage.loikmon.org/books/42.epub?sig=expired', bookId: 42, refreshUrl },
+      attachTo: document.body,
+    })
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
+
+    expect(refreshUrl).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[1][0]).toBe('https://storage.loikmon.org/books/42.epub?sig=fresh')
+    await vi.waitFor(() => expect(mockRenderTo).toHaveBeenCalled())
+  })
 })

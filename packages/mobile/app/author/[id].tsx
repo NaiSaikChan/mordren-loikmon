@@ -17,13 +17,10 @@ export default function AuthorDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>()
   const { t } = useI18n()
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const { user, isLoggedIn } = useAuth()
+  const { isLoggedIn } = useAuth()
   const { width } = useWindowDimensions()
   const authorId = Array.isArray(id) ? id[0] : id
-  const { author, books, articles, loading, error, following, toggleFollow } = useAuthorDetail(
-    authorId,
-    user?.email,
-  )
+  const { author, books, articles, loading, error, following, toggleFollow } = useAuthorDetail(authorId)
   const [tab, setTab] = useState<'about' | 'books' | 'articles'>('about')
 
   const isTablet = width >= 768
@@ -71,22 +68,20 @@ export default function AuthorDetailScreen() {
     )
   }
 
-  const avatar = fixUrl(
-    (author.thumbnail as string) ?? (author.avatar_url as string) ?? (author.avatar as string) ?? '',
-  )
+  const avatar = fixUrl(author.avatar_url || author.thumbnail)
   const socials = [
-    { id: 'facebook', label: 'Facebook', value: author.facebook as string | undefined },
-    { id: 'instagram', label: 'Instagram', value: author.instagram as string | undefined },
-    { id: 'youtube', label: 'YouTube', value: author.youtube as string | undefined },
-    { id: 'email', label: 'Email', value: author.email ? `mailto:${author.email}` : undefined },
+    { id: 'website', label: author.website ?? '', value: author.website },
+    { id: 'facebook', label: t('authors.socialFacebook'), value: author.facebook },
+    { id: 'instagram', label: t('authors.socialInstagram'), value: author.instagram },
+    { id: 'youtube', label: t('authors.socialYouTube'), value: author.youtube },
   ].filter((item) => item.value)
 
   const onToggleFollow = async () => {
-    if (!isLoggedIn || !user?.email) {
+    if (!isLoggedIn) {
       router.push('/(auth)/login')
       return
     }
-    await toggleFollow()
+    await toggleFollow().catch(() => undefined)
   }
 
   return (
@@ -146,7 +141,7 @@ export default function AuthorDetailScreen() {
         <View className={`${isTablet ? 'px-6' : 'px-4'} mt-5`}>
           <View className="flex-row rounded-2xl bg-surface-200 p-1 dark:bg-surface-800">
             {[
-              { id: 'about' as const, label: 'About' },
+              { id: 'about' as const, label: t('books.description') },
               { id: 'books' as const, label: `${t('nav.books')} (${books.length})` },
               { id: 'articles' as const, label: `${t('nav.articles')} (${articles.length})` },
             ].map((item) => {
@@ -175,7 +170,7 @@ export default function AuthorDetailScreen() {
             {author.bio ? (
               <View className="rounded-2xl bg-white p-5 dark:bg-surface-800">
                 <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                  Biography
+                  {t('authors.biography')}
                 </Text>
                 <Text className="leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
                   {String(author.bio)}
@@ -186,7 +181,7 @@ export default function AuthorDetailScreen() {
             {socials.length ? (
               <View className="rounded-2xl bg-white p-5 dark:bg-surface-800">
                 <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                  Follow
+                  {t('authors.followLinks')}
                 </Text>
                 <View className="flex-row flex-wrap gap-2">
                   {socials.map((social) => (
@@ -204,24 +199,19 @@ export default function AuthorDetailScreen() {
               </View>
             ) : null}
 
-            {author.description || author.created_at || author.status ? (
+            {(author.description && author.description !== author.bio) || author.joined_date || author.created_at ? (
               <View className="rounded-2xl bg-white p-5 dark:bg-surface-800">
                 <Text className="mb-3 text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
-                  Additional Information
+                  {t('authors.additionalInfo')}
                 </Text>
-                {author.description ? (
+                {author.description && author.description !== author.bio ? (
                   <Text className="mb-4 leading-7 text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
                     {String(author.description)}
                   </Text>
                 ) : null}
-                {author.created_at ? (
+                {author.joined_date || author.created_at ? (
                   <Text className="text-sm text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
-                    Joined: {new Date(String(author.created_at)).toLocaleDateString()}
-                  </Text>
-                ) : null}
-                {author.status ? (
-                  <Text className="mt-2 text-sm text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
-                    Status: {String(author.status)}
+                    {t('authors.joined')}: {new Date(String(author.joined_date ?? author.created_at)).toLocaleDateString()}
                   </Text>
                 ) : null}
               </View>

@@ -1,87 +1,69 @@
-import { useCallback, useEffect, useState } from 'react'
-import { books as booksApi } from '@loikmon/api'
-import type { Book, BookChapter } from '@loikmon/api'
-import { parseBooks, parseBookDetail } from '@/lib/normalize'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { books as booksApi, errorMessage } from '@loikmon/api'
+import type { Book, BookDetail, BookQuery } from '@loikmon/api'
+import { useAuth } from '@/context/AuthContext'
 import { stableKey } from '@/lib/stableKey'
+import { usePaginatedList } from './usePaginatedList'
 
-/** Paginated book list hook (home / books tab / category screens). */
-export function useBooks(params?: Record<string, unknown>) {
-  const [items, setItems] = useState<Book[]>([])
-  const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
+/** Paginated book list (books tab / audiobooks / filtered lists). */
+export function useBooks(params: Omit<BookQuery, 'page'> = {}) {
   const key = stableKey(params)
-
-  const load = useCallback(
-    async (nextPage: number, replace: boolean) => {
-      setError(null)
-      try {
-        const res = await booksApi.fetchBooks({ ...(params ?? {}), page: String(nextPage) })
-        const parsed = parseBooks(res.data)
-        setItems((prev) => (replace ? parsed : [...prev, ...parsed]))
-        setHasMore(parsed.length > 0)
-        setPage(nextPage)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load books')
-      }
+  const fetchPage = useCallback(
+    async (page: number) => {
+      const { data } = await booksApi.fetchBooks({ limit: 20, ...params, page })
+      return { items: data.books, pagination: data.pagination }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [key],
   )
-
-  useEffect(() => {
-    setLoading(true)
-    load(0, true).finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-
-  const loadMore = useCallback(() => {
-    if (loading || refreshing || !hasMore) return
-    load(page + 1, false)
-  }, [loading, refreshing, hasMore, page, load])
-
-  const refresh = useCallback(() => {
-    setRefreshing(true)
-    load(0, true).finally(() => setRefreshing(false))
-  }, [load])
-
-  return { items, loading, refreshing, hasMore, error, loadMore, refresh }
+  return usePaginatedList<Book>(key, fetchPage)
 }
 
-/** Single book detail + chapters + related. */
-export function useBookDetail(id: string | number) {
-  const [book, setBook] = useState<Book | null>(null)
-  const [chapters, setChapters] = useState<BookChapter[]>([])
+/**
+ * Book detail (with the server's `access` decision) + related books.
+ * Re-fetches when the session/entitlement changes so `access` stays current.
+ * Counts one view per opened book.
+ */
+export function useBookDetail(id: string | number | undefined, options: { trackView?: boolean } = {}) {
+  const trackView = options.trackView ?? true
+  const { user, entitlement } = useAuth()
+  const [book, setBook] = useState<BookDetail | null>(null)
   const [related, setRelated] = useState<Book[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [version, setVersion] = useState(0)
+  const viewedId = useRef<string | null>(null)
+  const loadedId = useRef<string | null>(null)
+
+  const accessKey = `${user?.id ?? ''}:${entitlement?.active ? 1 : 0}`
 
   useEffect(() => {
+    if (id == null || String(id) === '') {
+      setLoading(false)
+      setError('Missing book id')
+      return
+    }
     let active = true
+    // Only show the full-screen spinner for a different book, not for access refreshes.
+    const isNewBook = loadedId.current !== String(id)
     ;(async () => {
-      setLoading(true)
+      if (isNewBook) {
+        setLoading(true)
+        setBook(null)
+        setRelated([])
+      }
       setError(null)
       try {
-        const [detailRes, chaptersRes, relatedRes] = await Promise.all([
-          booksApi.getItem(id),
-          booksApi.getChapters(id).catch(() => ({ data: {} })),
-          booksApi.relatedBooks(id).catch(() => ({ data: {} })),
+        const [detail, relatedRes] = await Promise.all([
+          booksApi.getBook(id),
+          isNewBook ? booksApi.relatedBooks(id).catch(() => null) : Promise.resolve(null),
         ])
         if (!active) return
-        setBook(parseBookDetail(detailRes.data))
-        const chapterBody = chaptersRes.data as Record<string, unknown>
-        setChapters(
-          (chapterBody.chapters as BookChapter[]) ??
-            ((chapterBody.data as Record<string, unknown>)?.chapters as BookChapter[]) ??
-            [],
-        )
-        setRelated(parseBooks(relatedRes.data))
-        booksApi.updateTotalViews(id).catch(() => undefined)
+        loadedId.current = String(id)
+        setBook(detail.data.book)
+        if (relatedRes) setRelated(relatedRes.data.books.filter((b) => String(b.id) !== String(id)))
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Failed to load book')
+        if (active) setError(errorMessage(err, 'Failed to load book'))
       } finally {
         if (active) setLoading(false)
       }
@@ -89,7 +71,15 @@ export function useBookDetail(id: string | number) {
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, accessKey, version])
 
-  return { book, chapters, related, loading, error }
+  useEffect(() => {
+    if (!trackView || id == null || viewedId.current === String(id)) return
+    viewedId.current = String(id)
+    booksApi.updateTotalViews(id).catch(() => undefined)
+  }, [id, trackView])
+
+  const reload = useCallback(() => setVersion((v) => v + 1), [])
+
+  return { book, related, loading, error, reload }
 }

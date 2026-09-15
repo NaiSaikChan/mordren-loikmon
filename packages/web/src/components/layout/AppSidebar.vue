@@ -4,7 +4,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
-import { usePurchasesStore } from '@/stores/purchases'
 import logoUrl from '@/assets/logo.png'
 
 const { t } = useI18n()
@@ -12,19 +11,16 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
-const purchasesStore = usePurchasesStore()
 
 const navItems = computed(() => [
-  { key: 'home',        icon: '🏠', label: t('nav.home'),       path: '/' },
-  { key: 'books',       icon: '📚', label: t('nav.books'),      path: '/books' },
-  { key: 'articles',    icon: '📰', label: t('nav.articles'),   path: '/articles' },
-  { key: 'authors',     icon: '✍️',  label: t('nav.authors'),   path: '/authors' },
-  //{ key: 'music',       icon: '🎵', label: t('nav.music'),      path: '/music' },
-  // { key: 'search',      icon: '🔍', label: t('nav.search'),     path: '/search' },
-  { key: 'library',     icon: '📁', label: t('nav.library'),    path: '/library' },
-  { key: 'purchases',   icon: '💳', label: t('nav.purchases'),  path: '/purchases' },
-  { key: 'collections', icon: '📦', label: t('nav.collections'), path: '/collections' },
-  { key: 'inbox',       icon: '📬', label: t('nav.inbox'),        path: '/inbox' },
+  { key: 'home',         icon: '🏠', label: t('nav.home'),         path: '/' },
+  { key: 'books',        icon: '📚', label: t('nav.books'),        path: '/books' },
+  { key: 'articles',     icon: '📰', label: t('nav.articles'),     path: '/articles' },
+  { key: 'authors',      icon: '✍️',  label: t('nav.authors'),     path: '/authors' },
+  { key: 'library',      icon: '📁', label: t('nav.library'),      path: '/library' },
+  { key: 'subscription', icon: '👑', label: t('nav.subscription'), path: '/subscription' },
+  { key: 'collections',  icon: '📦', label: t('nav.collections'),  path: '/collections' },
+  { key: 'inbox',        icon: '📬', label: t('nav.inbox'),        path: '/inbox' },
 ])
 
 const bottomItems = computed(() => [
@@ -49,6 +45,7 @@ function navigate(path: string) {
 
 async function handleLogout() {
   await authStore.logout()
+  uiStore.closeSidebar()
   router.push('/auth')
 }
 </script>
@@ -77,17 +74,26 @@ async function handleLogout() {
       </div>
     </button>
 
-    <!-- User pill -->
+    <!-- User pill: subscription status -->
     <div v-if="authStore.user" class="px-3 py-3 border-b border-gray-100 dark:border-gray-800">
-      <div class="flex items-center gap-2.5 px-2 py-2 rounded-xl bg-gray-50 dark:bg-surface-800">
+      <button
+        type="button"
+        class="flex w-full items-center gap-2.5 px-2 py-2 rounded-xl bg-gray-50 text-left transition-colors hover:bg-gray-100 dark:bg-surface-800 dark:hover:bg-surface-700"
+        @click="navigate('/subscription')"
+      >
         <div class="w-8 h-8 rounded-full bg-brand-200 dark:bg-brand-800 flex items-center justify-center text-brand-700 dark:text-brand-300 font-semibold text-sm">
           {{ authStore.displayName.charAt(0).toUpperCase() }}
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ authStore.displayName }}</div>
-          <div class="text-xs text-gray-400 truncate">{{ purchasesStore.coinBalance }} coins</div>
+          <div v-if="authStore.isSubscribed" class="text-xs font-semibold text-amber-600 dark:text-amber-400 truncate">
+            👑 {{ t('subscription.premiumActive') }}
+          </div>
+          <div v-else class="text-xs text-gray-400 truncate">
+            {{ t('subscription.freePlan') }} · <span class="text-brand-600 dark:text-brand-400">{{ t('subscription.upgrade') }}</span>
+          </div>
         </div>
-      </div>
+      </button>
     </div>
 
     <!-- Nav -->
@@ -114,9 +120,17 @@ async function handleLogout() {
         <span class="text-base leading-none">{{ item.icon }}</span>
         <span>{{ item.label }}</span>
       </button>
-      <button class="nav-link w-full text-left text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" @click="handleLogout">
+      <button
+        v-if="authStore.isLoggedIn"
+        class="nav-link w-full text-left text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+        @click="handleLogout"
+      >
         <span>🚪</span>
         <span>{{ t('nav.logout') }}</span>
+      </button>
+      <button v-else class="nav-link w-full text-left" @click="navigate('/auth')">
+        <span>🔐</span>
+        <span>{{ t('nav.login') }}</span>
       </button>
     </div>
   </aside>

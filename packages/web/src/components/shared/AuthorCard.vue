@@ -4,7 +4,7 @@ import { computed } from 'vue'
 
 const props = defineProps<{ author: Author }>()
 
-const avatarUrl = computed(() => (props.author.thumbnail ?? props.author.avatar_url ?? props.author.avatar ?? '') as string)
+const avatarUrl = computed(() => props.author.thumbnail ?? props.author.avatar_url ?? '')
 const booksCount = computed(() => Number(props.author.bookscount ?? props.author.books_count ?? 0))
 const articlesCount = computed(() => Number(props.author.articlescount ?? props.author.articles_count ?? 0))
 </script>

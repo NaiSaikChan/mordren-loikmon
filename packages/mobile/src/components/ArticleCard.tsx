@@ -8,10 +8,8 @@ import { PriceBadge } from './PriceBadge'
 /** Horizontal list-row card for an article. */
 export function ArticleCard({ article }: { article: Article }) {
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const thumb = fixUrl(
-    (article.thumbnail_url as string) ?? (article.thumbnail as string) ?? '',
-  )
-  const category = (article.categoryname as string) ?? (article.cat as string) ?? ''
+  const thumb = fixUrl(article.thumbnail_url || article.thumbnail)
+  const category = article.categoryname ?? ''
   return (
     <Link href={{ pathname: '/articles/[id]', params: { id: String(article.id) } }} asChild>
       <Pressable className="mb-3 flex-row rounded-xl bg-white dark:bg-surface-800 p-3">
@@ -38,7 +36,7 @@ export function ArticleCard({ article }: { article: Article }) {
           ) : null}
           
           <View className="mt-1">
-            <PriceBadge item={article as unknown as Record<string, unknown>} />
+            <PriceBadge item={article} />
           </View>
         </View>
       </Pressable>

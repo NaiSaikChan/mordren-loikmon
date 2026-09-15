@@ -31,9 +31,9 @@ export function BookCard({
   variant?: 'carousel' | 'grid'
 }) {
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const cover = pickCover(book as unknown as Record<string, unknown>)
-  const author = (book.authorname as string) ?? (book.author as string) ?? ''
-  const category = (book.categoryname as string) ?? (book.cat as string) ?? ''
+  const cover = pickCover(book)
+  const author = book.authorname ?? ''
+  const category = book.categoryname ?? ''
 
   const isGrid = variant === 'grid'
 
@@ -106,7 +106,7 @@ export function BookCard({
           </View>
 
           <View style={styles.badgeRow}>
-            <PriceBadge item={book as unknown as Record<string, unknown>} />
+            <PriceBadge item={book} />
           </View>
         </Pressable>
       </Link>

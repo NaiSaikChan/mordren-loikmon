@@ -44,13 +44,14 @@
       "expo-router",
       "expo-localization",
       "expo-secure-store",
-      "expo-audio"
+      "expo-audio",
+      "expo-iap"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://loikmon.org/webapis/"
+      "apiBaseUrl": "https://api.loikmon.org/api/v1"
     }
   }
 }

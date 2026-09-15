@@ -28,6 +28,9 @@ jobs:
         run: npm run build:web
         env:
           NODE_ENV: production
+          # GitHub Pages has no /api proxy: call the backend directly.
+          # Add this site's origin to EXTRA_CORS_ORIGINS on the server.
+          VITE_API_BASE: https://api.loikmon.org/api/v1
 
       - name: Add .nojekyll
         run: touch packages/web/dist/.nojekyll

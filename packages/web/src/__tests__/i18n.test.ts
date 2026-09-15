@@ -18,9 +18,14 @@ function flatKeys(obj: Record<string, any>, prefix = ''): string[] {
 const enKeys  = new Set(flatKeys(en  as any))
 const monKeys = new Set(flatKeys(mon as any))
 
-const criticalSections = ['nav', 'common', 'auth', 'books', 'articles', 'authors', 'search', 'library', 'purchases', 'settings']
+const criticalSections = ['nav', 'common', 'auth', 'books', 'articles', 'authors', 'search', 'library', 'subscription', 'paywall', 'access', 'reviews', 'settings']
 
 describe('i18n', () => {
+  it('has no coin / bank / coupon keys left', () => {
+    const obsolete = [...enKeys, ...monKeys].filter(k => /^purchases\.|coin|coupon|bank/i.test(k))
+    expect(obsolete).toEqual([])
+  })
+
   describe('en.json completeness', () => {
     for (const section of criticalSections) {
       it(`has [${section}] section`, () => {

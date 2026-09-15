@@ -3,6 +3,7 @@ import { useI18n } from 'vue-i18n'
 import AboutFeatureCard from '@/components/about/AboutFeatureCard.vue'
 import AboutPolicyCard from '@/components/about/AboutPolicyCard.vue'
 import AboutStatCard from '@/components/about/AboutStatCard.vue'
+import { PRIVACY_URL, TERMS_URL } from '@/config'
 
 const { t } = useI18n()
 
@@ -62,10 +63,10 @@ const policyCards = [
     icon: '📜',
     title: 'Terms & Conditions',
     description: 'A transparent framework for readers, authors, payments, platform availability, and fair use.',
-    href: 'https://loikmon.org/webapis/terms',
+    href: TERMS_URL,
     points: [
       'Authors retain 100% ownership of their content.',
-      'Readers use accessed or purchased works for personal use only.',
+      'Readers use free works, or works unlocked by their subscription, for personal use only.',
       'LoikMon collects a small commission to support platform operations.',
     ],
   },
@@ -73,10 +74,10 @@ const policyCards = [
     icon: '🔐',
     title: 'Privacy Policy',
     description: 'A privacy-first summary of how LoikMon collects, uses, protects, and handles platform information.',
-    href: 'https://loikmon.org/webapis/privacy',
+    href: PRIVACY_URL,
     points: [
       'LoikMon does not sell, rent, or trade personal user data.',
-      'Payment details are handled by trusted third-party payment providers.',
+      'Subscription payments are processed by Google Play and the App Store; LoikMon never sees card details.',
       'Users can access, update, clarify, or request deletion of account data.',
     ],
   },

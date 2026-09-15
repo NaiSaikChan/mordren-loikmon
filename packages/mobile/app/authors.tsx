@@ -9,12 +9,12 @@ import { useI18n } from '@/context/I18nContext'
 
 export default function AuthorsScreen() {
   const { t } = useI18n()
-  const { items, loading } = useAuthors()
+  const { items, loading, loadMore, refreshing, refresh } = useAuthors()
 
   return (
     <Screen edges={[]}>
       <Stack.Screen options={{ title: t('nav.authors') }} />
-      {loading ? (
+      {loading && items.length === 0 ? (
         <LoadingSpinner />
       ) : (
         <FlatList
@@ -22,6 +22,10 @@ export default function AuthorsScreen() {
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => <AuthorCard author={item} />}
           contentContainerStyle={{ padding: 16 }}
+          onEndReached={() => void loadMore()}
+          onEndReachedThreshold={0.5}
+          refreshing={refreshing}
+          onRefresh={() => void refresh()}
           ListEmptyComponent={<EmptyState icon="👤" title={t('authors.noAuthors')} />}
         />
       )}

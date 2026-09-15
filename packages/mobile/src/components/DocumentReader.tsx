@@ -127,21 +127,41 @@ function applyFont(
 // Download helper
 // ---------------------------------------------------------------------------
 
-async function downloadEpub(remoteUrl: string): Promise<string> {
-  const filename = remoteUrl.split('/').pop()?.split('?')[0] ?? 'book.epub'
+class HttpStatusError extends Error {
+  constructor(readonly status: number) {
+    super(`EPUB download failed: HTTP ${status}`)
+  }
+}
+
+/** Signed URLs expire: S3/MinIO answer 403 (or 400/401) once the signature is stale. */
+function isExpiredStatus(status: number): boolean {
+  return status === 400 || status === 401 || status === 403
+}
+
+/**
+ * Download an EPUB into the cache. The cache file is keyed by book id + format
+ * (never by the signed URL, whose query string changes on every request), and
+ * is only committed after a successful download.
+ */
+async function downloadEpub(remoteUrl: string, cacheKey: string): Promise<string> {
+  const safeKey = cacheKey.replace(/[^a-zA-Z0-9._-]/g, '_')
   const dir = (FileSystem.cacheDirectory ?? '') + 'epubs/'
-  const localUri = dir + filename
+  const localUri = `${dir}${safeKey}.epub`
+  const partUri = `${localUri}.part`
   const dirInfo = await FileSystem.getInfoAsync(dir)
   if (!dirInfo.exists) {
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
   }
   const fileInfo = await FileSystem.getInfoAsync(localUri)
-  if (fileInfo.exists) return localUri
-  const result = await FileSystem.downloadAsync(remoteUrl, localUri)
-  if (result.status !== 200) {
-    throw new Error(`EPUB download failed: HTTP ${result.status}`)
+  if (fileInfo.exists && (fileInfo.size ?? 0) > 0) return localUri
+  try {
+    const result = await FileSystem.downloadAsync(remoteUrl, partUri)
+    if (result.status !== 200) throw new HttpStatusError(result.status)
+    await FileSystem.moveAsync({ from: partUri, to: localUri })
+    return localUri
+  } finally {
+    await FileSystem.deleteAsync(partUri, { idempotent: true }).catch(() => undefined)
   }
-  return result.uri
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +196,11 @@ function useCustomFontUris(): { uris: Record<string, string>; loading: boolean }
   return { uris, loading }
 }
 
-function useEpubDownload(url: string): {
+function useEpubDownload(
+  url: string,
+  cacheKey: string,
+  refreshUrl?: () => Promise<string | null>,
+): {
   localUri: string | null
   downloading: boolean
   error: string | null
@@ -184,20 +208,33 @@ function useEpubDownload(url: string): {
   const [localUri, setLocalUri] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const refreshRef = useRef(refreshUrl)
+  refreshRef.current = refreshUrl
 
   useEffect(() => {
     let cancelled = false
     setLocalUri(null)
     setError(null)
     setDownloading(true)
-    downloadEpub(url)
+    ;(async () => {
+      try {
+        return await downloadEpub(url, cacheKey)
+      } catch (err) {
+        // The signed URL may have expired before the download started: fetch a fresh one once.
+        if (err instanceof HttpStatusError && isExpiredStatus(err.status) && refreshRef.current) {
+          const fresh = await refreshRef.current()
+          if (fresh) return downloadEpub(fresh, cacheKey)
+        }
+        throw err
+      }
+    })()
       .then((uri) => { if (!cancelled) setLocalUri(uri) })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Download failed')
       })
       .finally(() => { if (!cancelled) setDownloading(false) })
     return () => { cancelled = true }
-  }, [url])
+  }, [url, cacheKey])
 
   return { localUri, downloading, error }
 }
@@ -658,10 +695,18 @@ function EpubReaderView({
 // Outer EPUB component — provides fonts + download, then renders ReaderProvider
 // ---------------------------------------------------------------------------
 
-function EpubDocumentReader({ url }: { url: string }) {
+function EpubDocumentReader({
+  url,
+  cacheKey,
+  refreshUrl,
+}: {
+  url: string
+  cacheKey: string
+  refreshUrl?: () => Promise<string | null>
+}) {
   const { bodyFontFamily } = useTypography()
   const { uris: customFontUris, loading: fontLoading } = useCustomFontUris()
-  const { localUri, downloading, error } = useEpubDownload(url)
+  const { localUri, downloading, error } = useEpubDownload(url, cacheKey, refreshUrl)
   // Settings are owned here so they're loaded before EpubReaderView mounts.
   // This ensures the initial theme passed to <Reader defaultTheme={}> is correct
   // and prevents the render-loop caused by a stale default vs loaded settings.
@@ -716,15 +761,37 @@ function EpubDocumentReader({ url }: { url: string }) {
 // PDF reader (unchanged — WebView-based)
 // ---------------------------------------------------------------------------
 
-function PdfDocumentReader({ url }: { url: string }) {
+/**
+ * Android WebView cannot render PDFs, so they go through the Google Docs
+ * viewer. The signed URL must be passed as ONE query parameter — fully
+ * percent-encoded — or its own `&X-Amz-…` parameters would be read as gview's.
+ */
+export function pdfViewerUri(url: string, os: string = Platform.OS): string {
+  return os === 'android' ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}` : url
+}
+
+function PdfDocumentReader({ url, refreshUrl }: { url: string; refreshUrl?: () => Promise<string | null> }) {
   const [error, setError] = useState<string | null>(null)
-  const uri = useMemo(
-    () =>
-      Platform.OS === 'android'
-        ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}`
-        : url,
-    [url],
-  )
+  const [currentUrl, setCurrentUrl] = useState(url)
+  const refreshed = useRef(false)
+  useEffect(() => {
+    setCurrentUrl(url)
+    refreshed.current = false
+  }, [url])
+  const uri = useMemo(() => pdfViewerUri(currentUrl), [currentUrl])
+
+  const onHttpError = async (status: number) => {
+    // Expired signature: fetch a fresh signed URL once, then give up.
+    if (isExpiredStatus(status) && refreshUrl && !refreshed.current) {
+      refreshed.current = true
+      const fresh = await refreshUrl().catch(() => null)
+      if (fresh) {
+        setCurrentUrl(fresh)
+        return
+      }
+    }
+    setError(`HTTP ${status}`)
+  }
 
   const renderLoading = () => (
     <View style={styles.centered}>
@@ -746,6 +813,7 @@ function PdfDocumentReader({ url }: { url: string }) {
       startInLoadingState
       renderLoading={renderLoading}
       onError={(e) => setError(e.nativeEvent.description)}
+      onHttpError={(e) => void onHttpError(e.nativeEvent.statusCode)}
       allowFileAccess
       allowUniversalAccessFromFileURLs
       mixedContentMode="always"
@@ -758,12 +826,27 @@ function PdfDocumentReader({ url }: { url: string }) {
 // Public DocumentReader — dispatches by format
 // ---------------------------------------------------------------------------
 
-export function DocumentReader({ source }: { source: string }) {
+export function DocumentReader({
+  source,
+  format,
+  cacheKey,
+  refreshUrl,
+}: {
+  /** Signed, short-lived file URL from `books.getFileUrl`. */
+  source: string
+  format?: 'pdf' | 'epub'
+  /** Stable cache identity, e.g. `book-12-epub`. */
+  cacheKey?: string
+  /** Fetches a fresh signed URL when the current one has expired. */
+  refreshUrl?: () => Promise<string | null>
+}) {
   const url = fixUrl(source)
-  const format = detectFormat(url)
+  const kind = format ?? detectFormat(url)
 
-  if (format === 'epub') return <EpubDocumentReader url={url} />
-  return <PdfDocumentReader url={url} />
+  if (kind === 'epub') {
+    return <EpubDocumentReader url={url} cacheKey={cacheKey ?? `epub-${url.split('?')[0]}`} refreshUrl={refreshUrl} />
+  }
+  return <PdfDocumentReader url={url} refreshUrl={refreshUrl} />
 }
 
 // ---------------------------------------------------------------------------

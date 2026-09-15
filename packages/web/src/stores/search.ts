@@ -7,28 +7,35 @@ export const useSearchStore = defineStore('search', () => {
   const results = ref<SearchResults | null>(null)
   const loading = ref(false)
   const query = ref('')
+  let requestId = 0
 
   async function search(q: string) {
-    if (!q.trim()) { results.value = null; return }
-    query.value = q
+    const term = q.trim()
+    if (!term) { results.value = null; return }
+    query.value = term
     loading.value = true
+    const id = ++requestId
     try {
-      // Fetch books (type=0) and articles (type=1) in parallel
-      const [booksRes, articlesRes] = await Promise.all([
-        searchApi.search(q, 0, 0),
-        searchApi.search(q, 1, 0),
-      ])
-      const books  = (booksRes.data as any)?.search   ?? []
-      const articles = (articlesRes.data as any)?.search ?? []
-      results.value = { books, articles }
+      const { data } = await searchApi.search(term, { type: 'all', limit: 20 })
+      if (id !== requestId) return
+      results.value = {
+        ...data,
+        books: data.books ?? [],
+        articles: data.articles ?? [],
+        authors: data.authors ?? [],
+      }
+    } catch {
+      if (id === requestId) results.value = null
     } finally {
-      loading.value = false
+      if (id === requestId) loading.value = false
     }
   }
 
   function clear() {
+    requestId++
     results.value = null
     query.value = ''
+    loading.value = false
   }
 
   return { results, loading, query, search, clear }

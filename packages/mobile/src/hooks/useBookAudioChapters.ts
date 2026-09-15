@@ -1,70 +1,69 @@
-import { useCallback, useEffect, useState } from 'react'
-import { books as booksApi } from '@loikmon/api'
-import type { BookAudioChapter } from '@loikmon/api'
-import { chaptersToTracks, type AudioTrack } from '@/lib/audio'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { books as booksApi, errorMessage } from '@loikmon/api'
+import type { AccessInfo, BookChapter } from '@loikmon/api'
+import { useAuth } from '@/context/AuthContext'
+import { chaptersToTracks, type AudioTrack, type TrackSource } from '@/lib/audio'
 
 interface UseBookAudioChaptersResult {
-  chapters: BookAudioChapter[]
+  /** All chapters, including locked ones (shown with a lock, never played). */
+  chapters: BookChapter[]
+  /** Playable tracks only (unlocked chapters with a signed audio URL). */
   tracks: AudioTrack[]
+  access: AccessInfo | null
+  lockedCount: number
   loading: boolean
   error: string | null
   hasAudio: boolean
-  refetch: () => void
+  refetch: () => Promise<void>
 }
 
 /**
- * Fetch the audiobook chapters for a book via `getBookChapters`.
- *
- * The endpoint returns a success response when audio chapters exist and an
- * empty/error response otherwise. We treat any non-empty chapter list as
- * "has audio" and expose pre-built AudioTracks for the media player.
+ * Audiobook chapters via `books.getChapters`. Locked chapters come without
+ * `audio_url`; preview chapters stay open. Re-fetches when the entitlement
+ * changes (e.g. right after subscribing) so locks and URLs are current.
  */
-export function useBookAudioChapters(
-  bookId: string | number | undefined,
-  bookTitle?: string,
-): UseBookAudioChaptersResult {
-  const [chapters, setChapters] = useState<BookAudioChapter[]>([])
+export function useBookAudioChapters(bookId: string | number | undefined, book?: TrackSource): UseBookAudioChaptersResult {
+  const { user, entitlement } = useAuth()
+  const [chapters, setChapters] = useState<BookChapter[]>([])
+  const [access, setAccess] = useState<AccessInfo | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const accessKey = `${user?.id ?? ''}:${entitlement?.active ? 1 : 0}`
 
   const load = useCallback(async () => {
-    if (!bookId) {
+    if (bookId == null || String(bookId) === '') {
       setChapters([])
+      setAccess(null)
       setError(null)
       return
     }
-
     setLoading(true)
     setError(null)
     try {
-      const res = await booksApi.getAudioChapters(bookId)
-      const payload = res.data as Record<string, unknown>
-      const data = payload.data as unknown
-      const list: BookAudioChapter[] =
-        Array.isArray(data) ? data :
-        (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).chapters))
-          ? (data as Record<string, unknown>).chapters as BookAudioChapter[] :
-        Array.isArray(payload.chapters) ? payload.chapters as BookAudioChapter[] :
-        []
-      setChapters(list)
+      const { data } = await booksApi.getChapters(bookId)
+      setChapters(data.chapters ?? [])
+      setAccess(data.access ?? null)
     } catch (err) {
       setChapters([])
-      setError(err instanceof Error ? err.message : 'Failed to load audiobook chapters')
+      setError(errorMessage(err, 'Failed to load audiobook chapters'))
     } finally {
       setLoading(false)
     }
-  }, [bookId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookId, accessKey])
 
   useEffect(() => {
-    load()
+    void load()
   }, [load])
 
-  const tracks = chaptersToTracks(chapters, bookTitle).map((track, _index, all) => ({
-    ...track,
-    sourceBookId: track.sourceBookId ?? bookId,
-    queueLength: all.length,
-  }))
-  const hasAudio = tracks.length > 0
+  const title = book?.title
+  const author = book?.authorname
+  const cover = book?.thumbnail ?? book?.cover_url ?? book?.coverphoto
+  const tracks = useMemo(
+    () => chaptersToTracks(chapters, { id: bookId, title, authorname: author, thumbnail: cover }),
+    [chapters, bookId, title, author, cover],
+  )
+  const lockedCount = useMemo(() => chapters.filter((c) => c.locked).length, [chapters])
 
-  return { chapters, tracks, loading, error, hasAudio, refetch: load }
+  return { chapters, tracks, access, lockedCount, loading, error, hasAudio: chapters.length > 0, refetch: load }
 }

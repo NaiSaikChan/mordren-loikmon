@@ -14,8 +14,12 @@ export function MiniPlayer() {
   const hasQueue = queue.length > 1
 
   const openPlayer = () => {
-    const targetId = current.sourceBookId ?? current.id
+    const targetId = current.sourceBookId
     if (targetId === undefined || targetId === null) return
+    if (current.sourceType === 'article') {
+      router.push({ pathname: '/articles/[id]', params: { id: String(targetId) } })
+      return
+    }
     router.push({ pathname: '/audiobook/[id]', params: { id: String(targetId) } })
   }
 

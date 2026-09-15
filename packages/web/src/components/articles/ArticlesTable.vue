@@ -2,8 +2,10 @@
 import type { Article } from '@loikmon/api'
 import { shallowRef } from 'vue'
 import { RouterLink } from 'vue-router'
+import AccessBadge from '@/components/shared/AccessBadge.vue'
+import SaveButton from '@/components/shared/SaveButton.vue'
 
-const props = defineProps<{
+defineProps<{
   articles: Article[]
   sortOrder: 'asc' | 'desc'
 }>()
@@ -12,21 +14,13 @@ const emit = defineEmits<{
   'toggle-sort': []
 }>()
 
-// Local bookmark state — replaced entirely on each toggle so shallowRef tracks it
-const bookmarked = shallowRef(new Set<string | number>())
-const copied     = shallowRef<string | number | null>(null)
-
-function toggleBookmark(id: string | number) {
-  const next = new Set(bookmarked.value)
-  next.has(id) ? next.delete(id) : next.add(id)
-  bookmarked.value = next
-}
+const copied = shallowRef<string | number | null>(null)
 
 async function shareArticle(e: MouseEvent, article: Article) {
   e.preventDefault()
   const url = `${window.location.origin}/articles/${article.id}`
   if (navigator.share) {
-    try { await navigator.share({ title: String(article.title ?? ''), url }) } catch { /* cancelled */ }
+    try { await navigator.share({ title: article.title ?? '', url }) } catch { /* cancelled */ }
   } else {
     await navigator.clipboard.writeText(url)
     copied.value = article.id
@@ -41,15 +35,15 @@ function fmtViews(v: unknown) {
   return String(n)
 }
 
-function fmtDate(raw: unknown) {
+function fmtDate(raw: string | null | undefined) {
   if (!raw) return '—'
-  const d = new Date(raw as string)
+  const d = new Date(raw)
   if (isNaN(d.getTime())) return String(raw)
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-function articleDate(article: Article): unknown {
-  return article.articledate ?? article.updated_at ?? article.created_at ?? article.date
+function articleDate(article: Article) {
+  return article.articledate ?? article.published_at ?? article.updated_at ?? article.created_at ?? article.date
 }
 
 function fmtRating(r: unknown) {
@@ -57,17 +51,8 @@ function fmtRating(r: unknown) {
   return n > 0 ? n.toFixed(1) : null
 }
 
-function getArticlePrice(article: Article): { isFree: boolean; amount: number | null } {
-  const price = Number(article.price ?? article.amount ?? 0)
-  const isFree = article.is_free || price === 0
-  return { isFree, amount: isFree ? null : price }
-}
-
-function hasAudio(article: Article): boolean {
-  return Boolean(
-    (typeof article.audio_url === 'string' && article.audio_url.trim()) ||
-    (typeof article.audio === 'string' && article.audio.trim()),
-  )
+function thumb(article: Article) {
+  return article.thumbnail_url ?? article.thumbnail ?? ''
 }
 </script>
 
@@ -84,8 +69,8 @@ function hasAudio(article: Article): boolean {
         <RouterLink :to="`/articles/${article.id}`" tabindex="-1" class="shrink-0">
           <div class="w-28 h-28 object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 flex items-center justify-center bg-linear-to-br">
             <img
-              v-if="article.thumbnail_url || article.thumbnail"
-              :src="(article.thumbnail_url ?? article.thumbnail) as string"
+              v-if="thumb(article)"
+              :src="thumb(article)"
               :alt="article.title"
               class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
               loading="lazy"
@@ -103,28 +88,17 @@ function hasAudio(article: Article): boolean {
             </p>
           </RouterLink>
 
-          <!-- category, coin -->
+          <!-- category, access -->
           <div class="mt-1 flex flex-wrap gap-1">
             <span
-              v-if="article.categoryname || article.category"
+              v-if="article.categoryname"
               class="px-2 py-0.5 bg-brand-600 text-white text-xs font-semibold rounded-full"
             >
-              {{ (article.categoryname ?? article.category) as string }}
+              {{ article.categoryname }}
             </span>
+              <AccessBadge :item="article" />
             <span
-              v-if="getArticlePrice(article).isFree"
-              class="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full"
-            >
-              Free
-            </span>
-            <span
-              v-else-if="getArticlePrice(article).amount"
-              class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full"
-            >
-              🪙 {{ getArticlePrice(article).amount }} coins
-            </span>
-            <span
-              v-if="hasAudio(article)"
+              v-if="article.has_audio"
               class="px-2 py-0.5 bg-purple-500 text-white text-xs font-semibold rounded-full"
               title="Audio available"
               aria-label="Audio available"
@@ -135,13 +109,13 @@ function hasAudio(article: Article): boolean {
 
           <!-- author, date -->
           <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
-            <span v-if="article.authorname || article.author" class="truncate">✍️ {{ (article.authorname ?? article.author) as string }}</span>
+            <span v-if="article.authorname" class="truncate">✍️ {{ article.authorname }}</span>
             <span>📅 {{ fmtDate(articleDate(article)) }}</span>
           </div>
 
           <!-- view, rating -->
           <div class="mt-1 flex items-center gap-3 text-xs">
-            <span class="text-gray-700 dark:text-gray-300">👁️ {{ fmtViews(article.views ?? article.total_views) }}</span>
+            <span class="text-gray-700 dark:text-gray-300">👁️ {{ fmtViews(article.views) }}</span>
             <span v-if="fmtRating(article.rating)" class="text-yellow-500 font-semibold">⭐ {{ fmtRating(article.rating) }}</span>
           </div>
 
@@ -154,16 +128,7 @@ function hasAudio(article: Article): boolean {
             >
               {{ copied === article.id ? '✅' : '🔗' }}
             </button>
-            <button
-              class="p-1.5 rounded-lg transition-colors text-base leading-none"
-              :class="bookmarked.has(article.id)
-                ? 'text-brand-500 hover:bg-brand-50 dark:hover:bg-surface-700'
-                : 'text-gray-400 hover:text-brand-500 hover:bg-gray-100 dark:hover:bg-surface-700'"
-              :title="bookmarked.has(article.id) ? 'Saved' : 'Save'"
-              @click="toggleBookmark(article.id)"
-            >
-              {{ bookmarked.has(article.id) ? '🔖' : '☆' }}
-            </button>
+            <SaveButton item-type="article" :item-id="article.id" variant="icon" />
           </div>
         </div>
       </div>
@@ -221,8 +186,8 @@ function hasAudio(article: Article): boolean {
             <RouterLink :to="`/articles/${article.id}`" tabindex="-1">
               <div class="w-56 md:w-48 h-auto object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0 flex items-center justify-center bg-linear-to-br">
                 <img
-                  v-if="article.thumbnail_url || article.thumbnail"
-                  :src="(article.thumbnail_url ?? article.thumbnail) as string"
+                  v-if="thumb(article)"
+                  :src="thumb(article)"
                   :alt="article.title"
                   class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                   loading="lazy"
@@ -241,25 +206,14 @@ function hasAudio(article: Article): boolean {
             </RouterLink>
             <div class="mt-1 flex flex-wrap gap-1 py-3.5">
               <span
-                v-if="article.categoryname || article.category"
+                v-if="article.categoryname"
                 class="px-2 py-0.5 bg-brand-600 text-white text-xs font-semibold rounded-full"
               >
-                {{ (article.categoryname ?? article.category) as string }}
+                {{ article.categoryname }}
               </span>
+              <AccessBadge :item="article" />
               <span
-                v-if="getArticlePrice(article).isFree"
-                class="px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full"
-              >
-                Free
-              </span>
-              <span
-                v-else-if="getArticlePrice(article).amount"
-                class="px-2 py-0.5 bg-yellow-500 text-white text-xs font-bold rounded-full"
-              >
-                🪙 {{ getArticlePrice(article).amount }} coins
-              </span>
-              <span
-                v-if="hasAudio(article)"
+                v-if="article.has_audio"
                 class="px-2 py-0.5 bg-purple-500 text-white text-xs font-semibold rounded-full"
                 title="Audio available"
                 aria-label="Audio available"
@@ -271,8 +225,8 @@ function hasAudio(article: Article): boolean {
 
           <!-- Author -->
           <td class="px-4 py-3 text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">
-            <span v-if="article.authorname || article.author">
-              ✍️ {{ (article.authorname ?? article.author) as string }}
+            <span v-if="article.authorname">
+              ✍️ {{ article.authorname }}
             </span>
             <span v-else class="text-gray-400">—</span>
           </td>
@@ -286,7 +240,7 @@ function hasAudio(article: Article): boolean {
           <td class="px-4 py-3">
             <div class="flex flex-col gap-0.5 text-xs">
               <span class="text-gray-700 dark:text-gray-300">
-                👁️ {{ fmtViews(article.views ?? article.total_views) }}
+                👁️ {{ fmtViews(article.views) }}
               </span>
               <span v-if="fmtRating(article.rating)" class="text-yellow-500 font-semibold">
                 ⭐ {{ fmtRating(article.rating) }}
@@ -305,17 +259,8 @@ function hasAudio(article: Article): boolean {
               >
                 {{ copied === article.id ? '✅' : '🔗' }}
               </button>
-              <!-- Bookmark -->
-              <button
-                class="p-1.5 rounded-lg transition-colors text-base leading-none"
-                :class="bookmarked.has(article.id)
-                  ? 'text-brand-500 hover:bg-brand-50 dark:hover:bg-surface-700'
-                  : 'text-gray-400 hover:text-brand-500 hover:bg-gray-100 dark:hover:bg-surface-700'"
-                :title="bookmarked.has(article.id) ? 'Saved' : 'Save'"
-                @click="toggleBookmark(article.id)"
-              >
-                {{ bookmarked.has(article.id) ? '🔖' : '☆' }}
-              </button>
+              <!-- Save to library -->
+              <SaveButton item-type="article" :item-id="article.id" variant="icon" />
             </div>
           </td>
         </tr>

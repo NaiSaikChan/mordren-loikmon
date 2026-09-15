@@ -7,16 +7,20 @@ import './assets/main.css'
 import "@fontsource/padauk/400.css";
 import "@fontsource/padauk/700.css";
 
+import { installApiClient } from './api'
 import { useAuthStore } from './stores/auth'
 
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
+
+// Configure @loikmon/api (base URL, bearer token, 401 handling) before any request.
+installApiClient({ pinia, router })
+
 app.use(router)
 app.use(i18n)
 
-// Restore persisted session before mounting so auth state is available immediately
-const authStore = useAuthStore()
-authStore.restore()
+// Validate the persisted session (auth.me()) — protected routes wait for it.
+void useAuthStore(pinia).restore()
 
 app.mount('#app')

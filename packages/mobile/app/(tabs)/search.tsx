@@ -5,6 +5,7 @@ import { Screen } from '@/components/Screen'
 import { SearchBar } from '@/components/SearchBar'
 import { BookCard } from '@/components/BookCard'
 import { ArticleCard } from '@/components/ArticleCard'
+import { AuthorCard } from '@/components/AuthorCard'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EmptyState } from '@/components/EmptyState'
 import { useSearch } from '@/hooks/useSearch'
@@ -12,7 +13,7 @@ import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
 export default function SearchScreen() {
   const { t } = useI18n()
-  const { books, articles, loading, searched, run } = useSearch()
+  const { books, articles, authors, loading, searched, run } = useSearch()
   const { q } = useLocalSearchParams<{ q?: string }>()
   const [text, setText] = useState(q ?? '')
   const { headerTextStyle, bodyTextStyle } = useTypography()
@@ -23,7 +24,7 @@ export default function SearchScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const hasResults = books.length > 0 || articles.length > 0
+  const hasResults = books.length > 0 || articles.length > 0 || authors.length > 0
 
   return (
     <Screen>
@@ -44,7 +45,7 @@ export default function SearchScreen() {
       {loading ? (
         <LoadingSpinner />
       ) : searched && !hasResults ? (
-        <EmptyState icon="🔍" title={t('search.noResults')} />
+        <EmptyState icon="🔍" title={t('search.noResults', { query: text.trim() })} />
       ) : !searched ? (
         <EmptyState icon="🔍" title={t('search.placeholder')} />
       ) : (
@@ -73,6 +74,19 @@ export default function SearchScreen() {
               <View className="px-4">
                 {articles.map((article) => (
                   <ArticleCard key={`a-${article.id}`} article={article} />
+                ))}
+              </View>
+            </>
+          ) : null}
+
+          {authors.length > 0 ? (
+            <>
+              <Text className="px-4 pt-4 pb-2 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                {t('nav.authors')}
+              </Text>
+              <View className="px-4">
+                {authors.map((author) => (
+                  <AuthorCard key={`u-${author.id}`} author={author} />
                 ))}
               </View>
             </>

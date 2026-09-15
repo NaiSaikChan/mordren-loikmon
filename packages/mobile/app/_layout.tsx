@@ -8,6 +8,7 @@ import { initApiClient } from '@/services/api'
 import { ThemeProvider, useTheme } from '@/context/ThemeContext'
 import { I18nProvider, useI18n } from '@/context/I18nContext'
 import { AuthProvider } from '@/context/AuthContext'
+import { SubscriptionProvider } from '@/context/SubscriptionContext'
 import { AudioProvider } from '@/context/AudioContext'
 import { LibraryProvider } from '@/context/LibraryContext'
 import { TypographyProvider, useTypography } from '@/context/TypographyContext'
@@ -46,6 +47,7 @@ function RootNavigator() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: tabsBackTitle }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="reader" options={{ title: '' }} />
+        <Stack.Screen name="subscribe" options={{ title: t('subscribe.title') }} />
         <Stack.Screen name="audio" options={{ title: '' }} />
         <Stack.Screen name="audiobook/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
@@ -77,11 +79,13 @@ export default function RootLayout() {
           <I18nProvider>
             <TypographyProvider>
               <AuthProvider>
-                <LibraryProvider>
-                  <AudioProvider>
-                    <RootNavigator />
-                  </AudioProvider>
-                </LibraryProvider>
+                <SubscriptionProvider>
+                  <LibraryProvider>
+                    <AudioProvider>
+                      <RootNavigator />
+                    </AudioProvider>
+                  </LibraryProvider>
+                </SubscriptionProvider>
               </AuthProvider>
             </TypographyProvider>
           </I18nProvider>

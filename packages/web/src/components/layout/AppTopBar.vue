@@ -39,8 +39,8 @@ function toggleLocale() {
   locale.value = next
 }
 
-function logout() {
-  authStore.logout()
+async function logout() {
+  await authStore.logout()
   router.push('/')
 }
 
@@ -110,9 +110,13 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
       <!-- Auth: Login button or user avatar+logout -->
       <template v-if="authStore.isLoggedIn">
         <div class="flex items-center gap-2 pl-1 border-l border-gray-200 dark:border-gray-700 ml-1">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:block truncate max-w-[100px]">
-            {{ authStore.displayName }}
-          </span>
+          <RouterLink
+            to="/subscription"
+            class="text-sm font-medium text-gray-700 dark:text-gray-300 hidden sm:block truncate max-w-[140px]"
+            :title="authStore.isSubscribed ? t('subscription.premiumActive') : t('subscription.freePlan')"
+          >
+            <span v-if="authStore.isSubscribed" aria-hidden="true">👑 </span>{{ authStore.displayName }}
+          </RouterLink>
           <button class="btn-ghost px-2.5 py-1.5 text-xs" @click="logout">
             {{ t('nav.logout') }}
           </button>
@@ -120,7 +124,7 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
       </template>
       <template v-else>
         <RouterLink
-          to="/auth"
+          :to="{ name: 'auth', query: route.path.startsWith('/auth') ? {} : { redirect: route.fullPath } }"
           class="ml-1 btn-primary px-3 py-1.5 text-xs"
         >
           {{ t('nav.login') }}

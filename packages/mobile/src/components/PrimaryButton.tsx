@@ -31,7 +31,7 @@ export function PrimaryButton({
   return (
     <Pressable
       {...props}
-      className={`${base} ${styles} ${loading ? 'opacity-70' : ''}`}
+      className={`${base} ${styles} ${loading || props.disabled ? 'opacity-60' : ''}`}
       disabled={loading || !!props.disabled}
     >
       {loading ? (

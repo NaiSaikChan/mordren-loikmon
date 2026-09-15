@@ -116,7 +116,14 @@ function buildFontFaceCSS(): string {
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
-const props = defineProps<{ url: string }>()
+const props = defineProps<{
+  /** Signed, short-lived URL of the EPUB. */
+  url: string
+  /** Book id: reading positions are stored per book because signed URLs change. */
+  bookId?: string | number
+  /** Requests a fresh signed URL when storage rejects an expired one (called at most once per load). */
+  refreshUrl?: () => Promise<string | null>
+}>()
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 const readerRoot = ref<HTMLDivElement | null>(null)
@@ -245,7 +252,13 @@ function fixUrl(url: string): string {
 
 // ─── Book key for position persistence ───────────────────────────────────────
 function bookKey(): string {
+  if (props.bookId != null && props.bookId !== '') return `epub-cfi-book-${props.bookId}`
   try { return `epub-cfi-${btoa(props.url)}` } catch { return `epub-cfi-${props.url}` }
+}
+
+/** Storage answers expired signed URLs with 401/403 (S3/MinIO) or 410. */
+function isExpiredUrlStatus(status: number): boolean {
+  return status === 401 || status === 403 || status === 410
 }
 
 // ─── Apply reader styles to the epubjs iframe ─────────────────────────────────
@@ -515,8 +528,15 @@ async function render(url: string) {
   try {
     // Fetch the EPUB as an ArrayBuffer. This avoids any URL escaping/CORS issues
     // when epubjs internally re-fetches the archive.
-    const fixedUrl = fixUrl(url)
-    const blobRes  = await fetch(fixedUrl, { mode: 'cors', credentials: 'omit' })
+    let fixedUrl = fixUrl(url)
+    let blobRes  = await fetch(fixedUrl, { mode: 'cors', credentials: 'omit' })
+    if (!blobRes.ok && isExpiredUrlStatus(blobRes.status) && props.refreshUrl) {
+      // The signed URL expired: ask the server for a new one and retry once.
+      const freshUrl = await props.refreshUrl()
+      if (!freshUrl) throw new Error('This book is no longer available to your account.')
+      fixedUrl = fixUrl(freshUrl)
+      blobRes = await fetch(fixedUrl, { mode: 'cors', credentials: 'omit' })
+    }
     if (!blobRes.ok) throw new Error(`Failed to download EPUB: ${blobRes.status} ${blobRes.statusText}`)
     const buffer = await blobRes.arrayBuffer()
 

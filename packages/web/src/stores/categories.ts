@@ -1,25 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { categories as catApi } from '@loikmon/api'
+import type { Category } from '@loikmon/api'
 
 export const useCategoriesStore = defineStore('categories', () => {
-  const list = ref<any[]>([])
+  const list = ref<Category[]>([])
   const loading = ref(false)
 
-  async function fetchCategories(type: 'book' | 'article' = 'book', page = 0) {
+  /** Categories for books or articles; omit `type` for all. */
+  async function fetchCategories(type?: 'book' | 'article') {
     loading.value = true
     try {
-      const res = await catApi.fetchCategories(type, page)
-      const body = res.data as any
-      list.value = body.categories ?? []
-    } finally { loading.value = false }
+      const { data } = await catApi.fetchCategories(type)
+      list.value = data.categories ?? []
+    } catch {
+      list.value = []
+    } finally {
+      loading.value = false
+    }
+    return list.value
   }
 
-  async function fetchBooksByCategory(cat: string | number, sub?: string | number, page = 0) {
-    const res = await catApi.fetchBooksByCategory(cat, sub, page)
-    const body = res.data as any
-    return body.books ?? []
-  }
-
-  return { list, loading, fetchCategories, fetchBooksByCategory }
+  return { list, loading, fetchCategories }
 })

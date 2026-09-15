@@ -41,22 +41,22 @@ watch(
 
     <div v-else-if="store.results">
       <section v-if="store.results.books?.length" class="mb-8">
-        <h2 class="section-title">📚 Books</h2>
+        <h2 class="section-title">📚 {{ t('books.title') }}</h2>
         <div class="content-grid">
           <BookCard v-for="b in store.results.books" :key="b.id" :book="b" />
         </div>
       </section>
 
       <section v-if="store.results.articles?.length" class="mb-8">
-        <h2 class="section-title">📰 Articles</h2>
+        <h2 class="section-title">📰 {{ t('articles.title') }}</h2>
         <div class="space-y-3">
           <ArticleCard v-for="a in store.results.articles" :key="a.id" :article="a" />
         </div>
       </section>
 
       <section v-if="store.results.authors?.length" class="mb-8">
-        <h2 class="section-title">✍️ Authors</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <h2 class="section-title">✍️ {{ t('authors.title') }}</h2>
+        <div class="authors-grid">
           <AuthorCard v-for="a in store.results.authors" :key="a.id" :author="a" />
         </div>
       </section>
