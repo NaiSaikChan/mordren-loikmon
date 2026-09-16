@@ -183,7 +183,7 @@ async function remove(slider: CmsSlider) {
         <div class="relative aspect-[21/9] bg-gray-100 dark:bg-gray-800">
           <img
             v-if="slider.image_key"
-            :src="slider.image_key.startsWith('http') ? slider.image_key : undefined"
+            :src="slider.image_url"
             :alt="slider.title ?? 'Slider image'"
             class="h-full w-full object-cover"
             loading="lazy"

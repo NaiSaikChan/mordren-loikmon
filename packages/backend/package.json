@@ -2,7 +2,7 @@
   "name": "@loikmon/backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Loikmon core backend \u2014 Express 5 + MySQL + Better Auth. Subscription entitlements verified with Google Play Billing & Apple App Store, content files in MinIO.",
+  "description": "Loikmon core backend — Express 5 + MySQL + Better Auth. Subscription entitlements verified with Google Play Billing & Apple App Store, content files in MinIO.",
   "type": "module",
   "main": "dist/index.js",
   "engines": {
@@ -34,7 +34,7 @@
     "google-auth-library": "^10.9.1",
     "helmet": "^8.3.0",
     "kysely": "^0.29.5",
-    "minio": "^8.0.7",
+    "minio": "^7.1.3",
     "multer": "^2.4.0",
     "mysql2": "^3.24.4",
     "nodemailer": "^10.0.10",

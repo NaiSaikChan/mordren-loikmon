@@ -23,11 +23,21 @@ import type { AssetKind, StorageService } from '../storage/storage.js'
  * they migrate automatically on first sign-in when LEGACY_API_BASE is set.
  */
 
-const args = new Set(process.argv.slice(2))
-const COPY_FILES = args.has('--files')
-const ALL_PAID = args.has('--all-paid')
+const args = process.argv.slice(2)
+/**
+ * Read `--name` / `--name=value` from argv, falling back to `npm_config_name`.
+ * Windows PowerShell drops the bare `--` in `npm run import:legacy -- --files`,
+ * so npm keeps the flag as its own config and the script gets no arguments.
+ */
+const option = (name: string): string | undefined => {
+  const arg = args.find((a) => a === `--${name}` || a.startsWith(`--${name}=`))
+  if (arg) return arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : 'true'
+  return process.env[`npm_config_${name.replace(/-/g, '_')}`]
+}
+const COPY_FILES = option('files') === 'true'
+const ALL_PAID = option('all-paid') === 'true'
 /** `--max-pages=2` limits each paginated list (useful for a trial run). */
-const MAX_PAGES = Number([...args].find((a) => a.startsWith('--max-pages='))?.split('=')[1] ?? 500)
+const MAX_PAGES = Number(option('max-pages') ?? 500)
 
 type Json = Record<string, unknown>
 
@@ -86,7 +96,7 @@ class LegacyClient {
       })
       if (!fresh.length) return
       yield fresh
-      if (body.isLastPage === true) return
+      // if (body.isLastPage === true) return
     }
   }
 }
@@ -145,6 +155,7 @@ async function main() {
   const { db, storage, logger } = container.ctx
   const legacy = new LegacyClient(config.legacyApiBase, logger)
   const stats = { categories: 0, authors: 0, books: 0, chapters: 0, articles: 0, files: 0 }
+  logger.info({ copyFiles: COPY_FILES, allPaid: ALL_PAID, maxPages: MAX_PAGES }, 'legacy import starting')
 
   try {
     // ── Categories (shared by books and articles in the legacy system) ──
@@ -248,7 +259,7 @@ async function main() {
     }
 
     // ── Articles ──
-    for await (const page of legacy.pages('fetcharticles', 'articles', (p) => ({ page: p, limit: 50, type: 1, query: '', category: 0 }))) {
+    for await (const page of legacy.pages('fetcharticles', 'articles', (p) => ({ page: p, limit: 500, type: 1, query: '', category: 0 }))) {
       for (const a of page) {
         const legacyId = String(a.id)
         const content = str(a.content) ?? ''

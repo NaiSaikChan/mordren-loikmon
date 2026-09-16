@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import logoUrl from '@/assets/logo.png'
 import { CMS_NAV } from '@/cms/navigation'
 import { useCmsSessionStore } from '@/cms/stores/session'
 
@@ -27,7 +28,7 @@ const roleLabel = computed(() => session.session?.roles.map((r) => r.name).join(
   >
     <div class="flex h-14 shrink-0 items-center gap-2 border-b border-gray-100 px-4 dark:border-gray-800">
       <RouterLink to="/" class="flex min-w-0 items-center gap-2 no-underline" title="Back to the site">
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand-600 text-sm font-bold text-white">L</span>
+        <img :src="logoUrl" alt="Loikmon logo" class="h-7 w-7 shrink-0 rounded-lg object-cover" />
         <span class="truncate text-sm font-semibold text-gray-900 dark:text-white">Loikmon CMS</span>
       </RouterLink>
       <button

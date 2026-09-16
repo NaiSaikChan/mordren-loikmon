@@ -51,6 +51,10 @@ const SliderInput = z.object({
 export function taxonomyRouter(ctx: AppContext) {
   const router = Router()
   const taxonomy = ctx.services.cmsTaxonomy
+  const withSliderImageUrl = <T extends { image_key: string }>(slider: T) => ({
+    ...slider,
+    image_url: ctx.storage.publicUrl(slider.image_key) ?? slider.image_key,
+  })
 
   // ── Authors ────────────────────────────────────────────────────────────
 
@@ -186,24 +190,26 @@ export function taxonomyRouter(ctx: AppContext) {
 
   router.get('/sliders', requirePermission('sliders.view'), async (req, res) => {
     const q = parse(z.object({ placement: z.string().trim().max(32).optional() }), req.query)
-    res.json({ status: 'ok', sliders: await taxonomy.listSliders(q) })
+    const sliders = await taxonomy.listSliders(q)
+    res.json({ status: 'ok', sliders: sliders.map(withSliderImageUrl) })
   })
 
   router.post('/sliders', requirePermission('sliders.create'), async (req, res) => {
     const slider = await taxonomy.createSlider(cmsContext(req), parse(SliderInput, req.body))
-    res.status(201).json({ status: 'ok', slider })
+    res.status(201).json({ status: 'ok', slider: withSliderImageUrl(slider) })
   })
 
   router.put('/sliders/order', requirePermission('sliders.edit'), async (req, res) => {
     const { ids } = parse(idsBody, req.body)
     await taxonomy.reorderSliders(cmsContext(req), ids)
-    res.json({ status: 'ok', sliders: await taxonomy.listSliders() })
+    const sliders = await taxonomy.listSliders()
+    res.json({ status: 'ok', sliders: sliders.map(withSliderImageUrl) })
   })
 
   router.patch('/sliders/:id', requirePermission('sliders.edit'), async (req, res) => {
     const { id } = parse(idParam, req.params)
     const slider = await taxonomy.updateSlider(cmsContext(req), id, parse(SliderInput.partial(), req.body))
-    res.json({ status: 'ok', slider })
+    res.json({ status: 'ok', slider: withSliderImageUrl(slider) })
   })
 
   router.delete('/sliders/:id', requirePermission('sliders.delete'), async (req, res) => {

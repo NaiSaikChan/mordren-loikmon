@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import appStoreBadge from '@/assets/Download_on_the_App_Store_RGB_blk.svg'
+import googlePlayBadge from '@/assets/Google_Play_Store_badge_EN.svg'
 import { APP_STORE_URL, PLAY_STORE_URL } from '@/config'
 
 const { t } = useI18n()
@@ -11,25 +13,21 @@ const { t } = useI18n()
       :href="PLAY_STORE_URL"
       target="_blank"
       rel="noopener"
-      class="inline-flex items-center gap-3 rounded-2xl bg-gray-900 px-4 py-2.5 text-white shadow-sm transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+      class="inline-flex transition-opacity hover:opacity-90"
+      :aria-label="t('subscription.getOnGooglePlay')"
       data-testid="store-google-play"
     >
-      <span class="text-2xl" aria-hidden="true">▶</span>
-      <span class="text-left leading-tight">
-        <span class="block text-sm font-semibold">{{ t('subscription.getOnGooglePlay') }}</span>
-      </span>
+      <img :src="googlePlayBadge" :alt="t('subscription.getOnGooglePlay')" class="h-[52px] w-auto" />
     </a>
     <a
       :href="APP_STORE_URL"
       target="_blank"
       rel="noopener"
-      class="inline-flex items-center gap-3 rounded-2xl bg-gray-900 px-4 py-2.5 text-white shadow-sm transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+      class="inline-flex transition-opacity hover:opacity-90"
+      :aria-label="t('subscription.downloadOnAppStore')"
       data-testid="store-app-store"
     >
-      <span class="text-2xl" aria-hidden="true">🍎</span>
-      <span class="text-left leading-tight">
-        <span class="block text-sm font-semibold">{{ t('subscription.downloadOnAppStore') }}</span>
-      </span>
+      <img :src="appStoreBadge" :alt="t('subscription.downloadOnAppStore')" class="h-[52px] w-auto" />
     </a>
   </div>
 </template>

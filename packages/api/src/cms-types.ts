@@ -267,6 +267,7 @@ export interface CmsSlider {
   id: Id
   title: string | null
   image_key: string
+  image_url: string
   link: string | null
   display_order: number
   is_active: boolean

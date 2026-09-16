@@ -256,6 +256,21 @@ describe.skipIf(!hasTestDatabase)('CMS moderation, feedback, policies & settings
       .send({ title: 'Next week', image_key: 'slider/t/b.jpg', is_active: true, starts_at: future })
     expect(live.status).toBe(201)
     expect(scheduled.status).toBe(201)
+    expect(live.body.slider).toMatchObject({
+      image_key: 'slider/t/a.jpg',
+      image_url: 'https://storage.test/public/slider/t/a.jpg',
+    })
+
+    const cmsSliders = await request(t.app).get('/api/v1/cms/sliders').set(bearer(admin))
+    expect(cmsSliders.status).toBe(200)
+    expect(cmsSliders.body.sliders).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          image_key: 'slider/t/a.jpg',
+          image_url: 'https://storage.test/public/slider/t/a.jpg',
+        }),
+      ]),
+    )
 
     const home = await request(t.app).get('/api/v1/home')
     const titles = home.body.sliders.map((s: { title: string }) => s.title)
