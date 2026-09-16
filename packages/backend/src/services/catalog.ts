@@ -448,8 +448,29 @@ export class CatalogService {
     }
   }
 
-  async listSliders() {
-    return this.db.selectFrom('sliders').selectAll().where('is_active', '=', true).orderBy('display_order').execute()
+  /**
+   * Active sliders for one viewer: inside their scheduling window, matching
+   * their audience rule and (optionally) a placement.
+   */
+  async listSliders(viewer: { isAuthenticated?: boolean; isSubscribed?: boolean; placement?: string; now?: Date } = {}) {
+    const now = viewer.now ?? new Date()
+    const audiences: string[] = ['all']
+    if (viewer.isAuthenticated) {
+      audiences.push('members')
+      audiences.push(viewer.isSubscribed ? 'subscribers' : 'non_subscribers')
+    } else {
+      audiences.push('guests', 'non_subscribers')
+    }
+    let q = this.db
+      .selectFrom('sliders')
+      .selectAll()
+      .where('is_active', '=', true)
+      .where((eb) => eb.or([eb('starts_at', 'is', null), eb('starts_at', '<=', now)]))
+      .where((eb) => eb.or([eb('ends_at', 'is', null), eb('ends_at', '>', now)]))
+      .where('audience', 'in', audiences as never)
+      .orderBy('display_order')
+    if (viewer.placement) q = q.where('placement', '=', viewer.placement)
+    return q.execute()
   }
 
   async listFaqs() {

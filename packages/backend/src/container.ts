@@ -7,9 +7,19 @@ import { createLogger, type Logger } from './lib/logger.js'
 import { createMailer, type Mailer } from './lib/mailer.js'
 import { AppleStoreService } from './payments/apple.js'
 import { GooglePlayService } from './payments/google.js'
+import { AuditService } from './services/audit.js'
 import { CatalogService } from './services/catalog.js'
+import { AnalyticsService } from './services/cms/analytics.js'
+import { CmsContentService } from './services/cms/content.js'
+import { CouponService } from './services/cms/coupons.js'
+import { FeedbackService } from './services/cms/feedback.js'
+import { ModerationService } from './services/cms/moderation.js'
+import { PolicyService } from './services/cms/policies.js'
+import { SettingsService } from './services/cms/settings.js'
+import { TaxonomyService } from './services/cms/taxonomy.js'
 import { EngagementService } from './services/engagement.js'
 import { LegacyAuthService } from './services/legacyAuth.js'
+import { RbacService } from './services/rbac.js'
 import { SubscriptionService } from './services/subscriptions.js'
 import { MinioStorageService, type StorageService } from './storage/storage.js'
 
@@ -65,6 +75,9 @@ export async function createContainer(
         ? new LegacyAuthService(config.legacyApiBase, logger.child({ component: 'legacy-auth' }))
         : null
 
+  const now = overrides.now ?? (() => new Date())
+  const audit = new AuditService(dbHandle.db, logger.child({ component: 'audit' }))
+
   const ctx: AppContext = {
     config,
     logger,
@@ -79,6 +92,16 @@ export async function createContainer(
       subscriptions: new SubscriptionService({ db: dbHandle.db, apple, google, logger: logger.child({ component: 'subscriptions' }), now: overrides.now }),
       catalog: new CatalogService(dbHandle.db),
       engagement: new EngagementService(dbHandle.db),
+      rbac: new RbacService(dbHandle.db, now),
+      audit,
+      cmsContent: new CmsContentService(dbHandle.db, storage, audit, now),
+      cmsTaxonomy: new TaxonomyService(dbHandle.db, storage, audit, now),
+      coupons: new CouponService(dbHandle.db, audit, now),
+      moderation: new ModerationService(dbHandle.db, audit, now),
+      feedback: new FeedbackService(dbHandle.db, audit, mailer, logger.child({ component: 'feedback' }), now),
+      policies: new PolicyService(dbHandle.db, audit, now),
+      settings: new SettingsService(dbHandle.db, audit),
+      analytics: new AnalyticsService(dbHandle.db),
     },
     healthChecks: {
       database: () => pingDb(dbHandle.db),

@@ -11,7 +11,9 @@ import { createRateLimiters } from './middleware/rateLimit.js'
 import { adminRouter } from './routes/admin.js'
 import { authRouter } from './routes/auth.js'
 import { catalogRouter } from './routes/catalog.js'
+import { cmsRouter } from './routes/cms/index.js'
 import { healthRouter } from './routes/health.js'
+import { siteRouter } from './routes/site.js'
 import { subscriptionsRouter } from './routes/subscriptions.js'
 import { webhooksRouter } from './routes/webhooks.js'
 
@@ -71,6 +73,10 @@ export function createApp(ctx: AppContext): Express {
   app.use('/api/v1/auth', authRouter(ctx, limiters))
   app.use('/api/v1/subscriptions', subscriptionsRouter(ctx, limiters))
   app.use('/api/v1/admin', adminRouter(ctx))
+  app.use('/api/v1/cms', cmsRouter(ctx))
+  // Public settings, policies, feedback and review reports. Mounted before the
+  // catalogue router so its /reviews/:id/report route is reached first.
+  app.use('/api/v1', siteRouter(ctx, limiters))
   app.use('/api/v1', catalogRouter(ctx))
 
   app.use(notFoundHandler)

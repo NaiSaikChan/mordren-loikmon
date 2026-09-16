@@ -69,9 +69,10 @@ export function catalogRouter(ctx: AppContext) {
 
   // ── Home ───────────────────────────────────────────────────────────────
 
-  router.get('/home', async (_req, res) => {
+  router.get('/home', async (req, res) => {
+    const entitlement = await getEntitlement(ctx, req)
     const [sliders, latest, popular, recommended, audio, articles, authors] = await Promise.all([
-      catalog.listSliders(),
+      catalog.listSliders({ isAuthenticated: Boolean(req.user), isSubscribed: entitlement?.active === true, placement: 'home' }),
       catalog.listBooks({ page: 1, limit: 12, sort: 'latest' }),
       catalog.listBooks({ page: 1, limit: 12, sort: 'popular' }),
       catalog.listBooks({ page: 1, limit: 12, recommended: true, sort: 'latest' }),
@@ -411,16 +412,31 @@ export function catalogRouter(ctx: AppContext) {
       req.body,
     )
     if (!(await catalog.itemExists(body.item_type, body.item_id))) throw errors.notFound(body.item_type === 'book' ? 'Book' : 'Article')
+    if (!(await ctx.services.settings.flag('features.reviews_enabled', true))) {
+      throw errors.serviceUnavailable('Reviews are currently disabled')
+    }
+    // With moderation on, a new review waits in the CMS queue instead of
+    // appearing straight away; the author still sees their own.
+    const needsApproval = await ctx.services.settings.flag('features.reviews_require_approval', false)
     const review = await engagement.upsertReview({
       userId: requireUser(req).id,
       itemType: body.item_type,
       itemId: body.item_id,
       rating: body.rating,
       content: body.content || null,
+      status: needsApproval ? 'pending' : 'published',
     })
     res.status(201).json({
       status: 'ok',
-      review: { id: review.id, rating: review.rating, content: review.content ?? '', username: review.user_name, created_at: review.created_at },
+      pending_moderation: needsApproval,
+      review: {
+        id: review.id,
+        rating: review.rating,
+        content: review.content ?? '',
+        username: review.user_name,
+        status: review.status,
+        created_at: review.created_at,
+      },
     })
   })
 

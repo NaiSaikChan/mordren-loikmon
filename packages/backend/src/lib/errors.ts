@@ -12,6 +12,14 @@ export const ErrorCode = {
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   EMAIL_TAKEN: 'EMAIL_TAKEN',
   FORBIDDEN: 'FORBIDDEN',
+  PERMISSION_DENIED: 'PERMISSION_DENIED',
+  OWNERSHIP_REQUIRED: 'OWNERSHIP_REQUIRED',
+  ROLE_PROTECTED: 'ROLE_PROTECTED',
+  INVALID_TRANSITION: 'INVALID_TRANSITION',
+  COUPON_INVALID: 'COUPON_INVALID',
+  COUPON_EXPIRED: 'COUPON_EXPIRED',
+  COUPON_EXHAUSTED: 'COUPON_EXHAUSTED',
+  COUPON_NOT_APPLICABLE: 'COUPON_NOT_APPLICABLE',
   NOT_FOUND: 'NOT_FOUND',
   CONFLICT: 'CONFLICT',
   PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
@@ -60,6 +68,23 @@ export const errors = {
   emailTaken: () => new AppError(409, ErrorCode.EMAIL_TAKEN, 'An account with this email already exists'),
   forbidden: (message = 'You do not have permission to perform this action') =>
     new AppError(403, ErrorCode.FORBIDDEN, message),
+  /** A named permission is missing; `details.required` tells the client which. */
+  permissionDenied: (required: string | string[]) =>
+    new AppError(403, ErrorCode.PERMISSION_DENIED, 'You do not have permission to perform this action', {
+      required: Array.isArray(required) ? required : [required],
+    }),
+  /** The actor holds the permission but the row belongs to somebody else. */
+  ownershipRequired: (resource = 'record') =>
+    new AppError(403, ErrorCode.OWNERSHIP_REQUIRED, `You can only manage your own ${resource}`),
+  roleProtected: (message = 'System roles cannot be modified') =>
+    new AppError(409, ErrorCode.ROLE_PROTECTED, message),
+  invalidTransition: (from: string, to: string) =>
+    new AppError(409, ErrorCode.INVALID_TRANSITION, `Cannot move from "${from}" to "${to}"`, { from, to }),
+  couponInvalid: (message = 'This coupon code is not valid') => new AppError(422, ErrorCode.COUPON_INVALID, message),
+  couponExpired: () => new AppError(422, ErrorCode.COUPON_EXPIRED, 'This coupon is outside its validity period'),
+  couponExhausted: () => new AppError(422, ErrorCode.COUPON_EXHAUSTED, 'This coupon has reached its redemption limit'),
+  couponNotApplicable: (message = 'This coupon does not apply to the selected item') =>
+    new AppError(422, ErrorCode.COUPON_NOT_APPLICABLE, message),
   notFound: (resource = 'Resource') => new AppError(404, ErrorCode.NOT_FOUND, `${resource} not found`),
   conflict: (message: string, details?: unknown) => new AppError(409, ErrorCode.CONFLICT, message, details),
   loginRequired: () => new AppError(401, ErrorCode.LOGIN_REQUIRED, 'Sign in to access this content'),

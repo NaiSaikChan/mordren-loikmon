@@ -7,9 +7,19 @@ import type { Logger } from '../lib/logger.js'
 import type { Mailer } from '../lib/mailer.js'
 import type { AppleStoreService } from '../payments/apple.js'
 import type { GooglePlayService } from '../payments/google.js'
+import type { AuditService } from '../services/audit.js'
 import type { CatalogService } from '../services/catalog.js'
+import type { AnalyticsService } from '../services/cms/analytics.js'
+import type { CmsContentService } from '../services/cms/content.js'
+import type { CouponService } from '../services/cms/coupons.js'
+import type { FeedbackService } from '../services/cms/feedback.js'
+import type { ModerationService } from '../services/cms/moderation.js'
+import type { PolicyService } from '../services/cms/policies.js'
+import type { SettingsService } from '../services/cms/settings.js'
+import type { TaxonomyService } from '../services/cms/taxonomy.js'
 import type { EngagementService } from '../services/engagement.js'
 import type { LegacyAuthService } from '../services/legacyAuth.js'
+import type { CmsActor, RbacService } from '../services/rbac.js'
 import type { SubscriptionService } from '../services/subscriptions.js'
 import type { StorageService } from '../storage/storage.js'
 
@@ -28,6 +38,16 @@ export interface AppContext {
     subscriptions: SubscriptionService
     catalog: CatalogService
     engagement: EngagementService
+    rbac: RbacService
+    audit: AuditService
+    cmsContent: CmsContentService
+    cmsTaxonomy: TaxonomyService
+    coupons: CouponService
+    moderation: ModerationService
+    feedback: FeedbackService
+    policies: PolicyService
+    settings: SettingsService
+    analytics: AnalyticsService
   }
   /** Readiness probes, e.g. database and storage pings. */
   healthChecks: Record<string, () => Promise<void>>
@@ -55,6 +75,8 @@ declare global {
       sessionId: string | null
       /** Memoised entitlement for the current request (see getEntitlement). */
       entitlementPromise?: Promise<EntitlementDto>
+      /** Effective CMS permissions and ownership scope; set by loadCmsActor. */
+      cmsActor?: CmsActor
     }
   }
 }

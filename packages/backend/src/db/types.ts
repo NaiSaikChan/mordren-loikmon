@@ -24,7 +24,25 @@ export type SubscriptionStatus =
   | 'pending'
   | 'expired'
   | 'revoked'
-export type UserRole = 'user' | 'admin'
+export type UserRole = 'user' | 'admin' | 'manager' | 'author' | (string & {})
+
+/** Editorial workflow state of a book or article. `is_published` stays in sync with it. */
+export type WorkflowStatus = 'draft' | 'in_review' | 'scheduled' | 'published' | 'archived'
+export type RoleScope = 'all' | 'own'
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected'
+export type ReviewStatus = 'published' | 'pending' | 'hidden'
+export type ReportReason = 'spam' | 'abuse' | 'spoiler' | 'off_topic' | 'other'
+export type ReportStatus = 'open' | 'dismissed' | 'actioned'
+export type CouponScope = 'global' | 'subscription' | 'book' | 'article'
+export type DiscountType = 'percent' | 'fixed'
+export type CouponStatus = 'draft' | 'active' | 'paused' | 'expired' | 'archived'
+export type RedemptionItemType = ItemType | 'subscription' | 'order'
+export type TicketCategory = 'bug' | 'content' | 'billing' | 'account' | 'suggestion' | 'other'
+export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
+export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed'
+export type PolicyKind = 'terms' | 'privacy' | 'refund' | 'content' | 'custom'
+export type PolicyVersionStatus = 'draft' | 'published' | 'archived'
+export type SliderAudience = 'all' | 'guests' | 'members' | 'subscribers' | 'non_subscribers'
 
 export interface UsersTable {
   id: string
@@ -65,6 +83,10 @@ export interface AuthorsTable {
   youtube: string | null
   instagram: string | null
   is_verified: Generated<boolean>
+  verification_status: Generated<VerificationStatus>
+  verified_at: Date | null
+  verified_by: string | null
+  verification_note: string | null
   legacy_id: string | null
   created_at: CreatedAt
   updated_at: UpdatedAt
@@ -97,6 +119,13 @@ export interface BooksTable {
   view_count: Generated<number>
   rating_avg: Generated<number>
   rating_count: Generated<number>
+  status: Generated<WorkflowStatus>
+  submitted_at: Date | null
+  reviewed_by: string | null
+  review_note: string | null
+  created_by: string | null
+  updated_by: string | null
+  revision: Generated<number>
   legacy_id: string | null
   created_at: CreatedAt
   updated_at: UpdatedAt
@@ -129,6 +158,13 @@ export interface ArticlesTable {
   view_count: Generated<number>
   rating_avg: Generated<number>
   rating_count: Generated<number>
+  status: Generated<WorkflowStatus>
+  submitted_at: Date | null
+  reviewed_by: string | null
+  review_note: string | null
+  created_by: string | null
+  updated_by: string | null
+  revision: Generated<number>
   published_at: Date | null
   legacy_id: string | null
   created_at: CreatedAt
@@ -142,6 +178,8 @@ export interface CollectionsTable {
   thumbnail_key: string | null
   display_order: Generated<number>
   is_published: Generated<boolean>
+  is_featured: Generated<boolean>
+  slug: string | null
   created_at: CreatedAt
   updated_at: UpdatedAt
 }
@@ -160,6 +198,10 @@ export interface SlidersTable {
   link: string | null
   display_order: Generated<number>
   is_active: Generated<boolean>
+  starts_at: Date | null
+  ends_at: Date | null
+  audience: Generated<SliderAudience>
+  placement: Generated<string>
   created_at: CreatedAt
   updated_at: UpdatedAt
 }
@@ -192,6 +234,11 @@ export interface ReviewsTable {
   item_id: number
   rating: number
   content: string | null
+  status: Generated<ReviewStatus>
+  moderated_by: string | null
+  moderated_at: Date | null
+  moderation_note: string | null
+  report_count: Generated<number>
   created_at: CreatedAt
   updated_at: UpdatedAt
 }
@@ -277,6 +324,200 @@ export interface EntitlementGrantsTable {
   created_at: CreatedAt
 }
 
+// ── CMS module ───────────────────────────────────────────────────────────────
+
+/** Better Auth owns this table; typed read-only for analytics (active users). */
+export interface SessionsTable {
+  id: string
+  user_id: string
+  expires_at: Date
+  ip_address: string | null
+  user_agent: string | null
+  created_at: Date
+  updated_at: Date
+}
+
+export interface RolesTable {
+  id: Generated<number>
+  role_key: string
+  name: string
+  description: string | null
+  scope: Generated<RoleScope>
+  rank: Generated<number>
+  is_system: Generated<boolean>
+  created_at: CreatedAt
+  updated_at: UpdatedAt
+}
+
+export interface RolePermissionsTable {
+  role_id: number
+  permission: string
+}
+
+export interface UserRolesTable {
+  user_id: string
+  role_id: number
+  granted_by: string | null
+  created_at: CreatedAt
+}
+
+export interface AuditLogsTable {
+  id: Generated<number>
+  actor_id: string | null
+  actor_email: string | null
+  actor_role: string | null
+  action: string
+  entity_type: string
+  entity_id: string | null
+  summary: string | null
+  before_data: Json<unknown> | null
+  after_data: Json<unknown> | null
+  ip: string | null
+  user_agent: string | null
+  request_id: string | null
+  created_at: CreatedAt
+}
+
+export interface ContentVersionsTable {
+  id: Generated<number>
+  entity_type: ItemType
+  entity_id: number
+  version: number
+  snapshot: Json<Record<string, unknown>>
+  change_note: string | null
+  created_by: string | null
+  created_at: CreatedAt
+}
+
+export interface TagsTable {
+  id: Generated<number>
+  slug: string
+  name: string
+  created_at: CreatedAt
+}
+
+export interface ContentTagsTable {
+  tag_id: number
+  item_type: ItemType
+  item_id: number
+}
+
+export interface ReviewReportsTable {
+  id: Generated<number>
+  review_id: number
+  reporter_id: string | null
+  reason: ReportReason
+  note: string | null
+  status: Generated<ReportStatus>
+  resolved_by: string | null
+  resolved_at: Date | null
+  created_at: CreatedAt
+}
+
+export interface CouponsTable {
+  id: Generated<number>
+  code: string
+  name: string
+  description: string | null
+  created_by_user_id: string | null
+  /** Owning author; NULL for platform-wide campaigns. */
+  author_id: number | null
+  scope: CouponScope
+  book_id: number | null
+  article_id: number | null
+  plan_code: string | null
+  campaign_type: Generated<string>
+  discount_type: DiscountType
+  /** Percent: 1-100. Fixed: minor currency units. */
+  discount_value: number
+  max_discount_cents: number | null
+  min_order_cents: number | null
+  currency: Generated<string>
+  usage_limit: number | null
+  usage_limit_per_user: number | null
+  used_count: Generated<number>
+  starts_at: Generated<Date>
+  ends_at: Date | null
+  status: Generated<CouponStatus>
+  created_at: CreatedAt
+  updated_at: UpdatedAt
+}
+
+export interface CouponRedemptionsTable {
+  id: Generated<number>
+  coupon_id: number
+  user_id: string | null
+  item_type: Generated<RedemptionItemType>
+  item_id: number | null
+  discount_cents: Generated<number>
+  gross_cents: Generated<number>
+  currency: Generated<string>
+  source: Generated<string>
+  metadata: Json<Record<string, unknown> | null> | null
+  created_at: CreatedAt
+}
+
+export interface FeedbackTicketsTable {
+  id: Generated<number>
+  reference: string
+  user_id: string | null
+  email: string | null
+  name: string | null
+  subject: string
+  category: Generated<TicketCategory>
+  priority: Generated<TicketPriority>
+  status: Generated<TicketStatus>
+  assigned_to: string | null
+  resolution_note: string | null
+  first_response_at: Date | null
+  resolved_at: Date | null
+  created_at: CreatedAt
+  updated_at: UpdatedAt
+}
+
+export interface FeedbackMessagesTable {
+  id: Generated<number>
+  ticket_id: number
+  author_user_id: string | null
+  body: string
+  is_internal: Generated<boolean>
+  created_at: CreatedAt
+}
+
+export interface PoliciesTable {
+  id: Generated<number>
+  slug: string
+  title: string
+  kind: Generated<PolicyKind>
+  published_version: number | null
+  created_at: CreatedAt
+  updated_at: UpdatedAt
+}
+
+export interface PolicyVersionsTable {
+  id: Generated<number>
+  policy_id: number
+  version: number
+  title: string
+  body: string
+  summary: string | null
+  status: Generated<PolicyVersionStatus>
+  effective_at: Date | null
+  published_at: Date | null
+  created_by: string | null
+  created_at: CreatedAt
+  updated_at: UpdatedAt
+}
+
+export interface SettingsTable {
+  setting_key: string
+  group_key: Generated<string>
+  value: Json<unknown>
+  is_public: Generated<boolean>
+  updated_by: string | null
+  updated_at: UpdatedAt
+}
+
 export interface Database {
   users: UsersTable
   categories: CategoriesTable
@@ -297,6 +538,22 @@ export interface Database {
   subscriptions: SubscriptionsTable
   subscription_events: SubscriptionEventsTable
   entitlement_grants: EntitlementGrantsTable
+  sessions: SessionsTable
+  roles: RolesTable
+  role_permissions: RolePermissionsTable
+  user_roles: UserRolesTable
+  audit_logs: AuditLogsTable
+  content_versions: ContentVersionsTable
+  tags: TagsTable
+  content_tags: ContentTagsTable
+  review_reports: ReviewReportsTable
+  coupons: CouponsTable
+  coupon_redemptions: CouponRedemptionsTable
+  feedback_tickets: FeedbackTicketsTable
+  feedback_messages: FeedbackMessagesTable
+  policies: PoliciesTable
+  policy_versions: PolicyVersionsTable
+  settings: SettingsTable
 }
 
 export type Book = Selectable<BooksTable>
@@ -310,3 +567,15 @@ export type SubscriptionPlan = Selectable<SubscriptionPlansTable>
 export type Subscription = Selectable<SubscriptionsTable>
 export type EntitlementGrant = Selectable<EntitlementGrantsTable>
 export type User = Selectable<UsersTable>
+export type Role = Selectable<RolesTable>
+export type Coupon = Selectable<CouponsTable>
+export type NewCoupon = Insertable<CouponsTable>
+export type CouponUpdate = Updateable<CouponsTable>
+export type CouponRedemption = Selectable<CouponRedemptionsTable>
+export type FeedbackTicket = Selectable<FeedbackTicketsTable>
+export type FeedbackMessage = Selectable<FeedbackMessagesTable>
+export type Policy = Selectable<PoliciesTable>
+export type PolicyVersion = Selectable<PolicyVersionsTable>
+export type Setting = Selectable<SettingsTable>
+export type AuditLog = Selectable<AuditLogsTable>
+export type Review = Selectable<ReviewsTable>

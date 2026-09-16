@@ -41,7 +41,14 @@ async function main() {
   server.headersTimeout = 66_000
 
   const stopJobs = config.jobs.enabled
-    ? startJobs({ db: ctx.db, subscriptions: ctx.services.subscriptions, logger, reconcileIntervalMinutes: config.jobs.reconcileIntervalMinutes })
+    ? startJobs({
+        db: ctx.db,
+        subscriptions: ctx.services.subscriptions,
+        content: ctx.services.cmsContent,
+        coupons: ctx.services.coupons,
+        logger,
+        reconcileIntervalMinutes: config.jobs.reconcileIntervalMinutes,
+      })
     : () => {}
 
   let shuttingDown = false

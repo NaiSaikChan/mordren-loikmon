@@ -1,6 +1,7 @@
 import { sql, type Kysely } from 'kysely'
-import type { Database, ItemType } from '../db/types.js'
+import type { Database, ItemType, ReviewStatus } from '../db/types.js'
 import { errors } from '../lib/errors.js'
+import { refreshRatingAggregate } from './cms/moderation.js'
 
 /**
  * Per-user interactions: reviews & ratings, saved library, reading progress,
@@ -15,18 +16,34 @@ export class EngagementService {
     return this.db
       .selectFrom('reviews as r')
       .innerJoin('users as u', 'u.id', 'r.user_id')
-      .select(['r.id', 'r.user_id', 'r.item_type', 'r.item_id', 'r.rating', 'r.content', 'r.created_at', 'r.updated_at', 'u.name as user_name', 'u.image as user_image'])
+      .select([
+        'r.id',
+        'r.user_id',
+        'r.item_type',
+        'r.item_id',
+        'r.rating',
+        'r.content',
+        'r.status',
+        'r.created_at',
+        'r.updated_at',
+        'u.name as user_name',
+        'u.image as user_image',
+      ])
   }
 
   async listReviews(input: { itemType: ItemType; itemId: number; page: number; limit: number; viewerId?: string }) {
     const base = this.reviewQuery().where('r.item_type', '=', input.itemType).where('r.item_id', '=', input.itemId)
+    // Readers only see published reviews; the viewer always sees their own,
+    // so a review awaiting moderation does not look like it was lost.
+    const visible = base.where('r.status', '=', 'published')
     const [rows, summary, own] = await Promise.all([
-      base.orderBy('r.created_at', 'desc').limit(input.limit).offset((input.page - 1) * input.limit).execute(),
+      visible.orderBy('r.created_at', 'desc').limit(input.limit).offset((input.page - 1) * input.limit).execute(),
       this.db
         .selectFrom('reviews')
         .select((eb) => [eb.fn.countAll().as('count'), sql<number>`COALESCE(AVG(rating), 0)`.as('average')])
         .where('item_type', '=', input.itemType)
         .where('item_id', '=', input.itemId)
+        .where('status', '=', 'published')
         .executeTakeFirst(),
       input.viewerId ? base.where('r.user_id', '=', input.viewerId).executeTakeFirst() : Promise.resolve(undefined),
     ])
@@ -38,13 +55,25 @@ export class EngagementService {
     }
   }
 
-  /** One review per user per item: submitting again edits the existing review. */
-  async upsertReview(input: { userId: string; itemType: ItemType; itemId: number; rating: number; content: string | null }) {
+  /**
+   * One review per user per item: submitting again edits the existing review.
+   * `status` comes from the `features.reviews_require_approval` setting, so a
+   * moderated platform queues new reviews instead of publishing them.
+   */
+  async upsertReview(input: {
+    userId: string
+    itemType: ItemType
+    itemId: number
+    rating: number
+    content: string | null
+    status?: ReviewStatus
+  }) {
+    const status: ReviewStatus = input.status ?? 'published'
     await this.db.transaction().execute(async (trx) => {
       await trx
         .insertInto('reviews')
-        .values({ user_id: input.userId, item_type: input.itemType, item_id: input.itemId, rating: input.rating, content: input.content })
-        .onDuplicateKeyUpdate({ rating: input.rating, content: input.content })
+        .values({ user_id: input.userId, item_type: input.itemType, item_id: input.itemId, rating: input.rating, content: input.content, status })
+        .onDuplicateKeyUpdate({ rating: input.rating, content: input.content, status })
         .execute()
       await this.refreshRating(trx, input.itemType, input.itemId)
     })
@@ -65,17 +94,9 @@ export class EngagementService {
     })
   }
 
-  private async refreshRating(trx: Kysely<Database>, itemType: ItemType, itemId: number) {
-    const table = itemType === 'book' ? 'books' : 'articles'
-    await sql`
-      UPDATE ${sql.table(table)} t
-      JOIN (
-        SELECT COALESCE(AVG(rating), 0) AS avg_rating, COUNT(*) AS n
-        FROM reviews WHERE item_type = ${itemType} AND item_id = ${itemId}
-      ) s
-      SET t.rating_avg = ROUND(s.avg_rating, 2), t.rating_count = s.n, t.updated_at = t.updated_at
-      WHERE t.id = ${itemId}
-    `.execute(trx)
+  /** Delegates to the shared aggregate so the CMS and the storefront agree. */
+  private refreshRating(trx: Kysely<Database>, itemType: ItemType, itemId: number) {
+    return refreshRatingAggregate(trx, itemType, itemId)
   }
 
   // ── Library (saved items) ──────────────────────────────────────────────

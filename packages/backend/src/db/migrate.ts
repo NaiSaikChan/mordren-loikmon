@@ -5,6 +5,7 @@ import { Migrator, type Migration, type MigrationProvider } from 'kysely/migrati
 import type { Logger } from '../lib/logger.js'
 import * as m0001 from './migrations/0001_content.js'
 import * as m0002 from './migrations/0002_subscriptions.js'
+import * as m0003 from './migrations/0003_cms.js'
 import type { Database } from './types.js'
 
 /** Migrations are bundled in code (no filesystem scanning), so dist/ and tsx behave the same. */
@@ -13,6 +14,7 @@ const provider: MigrationProvider = {
     return {
       '0001_content': m0001,
       '0002_subscriptions': m0002,
+      '0003_cms': m0003,
     }
   },
 }

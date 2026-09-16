@@ -1,6 +1,8 @@
 import { sql, type Kysely } from 'kysely'
 import type { Database } from '../db/types.js'
 import type { Logger } from '../lib/logger.js'
+import type { CmsContentService } from '../services/cms/content.js'
+import type { CouponService } from '../services/cms/coupons.js'
 import type { SubscriptionService } from '../services/subscriptions.js'
 
 /**
@@ -10,6 +12,8 @@ import type { SubscriptionService } from '../services/subscriptions.js'
 export function startJobs(deps: {
   db: Kysely<Database>
   subscriptions: SubscriptionService
+  content: CmsContentService
+  coupons: CouponService
   logger: Logger
   reconcileIntervalMinutes: number
 }): () => void {
@@ -27,7 +31,14 @@ export function startJobs(deps: {
           const started = Date.now()
           const result = await deps.subscriptions.reconcile()
           const expired = await deps.subscriptions.expireLapsed()
-          log.info({ ...result, expired, duration_ms: Date.now() - started }, 'subscription reconciliation finished')
+          // CMS housekeeping rides the same lock: scheduled content goes live
+          // and campaigns past their end date stop being redeemable.
+          const published = await deps.content.publishDue()
+          const couponsExpired = await deps.coupons.expireDue()
+          log.info(
+            { ...result, expired, published, coupons_expired: couponsExpired, duration_ms: Date.now() - started },
+            'scheduled maintenance finished',
+          )
         } finally {
           await sql`SELECT RELEASE_LOCK('loikmon_reconcile')`.execute(conn)
         }

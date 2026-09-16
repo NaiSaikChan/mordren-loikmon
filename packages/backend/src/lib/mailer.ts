@@ -70,6 +70,19 @@ export const emailTemplates = {
       ),
     }
   },
+  /** Staff reply on a support ticket, sent to the reporter. */
+  ticketReply(reference: string, subject: string, message: string): Pick<MailMessage, 'subject' | 'text' | 'html'> {
+    return {
+      subject: `[${reference}] ${subject}`,
+      text: `Our team replied to your message:\n\n${message}\n\nReply to this email to continue the conversation.\n\nReference: ${reference}`,
+      html: layout(
+        subject,
+        `<p>Our team replied to your message:</p><blockquote style="margin:0;padding:12px 16px;border-left:3px solid #b8860b;background:#faf7f0;white-space:pre-wrap">${escapeHtml(
+          message,
+        )}</blockquote><p style="font-size:12px;color:#888">Reference: ${escapeHtml(reference)}</p>`,
+      ),
+    }
+  },
 }
 
 function escapeHtml(value: string): string {
