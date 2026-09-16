@@ -392,3 +392,38 @@ h2           { font-size: calc(1.25rem  * var(--ui-header-scale, 1)); }
 h3           { font-size: calc(1.125rem * var(--ui-header-scale, 1)); }
 h4           { font-size: calc(1rem     * var(--ui-header-scale, 1)); }
 h5, h6       { font-size: calc(0.875rem * var(--ui-header-scale, 1)); }
+
+/* ── CMS print support ────────────────────────────────────────────── */
+/* `printSection(id)` tags one element with [data-print-root] and adds
+   .cms-printing to <body>. Visibility (not display) is used so the print
+   root's ancestors stay in the layout while everything else disappears —
+   the browser's print dialog then produces just that fragment, and its
+   "Save as PDF" option is what "export as PDF" means here.               */
+@media print {
+  .cms-printing {
+    visibility: hidden;
+  }
+
+  .cms-printing [data-print-root],
+  .cms-printing [data-print-root] * {
+    visibility: visible;
+  }
+
+  .cms-printing [data-print-root] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .cms-printing [data-print-root] :is(button, select, input[type="checkbox"]) {
+    display: none !important;
+  }
+
+  .cms-printing [data-print-root] * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}

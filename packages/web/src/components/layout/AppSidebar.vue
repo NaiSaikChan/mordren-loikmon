@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { useCmsSessionStore } from '@/cms/stores/session'
 import logoUrl from '@/assets/logo.png'
 
 const { t } = useI18n()
@@ -11,6 +12,18 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const cmsSession = useCmsSessionStore()
+
+// Staff accounts get a link into the CMS. The permission set is fetched once,
+// only for signed-in users, and the CMS bundle itself stays lazily loaded.
+watch(
+  () => authStore.isLoggedIn,
+  (loggedIn) => {
+    if (loggedIn) void cmsSession.ensureLoaded()
+    else cmsSession.reset()
+  },
+  { immediate: true },
+)
 
 const navItems = computed(() => [
   { key: 'home',         icon: '🏠', label: t('nav.home'),         path: '/' },
@@ -119,6 +132,14 @@ async function handleLogout() {
       >
         <span class="text-base leading-none">{{ item.icon }}</span>
         <span>{{ item.label }}</span>
+      </button>
+      <button
+        v-if="cmsSession.canAccess"
+        :class="['nav-link w-full text-left', isActive('/cms') && 'nav-link-active']"
+        @click="navigate('/cms')"
+      >
+        <span class="text-base leading-none">🛠️</span>
+        <span>{{ t('nav.cms') }}</span>
       </button>
       <button
         v-if="authStore.isLoggedIn"

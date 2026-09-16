@@ -20,7 +20,8 @@
     "logout": "Logout",
     "login": "Login",
     "register": "Register",
-    "subscription": "Subscription"
+    "subscription": "Subscription",
+    "cms": "CMS"
   },
   "common": {
     "loading": "Loading…",

@@ -20,7 +20,8 @@
     "logout": "နုက်တိတ်",
     "login": "လုပ်ကျောဝ်",
     "register": "ခၞံတၟိ",
-    "subscription": "Subscription"
+    "subscription": "Subscription",
+    "cms": "CMS"
   },
   "common": {
     "loading": "လဇ…",

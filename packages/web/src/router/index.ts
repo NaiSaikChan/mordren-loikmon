@@ -1,7 +1,13 @@
 import { useAuthStore } from '@/stores/auth'
+import { useCmsSessionStore } from '@/cms/stores/session'
+import { cmsRoutes } from '@/cms/routes'
+import { firstAllowedRoute } from '@/cms/navigation'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 export const routes: RouteRecordRaw[] = [
+  // ─── CMS (own shell, lazily loaded, permission-guarded) ────────────
+  ...cmsRoutes,
+
   // ─── Auth (standalone pages, outside the app shell) ────────────────
   {
     path: '/auth',
@@ -57,17 +63,38 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  if (!to.meta?.requiresAuth) return
+  const needsAuth = to.matched.some((record) => record.meta?.requiresAuth)
+  const needsCms = to.matched.some((record) => record.meta?.requiresCms)
+  if (!needsAuth && !needsCms) return
+
   const auth = useAuthStore()
   // On a fresh page load the stored token is still being validated with auth.me().
   await auth.ensureRestored()
   if (!auth.isLoggedIn) {
     return { name: 'auth', query: { redirect: to.fullPath } }
   }
+  if (!needsCms) return
+
+  // The CMS session carries the permission set. It is a UI convenience only:
+  // the API re-checks every permission on every request.
+  const cms = useCmsSessionStore()
+  await cms.ensureLoaded()
+  if (!cms.canAccess) return { name: 'home' }
+
+  const required = (to.meta?.permissions as string[] | undefined) ?? []
+  if (required.length && !cms.canAny(...required)) {
+    // Send them to the first section they can actually open rather than a dead end.
+    const fallback = firstAllowedRoute((...permissions) => cms.canAny(...permissions))
+    return fallback && fallback !== to.name ? { name: fallback } : { name: 'home' }
+  }
 })
 
 router.afterEach((to) => {
   const baseTitle = 'Mordren Loikmon'
+  if (to.meta?.title) {
+    document.title = `${to.meta.title} | Loikmon CMS`
+    return
+  }
   const routeName = String(to.name || '')
   if (routeName && routeName !== 'home') {
     const formatted = routeName
