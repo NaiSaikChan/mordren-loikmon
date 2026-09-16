@@ -69,27 +69,36 @@ export class RbacService {
       this.db.selectFrom('authors').select('id').where('user_id', '=', user.id).execute(),
     ])
 
-    // A user created before the CMS module (or by a direct SQL insert) has no
-    // rows in user_roles; fall back to the legacy `users.role` column.
-    const roleKeys = roleRows.length ? roleRows.map((r) => r.role_key) : [user.role || 'user']
-    const permissions = new Set(permissionRows.map((r) => r.permission))
-    if (!roleRows.length && user.role === 'admin') {
-      for (const permission of await this.permissionsOfRoleKey('admin')) permissions.add(permission)
-    }
+    // Accounts created before the CMS module — and everyone who signs up, since
+    // Better Auth writes only `users.role` — have no rows in user_roles. Fall
+    // back to the role named there, so the two can never disagree.
+    const effective = roleRows.length ? roleRows : await this.roleByKey(user.role || 'user')
+    const permissions = new Set(
+      roleRows.length ? permissionRows.map((r) => r.permission) : await this.permissionsOfRoleKey(user.role || 'user'),
+    )
 
     const actor: CmsActor = {
       userId: user.id,
       email: user.email,
-      primaryRole: roleRows.length
-        ? roleRows.reduce((best, r) => (r.rank > best.rank ? r : best), roleRows[0]).role_key
+      primaryRole: effective.length
+        ? effective.reduce((best, r) => (r.rank > best.rank ? r : best), effective[0]).role_key
         : user.role || 'user',
-      roleKeys,
+      roleKeys: effective.length ? effective.map((r) => r.role_key) : [user.role || 'user'],
       permissions,
-      scope: roleRows.some((r) => r.scope === 'all') ? 'all' : roleRows.length ? 'own' : user.role === 'admin' ? 'all' : 'own',
+      scope: effective.some((r) => r.scope === 'all') ? 'all' : 'own',
       ownedAuthorIds: authorRows.map((r) => r.id),
     }
     this.cache.set(user.id, { expires: Date.now() + CACHE_TTL_MS, actor })
     return actor
+  }
+
+  private async roleByKey(key: string): Promise<Array<{ id: number; role_key: string; scope: RoleScope; rank: number }>> {
+    const row = await this.db
+      .selectFrom('roles')
+      .select(['id', 'role_key', 'scope', 'rank'])
+      .where('role_key', '=', key)
+      .executeTakeFirst()
+    return row ? [row] : []
   }
 
   private async permissionsOfRoleKey(key: string): Promise<string[]> {

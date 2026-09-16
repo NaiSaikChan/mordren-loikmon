@@ -866,7 +866,9 @@ export function tagSlug(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    // `\p{M}` keeps combining marks: Mon and Burmese words are written with
+    // them, and dropping them turns a tag into a different word.
+    .replace(/[^\p{L}\p{N}\p{M}]+/gu, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 96)
 }
