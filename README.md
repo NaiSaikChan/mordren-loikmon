@@ -13,6 +13,7 @@
 | Web Frontend | Vue 3 + Vite + Tailwind CSS v4, Pinia |
 | Mobile | React Native / Expo (development build) |
 | API client | `@loikmon/api` (shared by web and mobile) |
+| CMS | Role-based admin app at `/cms` — [`docs/CMS-MODULE.md`](docs/CMS-MODULE.md) |
 | Deployment | Docker Compose on a VPS behind Traefik — [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 | i18n | English + Mon (လိက်မန်) |
 
@@ -27,6 +28,21 @@
 
 An active subscription unlocks every book, audiobook and article. Subscriptions
 are bought in the Android/iOS apps and apply to the account on the web too.
+
+## CMS
+
+Staff manage the platform from `/cms` in the web app. Access is role-based:
+
+| Role | Reach |
+|---|---|
+| Administrator | Everything, including roles, permissions, settings and the activity log |
+| Manager | Catalogue, membership, coupons and community — no system configuration |
+| Author | Only their own books, audiobooks, articles and coupons |
+
+Custom roles can be built from the permission catalogue without a deployment.
+See [`docs/CMS-MODULE.md`](docs/CMS-MODULE.md) for the module reference,
+security review and deployment/rollback guide, and
+[`docs/CMS-ARCHITECTURE.md`](docs/CMS-ARCHITECTURE.md) for the design rationale.
 
 ## Monorepo Structure
 
@@ -83,3 +99,4 @@ npx expo run:android   # or: npx expo run:ios
 - 🌙 Dark Mode — System-aware with manual override
 - 🌐 i18n — English & Mon language support
 - 🖥️ Responsive layout
+- 🛠️ CMS — Content, coupons, moderation, policies and analytics with granular roles

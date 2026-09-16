@@ -20,6 +20,32 @@ const provider: MigrationProvider = {
 }
 
 /**
+ * Roll the most recent application migration back. Better Auth's own schema is
+ * never touched: it is diffed forward only.
+ *
+ * This destroys whatever that migration created, so the CLI wrapping it
+ * (`npm run db:migrate:down`) requires an explicit confirmation flag.
+ */
+export async function migrateDown(db: Kysely<Database>, logger: Logger): Promise<void> {
+  await db.connection().execute(async (conn) => {
+    const lock = await sql<{ acquired: number | null }>`SELECT GET_LOCK('loikmon_migrations', 120) AS acquired`.execute(conn)
+    if (lock.rows[0]?.acquired !== 1) throw new Error('Could not acquire the migration lock within 120s')
+    try {
+      const migrator = new Migrator({ db: conn, provider })
+      const { error, results } = await migrator.migrateDown()
+      for (const r of results ?? []) {
+        const log = r.status === 'Error' ? logger.error.bind(logger) : logger.warn.bind(logger)
+        log({ migration: r.migrationName, status: r.status }, 'migration rolled back')
+      }
+      if (error) throw error instanceof Error ? error : new Error(String(error))
+      if (!results?.length) logger.info('nothing to roll back')
+    } finally {
+      await sql`SELECT RELEASE_LOCK('loikmon_migrations')`.execute(conn)
+    }
+  })
+}
+
+/**
  * Bring the schema up to date:
  *  1. Better Auth tables (users, sessions, accounts, verifications) — diffed
  *     and created/altered by Better Auth for the installed version.

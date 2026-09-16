@@ -2,7 +2,7 @@
   "name": "@loikmon/backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Loikmon core backend — Express 5 + MySQL + Better Auth. Subscription entitlements verified with Google Play Billing & Apple App Store, content files in MinIO.",
+  "description": "Loikmon core backend \u2014 Express 5 + MySQL + Better Auth. Subscription entitlements verified with Google Play Billing & Apple App Store, content files in MinIO.",
   "type": "module",
   "main": "dist/index.js",
   "engines": {
@@ -18,6 +18,7 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:migrate": "tsx src/cli/migrate.ts",
+    "db:migrate:down": "tsx src/cli/migrate-down.ts",
     "db:seed": "tsx src/cli/seed.ts",
     "storage:init": "tsx src/cli/storage-init.ts",
     "jobs:reconcile": "tsx src/cli/reconcile.ts",
