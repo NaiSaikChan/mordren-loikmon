@@ -12,7 +12,7 @@ import { idParam, parse } from '../validate.js'
  * Everything here is either anonymous-readable (settings, published policies)
  * or belongs to the signed-in user (their own tickets).
  */
-export function siteRouter(ctx: AppContext, limiters: { api: RequestHandler }) {
+export function siteRouter(ctx: AppContext, limiters: { feedback: RequestHandler }) {
   const router = Router()
 
   /** Branding, SEO and feature toggles marked `is_public`. */
@@ -48,8 +48,8 @@ export function siteRouter(ctx: AppContext, limiters: { api: RequestHandler }) {
 
   // ── Feedback ───────────────────────────────────────────────────────────
 
-  /** Contact form. Open to guests, so it is rate-limited like the API. */
-  router.post('/feedback', limiters.api, async (req, res) => {
+  /** Contact form. Open to guests, so it gets its own stricter rate limit. */
+  router.post('/feedback', limiters.feedback, async (req, res) => {
     if (!(await ctx.services.settings.flag('features.feedback_enabled', true))) {
       throw errors.serviceUnavailable('Feedback is currently closed')
     }

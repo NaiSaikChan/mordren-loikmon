@@ -20,5 +20,10 @@ export function createRateLimiters(options: { enabled: boolean }) {
     auth: rateLimit({ ...common, windowMs: 15 * 60_000, limit: 30 }),
     /** Purchase verification calls store APIs — keep them bounded per user. */
     purchases: rateLimit({ ...common, windowMs: 15 * 60_000, limit: 60, keyGenerator: byUserOrIp }),
+    /**
+     * The contact form is open to guests and writes a row plus an e-mail, so it
+     * gets its own bucket: spamming it must not exhaust anyone's login attempts.
+     */
+    feedback: rateLimit({ ...common, windowMs: 60 * 60_000, limit: 10, keyGenerator: byUserOrIp }),
   }
 }
