@@ -1,13 +1,14 @@
 import pino from 'pino'
 import { GooglePlayService, type GooglePlayApi, type SubscriptionPurchaseV2 } from '../../src/payments/google.js'
 import { errors } from '../../src/lib/errors.js'
+import { allVariantKeys } from '@loikmon/media-standards'
 import { buildObjectKey, type AssetKind, type PresignedUpload, type StorageService } from '../../src/storage/storage.js'
 
 export const silentLogger = pino({ level: 'silent' })
 
 /** Storage double: deterministic URLs, objects kept in memory. */
 export class FakeStorage implements StorageService {
-  readonly objects = new Map<string, { size: number; contentType: string }>()
+  readonly objects = new Map<string, { size: number; contentType: string; body?: Buffer }>()
   readonly removed: string[] = []
 
   isAbsoluteUrl(value: string) {
@@ -30,9 +31,17 @@ export class FakeStorage implements StorageService {
     this.objects.set(key, { size, contentType })
     return key
   }
+  async putObjectAt(key: string, body: unknown, size: number, contentType: string) {
+    this.objects.set(key, { size, contentType, body: Buffer.isBuffer(body) ? body : undefined })
+  }
+  async statObject(key: string) {
+    const object = this.objects.get(key)
+    return object ? { size: object.size, contentType: object.contentType } : null
+  }
   async removeObject(key: string) {
     this.removed.push(key)
     this.objects.delete(key)
+    for (const variant of allVariantKeys(key)) this.objects.delete(variant)
   }
   async ensureBuckets() {}
   async ping() {}

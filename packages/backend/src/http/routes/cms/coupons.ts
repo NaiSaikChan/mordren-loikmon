@@ -23,6 +23,7 @@ const CouponInput = z.object({
   code: z.string().trim().min(3).max(48).optional(),
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(500).nullable().optional(),
+  banner_key: z.string().trim().max(1024).nullable().optional(),
   scope: couponScope,
   book_id: z.number().int().positive().nullable().optional(),
   article_id: z.number().int().positive().nullable().optional(),

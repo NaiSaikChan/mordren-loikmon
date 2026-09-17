@@ -1,10 +1,8 @@
 import { Router } from 'express'
-import multer from 'multer'
 import { z } from 'zod'
 import { serializePlans } from '../../../domain/plans.js'
 import { errors } from '../../../lib/errors.js'
 import { resolveRange } from '../../../services/cms/analytics.js'
-import { ASSET_CONTENT_TYPES, ASSET_VISIBILITY, type AssetKind } from '../../../storage/storage.js'
 import type { AppContext } from '../../context.js'
 import { actorCanAny } from '../../../services/rbac.js'
 import { auditActor, requireActor, requireAnyPermission, requirePermission } from '../../middleware/permissions.js'
@@ -12,7 +10,7 @@ import { pagination, parse } from '../../validate.js'
 import { cmsContext, rangeQuery } from './shared.js'
 
 /**
- * Platform surface of the CMS: policies, settings, media uploads, membership
+ * Platform surface of the CMS: policies, settings, membership
  * plans, subscriptions, dashboards and the audit log.
  */
 
@@ -26,6 +24,7 @@ const PlanUpdate = z
     apple_product_id: z.string().trim().max(128).nullable(),
     google_product_id: z.string().trim().max(128).nullable(),
     google_base_plan_id: z.string().trim().max(64).nullable(),
+    image_key: z.string().trim().max(1024).nullable(),
     display_order: z.number().int(),
     is_active: z.boolean(),
   })
@@ -33,79 +32,6 @@ const PlanUpdate = z
 
 export function platformRouter(ctx: AppContext) {
   const router = Router()
-  const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: { fileSize: Math.min(ctx.config.storage.uploadMaxBytes, 100 * 1024 * 1024), files: 1 },
-  })
-  const assetKind = z.enum(Object.keys(ASSET_VISIBILITY) as [AssetKind, ...AssetKind[]])
-
-  function assertContentType(kind: AssetKind, contentType: string) {
-    if (!ASSET_CONTENT_TYPES[kind].includes(contentType)) {
-      throw errors.validation([
-        { path: 'content_type', message: `Allowed types for ${kind}: ${ASSET_CONTENT_TYPES[kind].join(', ')}` },
-      ])
-    }
-  }
-
-  // ── Media ──────────────────────────────────────────────────────────────
-
-  /** Large files (books, audio) are PUT straight to MinIO with this URL. */
-  router.post('/media/presign', requirePermission('media.upload'), async (req, res) => {
-    const body = parse(
-      z.object({ kind: assetKind, content_type: z.string().min(1).max(128), filename: z.string().max(255).optional() }),
-      req.body,
-    )
-    assertContentType(body.kind, body.content_type)
-    const presigned = await ctx.storage.presignUpload(body.kind, body.content_type, body.filename)
-    await ctx.services.audit.record({
-      actor: auditActor(req),
-      action: 'upload',
-      entityType: 'media',
-      entityId: presigned.key,
-      summary: `Presigned ${body.kind} upload`,
-    })
-    res.json({
-      status: 'ok',
-      upload: presigned,
-      public_url: ASSET_VISIBILITY[body.kind] === 'public' ? ctx.storage.publicUrl(presigned.key) : null,
-    })
-  })
-
-  /** Small files (images) through the API. */
-  router.post('/media', requirePermission('media.upload'), upload.single('file'), async (req, res) => {
-    const { kind } = parse(z.object({ kind: assetKind }), req.body)
-    const file = req.file
-    if (!file) throw errors.validation([{ path: 'file', message: 'File is required' }])
-    assertContentType(kind, file.mimetype)
-    const key = await ctx.storage.putObject(kind, file.buffer, file.size, file.mimetype, file.originalname)
-    await ctx.services.audit.record({
-      actor: auditActor(req),
-      action: 'upload',
-      entityType: 'media',
-      entityId: key,
-      summary: `${file.originalname} (${Math.round(file.size / 1024)} KB)`,
-    })
-    res.status(201).json({
-      status: 'ok',
-      key,
-      public_url: ASSET_VISIBILITY[kind] === 'public' ? ctx.storage.publicUrl(key) : null,
-    })
-  })
-
-  /** Signed URL so the CMS can preview a private asset (PDF, EPUB, audio). */
-  router.post('/media/signed-url', requirePermission('media.upload'), async (req, res) => {
-    const { key } = parse(z.object({ key: z.string().trim().min(1).max(1024) }), req.body)
-    const signed = await ctx.storage.signedUrl(key, { ttlSeconds: 600 })
-    res.json({ status: 'ok', url: signed.url, expires_at: signed.expiresAt.toISOString() })
-  })
-
-  router.delete('/media', requirePermission('media.delete'), async (req, res) => {
-    const { key } = parse(z.object({ key: z.string().trim().min(1).max(1024) }), req.body)
-    await ctx.storage.removeObject(key)
-    await ctx.services.audit.record({ actor: auditActor(req), action: 'delete', entityType: 'media', entityId: key, summary: key })
-    res.json({ status: 'ok' })
-  })
-
   // ── Policies & terms ───────────────────────────────────────────────────
 
   router.get('/policies', requirePermission('policies.view'), async (_req, res) => {
@@ -139,6 +65,12 @@ export function platformRouter(ctx: AppContext) {
     res.json({ status: 'ok', policy: await ctx.services.policies.saveDraft(cmsContext(req), slug, body) })
   })
 
+  router.patch('/policies/:slug', requirePermission('policies.edit'), async (req, res) => {
+    const { slug } = parse(z.object({ slug: z.string().trim().max(96) }), req.params)
+    const body = parse(z.object({ thumbnail_key: z.string().trim().max(1024).nullable() }), req.body)
+    res.json({ status: 'ok', policy: await ctx.services.policies.setThumbnail(cmsContext(req), slug, body.thumbnail_key) })
+  })
+
   router.post('/policies/:slug/publish', requirePermission('policies.publish'), async (req, res) => {
     const { slug } = parse(z.object({ slug: z.string().trim().max(96) }), req.params)
     const { version } = parse(z.object({ version: z.number().int().positive() }), req.body)
@@ -165,7 +97,7 @@ export function platformRouter(ctx: AppContext) {
   // ── Membership plans & subscriptions ───────────────────────────────────
 
   router.get('/plans', requirePermission('plans.view'), async (_req, res) => {
-    res.json({ status: 'ok', plans: serializePlans(await ctx.services.subscriptions.listPlans({ includeInactive: true })) })
+    res.json({ status: 'ok', plans: serializePlans(await ctx.services.subscriptions.listPlans({ includeInactive: true }), (key) => ctx.storage.publicUrl(key)) })
   })
 
   router.patch('/plans/:code', requirePermission('plans.manage'), async (req, res) => {

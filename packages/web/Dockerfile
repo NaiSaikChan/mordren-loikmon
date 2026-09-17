@@ -10,9 +10,12 @@ ENV VITE_API_BASE=$VITE_API_BASE
 ENV VITE_PLAY_STORE_URL=$VITE_PLAY_STORE_URL
 ENV VITE_APP_STORE_URL=$VITE_APP_STORE_URL
 COPY package.json package-lock.json ./
+COPY packages/media-standards/package.json ./packages/media-standards/
 COPY packages/api/package.json ./packages/api/
 COPY packages/web/package.json ./packages/web/
-RUN npm ci --workspace=packages/api --workspace=packages/web --ignore-scripts
+RUN npm ci --workspace=packages/media-standards --workspace=packages/api --workspace=packages/web --ignore-scripts
+# Media standards are compiled from source by Vite (see the alias in vite.config.ts).
+COPY packages/media-standards ./packages/media-standards
 COPY packages/api ./packages/api
 COPY packages/web ./packages/web
 RUN npm run build -w @loikmon/web

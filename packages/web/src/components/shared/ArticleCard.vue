@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useArticleAudio } from '@/composables/useArticleAudio'
 import AccessBadge from './AccessBadge.vue'
+import ResponsiveImg from './ResponsiveImg.vue'
 
 const props = defineProps<{ article: Article }>()
 const { t } = useI18n()
@@ -64,12 +65,18 @@ async function shareArticle(e: MouseEvent) {
       <!-- Left Column: Thumbnail -->
       <div
         class="w-28 h-28 sm:w-36 sm:h-28 md:w-56 md:h-auto object-cover shadow-sm rounded-lg overflow-hidden bg-gray-100 dark:bg-surface-700 shrink-0 flex items-center justify-center bg-linear-to-br">
-        <img v-if="thumbnail"
-          :src="thumbnail" :alt="article.title"
-          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-          loading="lazy"
-          decoding="async" />
-        <span v-else class="text-2xl">📰</span>
+        <!-- Thumbnail box is 112px / 144px / 224px wide (w-28, sm:w-36, md:w-56). -->
+        <ResponsiveImg
+          :image="article.thumbnail_image"
+          :fallback="thumbnail"
+          :alt="article.title"
+          asset-type="article_cover"
+          fill
+          sizes="(min-width: 768px) 224px, (min-width: 640px) 144px, 112px"
+          img-class="transition-transform duration-300 group-hover:scale-110"
+        >
+          <template #empty><span class="text-2xl">📰</span></template>
+        </ResponsiveImg>
       </div>
 
       <!-- Right Column: Content -->

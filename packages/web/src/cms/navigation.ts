@@ -66,6 +66,7 @@ export const CMS_NAV: NavSection[] = [
     key: 'site',
     label: 'Site',
     items: [
+      { name: 'cms-media', label: 'Media library', icon: '🗃️', permissions: ['media.upload'], description: 'Images, documents and audio' },
       { name: 'cms-sliders', label: 'Sliders', icon: '🖼️', permissions: ['sliders.view'] },
       { name: 'cms-policies', label: 'Policies & terms', icon: '📜', permissions: ['policies.view'] },
       { name: 'cms-settings', label: 'Settings', icon: '⚙️', permissions: ['settings.manage'] },

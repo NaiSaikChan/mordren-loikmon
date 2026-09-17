@@ -6,6 +6,7 @@ import { requireAuth } from '../../middleware/auth.js'
 import { communityRouter } from './community.js'
 import { contentRouter } from './content.js'
 import { couponsRouter } from './coupons.js'
+import { mediaRouter } from './media.js'
 import { platformRouter } from './platform.js'
 import { taxonomyRouter } from './taxonomy.js'
 import { usersRouter } from './users.js'
@@ -49,6 +50,7 @@ export function cmsRouter(ctx: AppContext) {
   router.use(taxonomyRouter(ctx))
   router.use('/coupons', couponsRouter(ctx))
   router.use(communityRouter(ctx))
+  router.use(mediaRouter(ctx))
   router.use(platformRouter(ctx))
 
   return router

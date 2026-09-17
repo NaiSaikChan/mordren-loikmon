@@ -21,6 +21,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@loikmon/media-standards": [
+        "../media-standards/src/index.ts"
       ]
     }
   },

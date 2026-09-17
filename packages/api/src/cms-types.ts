@@ -6,7 +6,15 @@
  * storage keys, not the reader-facing projection.
  */
 
-import type { Id, ItemType, Pagination, SubscriptionPlatform, SubscriptionStatus } from './types.js'
+import type {
+  DisplayShape,
+  MediaAssetType,
+  MediaCategory,
+  MediaIssue,
+  ResponsiveImage,
+  StorageKind,
+} from '@loikmon/media-standards'
+import type { Id, ItemType, Pagination, Plan, SubscriptionPlatform, SubscriptionStatus } from './types.js'
 
 export type Permission = string
 
@@ -25,7 +33,9 @@ export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed'
 export type PolicyKind = 'terms' | 'privacy' | 'refund' | 'content' | 'custom'
 export type PolicyVersionStatus = 'draft' | 'published' | 'archived'
 export type SliderAudience = 'all' | 'guests' | 'members' | 'subscribers' | 'non_subscribers'
-export type AssetKind = 'cover' | 'thumbnail' | 'avatar' | 'slider' | 'category' | 'pdf' | 'epub' | 'audio'
+/** Storage folder of an object key. Uploads are addressed by `MediaAssetType` (see @loikmon/media-standards). */
+export type AssetKind = StorageKind
+export type { MediaAssetType, MediaCategory, MediaIssue, ResponsiveImage }
 
 export interface PermissionGroup {
   key: string
@@ -122,6 +132,8 @@ export interface CmsBook {
   cover_key: string | null
   pdf_key: string | null
   epub_key: string | null
+  /** Explicit social card; the cover's generated card is used when null. */
+  og_image_key: string | null
   is_free: boolean
   is_published: boolean
   is_recommended: boolean
@@ -166,6 +178,7 @@ export interface CmsArticle {
   subcategory_id: Id | null
   thumbnail_key: string | null
   audio_key: string | null
+  og_image_key: string | null
   is_free: boolean
   is_published: boolean
   status: WorkflowStatus
@@ -242,6 +255,7 @@ export interface CategoryNode {
   type: ItemType | 'all'
   name: string
   thumbnail_key: string | null
+  cover_key: string | null
   display_order: number
   books_count: number
   articles_count: number
@@ -268,6 +282,9 @@ export interface CmsSlider {
   title: string | null
   image_key: string
   image_url: string
+  /** 4:5 phone artwork; the storefront falls back to `image_key`. */
+  mobile_image_key: string | null
+  mobile_image_url: string | null
   link: string | null
   display_order: number
   is_active: boolean
@@ -286,6 +303,7 @@ export interface CmsCoupon {
   code: string
   name: string
   description: string | null
+  banner_key: string | null
   created_by_user_id: string | null
   author_id: Id | null
   author_name?: string | null
@@ -352,6 +370,7 @@ export interface CouponInputPayload {
   code?: string
   name: string
   description?: string | null
+  banner_key?: string | null
   scope: CouponScope
   book_id?: Id | null
   article_id?: Id | null
@@ -463,6 +482,7 @@ export interface CmsPolicySummary {
   slug: string
   title: string
   kind: PolicyKind
+  thumbnail_key: string | null
   published_version: number | null
   versions_count: number
   draft_version: number | null
@@ -500,6 +520,118 @@ export interface PublicPolicy {
   version: number
   effective_at: string | null
   published_at: string | null
+}
+
+/** A membership plan as the CMS edits it, with its 16:9 artwork. */
+export type CmsPlan = Plan & { image_key: string | null; image: ResponsiveImage | null }
+
+// ── Media library ──────────────────────────────────────────────────────────
+
+export interface MediaVariant {
+  key: string
+  width: number
+  height: number
+  bytes: number
+  url: string | null
+}
+
+export interface MediaAsset {
+  id: Id
+  key: string
+  asset_type: MediaAssetType
+  asset_type_label: string
+  category: MediaCategory
+  storage_kind: StorageKind
+  visibility: 'public' | 'private'
+  folder_id: Id | null
+  original_name: string
+  title: string | null
+  alt_text: string | null
+  mime_type: string
+  format: string
+  size_bytes: number
+  /** Original plus every generated variant. */
+  total_bytes: number
+  width: number | null
+  height: number | null
+  has_alpha: boolean
+  /** Placeholder colour while the image loads. */
+  dominant_color: string | null
+  display: DisplayShape | null
+  /** Public URL of the original; null for private files (use `cms.media.signedUrl`). */
+  url: string | null
+  image: ResponsiveImage | null
+  variants: Partial<Record<string, MediaVariant>>
+  uploaded_by: string | null
+  usage_count?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface MediaUsage {
+  /** Registry id, e.g. `book.cover`. */
+  reference: string
+  label: string
+  entity_type: string
+  entity_id: string
+  entity_label: string | null
+}
+
+export interface MediaAssetDetail extends MediaAsset {
+  usage_count: number
+  usages: MediaUsage[]
+}
+
+export interface MediaFolder {
+  id: Id
+  parent_id: Id | null
+  name: string
+  asset_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface MediaStats {
+  assets: number
+  total_bytes: number
+  original_bytes: number
+  by_category: Partial<Record<MediaCategory, { count: number; bytes: number }>>
+  unused: { count: number; bytes: number }
+}
+
+export type ResolvedMedia =
+  | { key: string; registered: true; asset: MediaAsset }
+  | { key: string; registered: false; url: string | null; image: ResponsiveImage | null }
+
+export interface MediaUploadResponse {
+  status: 'ok'
+  key: string
+  public_url: string | null
+  asset: MediaAsset | null
+  warnings: MediaIssue[]
+  /** An identical file of the same type already existed and was reused. */
+  reused: boolean
+}
+
+export interface MediaListQuery {
+  page?: number
+  limit?: number
+  q?: string
+  category?: MediaCategory
+  asset_type?: MediaAssetType
+  /** Folder id, or `root` for unfiled assets; omit for all folders. */
+  folder?: Id | 'root'
+  usage?: 'used' | 'unused'
+  sort?: 'latest' | 'oldest' | 'name' | 'largest'
+}
+
+export interface MediaBulkUploadResult {
+  name: string
+  ok: boolean
+  asset?: MediaAsset | null
+  warnings?: MediaIssue[]
+  reused?: boolean
+  error?: { code: string; message: string; details?: unknown }
 }
 
 export interface CmsSetting {

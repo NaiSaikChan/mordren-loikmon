@@ -112,6 +112,23 @@ export class PolicyService {
     return this.get(slug)
   }
 
+  /** The listing thumbnail belongs to the policy, not to a version: it changes without a new draft. */
+  async setThumbnail(ctx: CmsRequestContext, slug: string, thumbnailKey: string | null) {
+    const policy = await this.db.selectFrom('policies').selectAll().where('slug', '=', slug).executeTakeFirst()
+    if (!policy) throw errors.notFound('Policy')
+    await this.db.updateTable('policies').set({ thumbnail_key: thumbnailKey }).where('id', '=', policy.id).execute()
+    await this.audit.record({
+      actor: ctx.audit,
+      action: 'update',
+      entityType: 'policy',
+      entityId: policy.id,
+      summary: `${slug} thumbnail`,
+      before: { thumbnail_key: policy.thumbnail_key },
+      after: { thumbnail_key: thumbnailKey },
+    })
+    return this.get(slug)
+  }
+
   /**
    * Saves a draft. An existing draft is overwritten; otherwise a new version
    * number is allocated above the highest one.

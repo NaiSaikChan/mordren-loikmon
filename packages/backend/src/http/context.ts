@@ -19,6 +19,7 @@ import type { SettingsService } from '../services/cms/settings.js'
 import type { TaxonomyService } from '../services/cms/taxonomy.js'
 import type { EngagementService } from '../services/engagement.js'
 import type { LegacyAuthService } from '../services/legacyAuth.js'
+import type { MediaService } from '../services/media.js'
 import type { CmsActor, RbacService } from '../services/rbac.js'
 import type { SubscriptionService } from '../services/subscriptions.js'
 import type { StorageService } from '../storage/storage.js'
@@ -48,6 +49,7 @@ export interface AppContext {
     policies: PolicyService
     settings: SettingsService
     analytics: AnalyticsService
+    media: MediaService
   }
   /** Readiness probes, e.g. database and storage pings. */
   healthChecks: Record<string, () => Promise<void>>

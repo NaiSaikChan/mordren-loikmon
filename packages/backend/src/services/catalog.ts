@@ -20,6 +20,7 @@ export interface BookRow {
   publisher: string | null
   published_at: Date | null
   cover_key: string | null
+  og_image_key: string | null
   pdf_key: string | null
   epub_key: string | null
   is_free: boolean
@@ -47,6 +48,7 @@ export interface ArticleRow {
   subcategory_id: number | null
   thumbnail_key: string | null
   audio_key: string | null
+  og_image_key: string | null
   is_free: boolean
   is_published: boolean
   view_count: number
@@ -85,6 +87,7 @@ export interface CategoryRow {
   name: string
   parent_id: number | null
   thumbnail_key: string | null
+  cover_key: string | null
   display_order: number
   books_count: number | string | null
   articles_count: number | string | null
@@ -159,6 +162,7 @@ export class CatalogService {
         'b.publisher',
         'b.published_at',
         'b.cover_key',
+        'b.og_image_key',
         'b.pdf_key',
         'b.epub_key',
         'b.is_free',
@@ -283,6 +287,7 @@ export class CatalogService {
     'ar.category_id',
     'ar.subcategory_id',
     'ar.thumbnail_key',
+    'ar.og_image_key',
     'ar.audio_key',
     'ar.is_free',
     'ar.is_published',
@@ -375,7 +380,7 @@ export class CatalogService {
   async listCategories(type?: ItemType): Promise<CategoryRow[]> {
     let q = this.db
       .selectFrom('categories as c')
-      .select(['c.id', 'c.type', 'c.name', 'c.parent_id', 'c.thumbnail_key', 'c.display_order'])
+      .select(['c.id', 'c.type', 'c.name', 'c.parent_id', 'c.thumbnail_key', 'c.cover_key', 'c.display_order'])
       .select((eb) => [
         eb
           .selectFrom('books as b')

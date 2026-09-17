@@ -23,6 +23,7 @@ export interface CouponInput {
   code?: string
   name: string
   description?: string | null
+  banner_key?: string | null
   scope: CouponScope
   author_id?: number | null
   book_id?: number | null
@@ -197,6 +198,7 @@ export class CouponService {
       article_id: input.article_id !== undefined ? input.article_id : before.article_id,
       plan_code: input.plan_code !== undefined ? input.plan_code : before.plan_code,
       description: input.description !== undefined ? input.description : before.description,
+      banner_key: input.banner_key !== undefined ? input.banner_key : before.banner_key,
       campaign_type: input.campaign_type ?? before.campaign_type,
       max_discount_cents: input.max_discount_cents !== undefined ? input.max_discount_cents : before.max_discount_cents,
       min_order_cents: input.min_order_cents !== undefined ? input.min_order_cents : before.min_order_cents,
@@ -613,6 +615,7 @@ export class CouponService {
       code: existing?.code ?? normaliseCouponCode(input.code || generateCouponCode()),
       name: sanitizePlainText(input.name),
       description: input.description === null || input.description === undefined ? null : sanitizePlainText(input.description),
+      banner_key: input.banner_key ?? null,
       author_id: authorId,
       scope,
       book_id: bookId,

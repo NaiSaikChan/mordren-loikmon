@@ -47,6 +47,7 @@ const form = reactive({
   subcategory_id: null as number | null,
   thumbnail_key: null as string | null,
   audio_key: null as string | null,
+  og_image_key: null as string | null,
   is_free: false,
   published_at: '' as string | null,
   tags: [] as string[],
@@ -65,6 +66,7 @@ function hydrate(data: CmsArticleDetail) {
     subcategory_id: data.subcategory_id,
     thumbnail_key: data.thumbnail_key,
     audio_key: data.audio_key,
+    og_image_key: data.og_image_key ?? null,
     is_free: data.is_free,
     published_at: toLocalInput(data.published_at),
     tags: [...data.tags],
@@ -298,8 +300,14 @@ async function restore(version: ContentVersionSummary) {
             </button>
           </div>
 
-          <MediaPicker v-model="form.thumbnail_key" kind="thumbnail" label="Thumbnail" :disabled="!canEdit" />
-          <MediaPicker v-model="form.audio_key" kind="audio" label="Narration audio" preview="audio" :disabled="!canEdit" />
+          <MediaPicker v-model="form.thumbnail_key" asset-type="article_cover" label="Cover image" :disabled="!canEdit" />
+          <MediaPicker v-model="form.audio_key" asset-type="article_narration" label="Narration audio" :disabled="!canEdit" />
+          <MediaPicker
+            v-model="form.og_image_key"
+            asset-type="og_image"
+            label="Social share image (optional)"
+            :disabled="!canEdit"
+          />
         </aside>
       </form>
     </template>

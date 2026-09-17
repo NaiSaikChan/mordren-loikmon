@@ -7,6 +7,7 @@ import ChartLine from '@/cms/components/ChartLine.vue'
 import DataTable from '@/cms/components/DataTable.vue'
 import FilterBar from '@/cms/components/FilterBar.vue'
 import FormField from '@/cms/components/FormField.vue'
+import MediaPicker from '@/cms/components/MediaPicker.vue'
 import ModalDialog from '@/cms/components/ModalDialog.vue'
 import PageHeader from '@/cms/components/PageHeader.vue'
 import PagerBar from '@/cms/components/PagerBar.vue'
@@ -86,6 +87,7 @@ const form = reactive({
   code: '',
   name: '',
   description: '',
+  banner_key: null as string | null,
   scope: 'book' as CouponScope,
   book_id: null as number | null,
   article_id: null as number | null,
@@ -133,6 +135,7 @@ async function open(coupon?: CmsCoupon) {
     code: coupon?.code ?? '',
     name: coupon?.name ?? '',
     description: coupon?.description ?? '',
+    banner_key: coupon?.banner_key ?? null,
     scope: coupon?.scope ?? 'book',
     book_id: coupon?.book_id ?? null,
     article_id: coupon?.article_id ?? null,
@@ -170,6 +173,7 @@ async function save() {
     code: form.code || undefined,
     name: form.name,
     description: form.description || null,
+    banner_key: form.banner_key,
     scope: form.scope,
     book_id: form.scope === 'book' ? form.book_id : null,
     article_id: form.scope === 'article' ? form.article_id : null,
@@ -522,6 +526,8 @@ function exportCsv() {
         <FormField v-slot="{ id }" label="Description" class="md:col-span-2">
           <textarea :id="id" v-model="form.description" rows="2" class="input resize-y" maxlength="500" />
         </FormField>
+
+        <MediaPicker v-model="form.banner_key" asset-type="coupon_banner" label="Campaign banner" class="md:col-span-2" />
       </div>
 
       <template #footer>

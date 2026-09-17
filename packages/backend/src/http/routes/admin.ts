@@ -107,6 +107,7 @@ const PlanUpdate = z
     apple_product_id: z.string().trim().max(128).nullable(),
     google_product_id: z.string().trim().max(128).nullable(),
     google_base_plan_id: z.string().trim().max(64).nullable(),
+    image_key: z.string().trim().max(1024).nullable(),
     display_order: z.number().int(),
     is_active: z.boolean(),
   })
@@ -299,7 +300,7 @@ export function adminRouter(ctx: AppContext) {
   // ── Plans, users, subscriptions ────────────────────────────────────────
 
   router.get('/plans', async (_req, res) => {
-    res.json({ status: 'ok', plans: serializePlans(await ctx.services.subscriptions.listPlans({ includeInactive: true })) })
+    res.json({ status: 'ok', plans: serializePlans(await ctx.services.subscriptions.listPlans({ includeInactive: true }), (key) => ctx.storage.publicUrl(key)) })
   })
 
   router.patch('/plans/:code', async (req, res) => {

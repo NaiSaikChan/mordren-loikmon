@@ -1,7 +1,6 @@
 import { getClient } from '../client.js'
 import type {
   AdminOverview,
-  AssetKind,
   AuditLogEntry,
   AuthorPerformanceRow,
   BulkResult,
@@ -16,6 +15,7 @@ import type {
   CmsCollection,
   CmsCoupon,
   CmsCouponDetail,
+  CmsPlan,
   CmsPolicyDetail,
   CmsPolicySummary,
   CmsReview,
@@ -34,14 +34,24 @@ import type {
   ContentVersionSummary,
   CouponInputPayload,
   CouponPerformance,
-  CouponSummary,
   CouponStatus,
+  CouponSummary,
   DashboardResponse,
   FeedbackMetrics,
+  MediaAsset,
+  MediaAssetDetail,
+  MediaAssetType,
+  MediaBulkUploadResult,
+  MediaFolder,
+  MediaListQuery,
+  MediaStats,
+  MediaUploadResponse,
+  MediaUsage,
   Ok,
   Paged,
   PermissionGroup,
   PresignedUpload,
+  ResolvedMedia,
   ReviewMetrics,
   ReviewStatus,
   RoleScope,
@@ -51,7 +61,7 @@ import type {
   VerificationStatus,
   WorkflowStatus,
 } from '../cms-types.js'
-import type { Id, ItemType, Pagination, Plan } from '../types.js'
+import type { Id, ItemType, Pagination } from '../types.js'
 
 /**
  * CMS API (`/api/v1/cms`).
@@ -196,9 +206,9 @@ export const cms = {
 
   categories: {
     tree: () => c().get<{ status: 'ok'; categories: CategoryNode[] }>('cms/categories'),
-    create: (payload: { name: string; type?: ItemType | 'all'; parent_id?: Id | null; thumbnail_key?: string | null; display_order?: number }) =>
+    create: (payload: { name: string; type?: ItemType | 'all'; parent_id?: Id | null; thumbnail_key?: string | null; cover_key?: string | null; display_order?: number }) =>
       c().post<{ status: 'ok'; category: CategoryNode }>('cms/categories', payload),
-    update: (id: Id, payload: Partial<{ name: string; type: ItemType | 'all'; parent_id: Id | null; thumbnail_key: string | null; display_order: number }>) =>
+    update: (id: Id, payload: Partial<{ name: string; type: ItemType | 'all'; parent_id: Id | null; thumbnail_key: string | null; cover_key: string | null; display_order: number }>) =>
       c().patch<{ status: 'ok'; category: CategoryNode }>(`cms/categories/${id}`, payload),
     remove: (id: Id) => c().delete<Ok>(`cms/categories/${id}`),
     /** Persists a drag-and-drop reorder of the whole tree. */
@@ -291,6 +301,8 @@ export const cms = {
       c().post<{ status: 'ok'; policy: CmsPolicyDetail }>('cms/policies', payload),
     saveDraft: (slug: string, payload: { title?: string; body: string; summary?: string | null; effective_at?: string | null }) =>
       c().put<{ status: 'ok'; policy: CmsPolicyDetail }>(`cms/policies/${slug}/draft`, payload),
+    setThumbnail: (slug: string, thumbnailKey: string | null) =>
+      c().patch<{ status: 'ok'; policy: CmsPolicyDetail }>(`cms/policies/${slug}`, { thumbnail_key: thumbnailKey }),
     publish: (slug: string, version: number) => c().post<{ status: 'ok'; policy: CmsPolicyDetail }>(`cms/policies/${slug}/publish`, { version }),
     remove: (slug: string) => c().delete<Ok>(`cms/policies/${slug}`),
   },
@@ -301,8 +313,8 @@ export const cms = {
   },
 
   plans: {
-    list: () => c().get<{ status: 'ok'; plans: Plan[] }>('cms/plans'),
-    update: (code: string, payload: Partial<{ name: string; description: string | null; price_cents: number; apple_product_id: string | null; google_product_id: string | null; google_base_plan_id: string | null; display_order: number; is_active: boolean }>) =>
+    list: () => c().get<{ status: 'ok'; plans: CmsPlan[] }>('cms/plans'),
+    update: (code: string, payload: Partial<{ name: string; description: string | null; image_key: string | null; price_cents: number; apple_product_id: string | null; google_product_id: string | null; google_base_plan_id: string | null; display_order: number; is_active: boolean }>) =>
       c().patch<Ok>(`cms/plans/${code}`, payload),
   },
 
@@ -330,44 +342,117 @@ export const cms = {
   },
 
   media: {
-    /** Small files (images) go through the API. */
-    upload: (kind: AssetKind, file: Blob | File) => {
+    /** The shared standards as served by this deployment, with its effective upload limits. */
+    standards: () =>
+      c().get<{ status: 'ok'; limits: { image: number; document: number; audio: number; api_upload_bytes: number; deployment_max_bytes: number } }>(
+        'cms/media/standards',
+      ),
+    list: (params: MediaListQuery = {}) =>
+      c().get<{ status: 'ok'; assets: MediaAsset[]; pagination: Pagination }>('cms/media', { params }),
+    stats: () => c().get<{ status: 'ok'; stats: MediaStats }>('cms/media/stats'),
+    get: (id: Id) => c().get<{ status: 'ok'; asset: MediaAssetDetail }>(`cms/media/${id}`),
+    update: (id: Id, payload: Partial<{ title: string | null; alt_text: string | null; folder_id: Id | null }>) =>
+      c().patch<{ status: 'ok'; asset: MediaAssetDetail }>(`cms/media/${id}`, payload),
+    move: (ids: Id[], folderId: Id | null) => c().post<{ status: 'ok'; moved: number }>('cms/media/move', { ids, folder_id: folderId }),
+    /** Display data for keys stored on content rows. */
+    resolve: (keys: string[]) => c().post<{ status: 'ok'; items: ResolvedMedia[] }>('cms/media/resolve', { keys }),
+
+    /** One file through the API: validated against `assetType`, processed and registered. */
+    upload: (
+      assetType: MediaAssetType,
+      file: Blob | File,
+      options: { folderId?: Id | null; title?: string; altText?: string; onProgress?: (percent: number) => void } = {},
+    ) => {
       const form = new FormData()
-      form.append('kind', kind)
+      form.append('asset_type', assetType)
+      if (options.folderId) form.append('folder_id', String(options.folderId))
+      if (options.title) form.append('title', options.title)
+      if (options.altText) form.append('alt_text', options.altText)
       form.append('file', file)
-      return c().post<{ status: 'ok'; key: string; public_url: string | null }>('cms/media', form, {
+      return c().post<MediaUploadResponse>('cms/media', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: progressHandler(options.onProgress),
       })
     },
-    /** Large files (PDF, EPUB, audio) are PUT straight to object storage. */
-    presign: (kind: AssetKind, contentType: string, filename?: string) =>
-      c().post<{ status: 'ok'; upload: PresignedUpload; public_url: string | null }>('cms/media/presign', {
-        kind,
+    /** Drag-and-drop bulk upload; each file succeeds or fails independently. */
+    bulkUpload: (
+      files: Array<Blob | File>,
+      options: { assetType?: MediaAssetType; folderId?: Id | null; onProgress?: (percent: number) => void } = {},
+    ) => {
+      const form = new FormData()
+      if (options.assetType) form.append('asset_type', options.assetType)
+      if (options.folderId) form.append('folder_id', String(options.folderId))
+      for (const file of files) form.append('files', file)
+      return c().post<{ status: 'ok'; results: MediaBulkUploadResult[] }>('cms/media/bulk', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: progressHandler(options.onProgress),
+      })
+    },
+    /** Large documents and audio are PUT straight to object storage. */
+    presign: (assetType: MediaAssetType, contentType: string, filename?: string, size?: number) =>
+      c().post<{ status: 'ok'; asset_type: MediaAssetType; upload: PresignedUpload; public_url: string | null }>('cms/media/presign', {
+        asset_type: assetType,
         content_type: contentType,
         filename,
+        size,
       }),
+    complete: (payload: { key: string; asset_type: MediaAssetType; original_name: string; folder_id?: Id | null; title?: string | null }) =>
+      c().post<Omit<MediaUploadResponse, 'public_url' | 'reused'>>('cms/media/complete', payload),
     signedUrl: (key: string) => c().post<{ status: 'ok'; url: string; expires_at: string }>('cms/media/signed-url', { key }),
-    remove: (key: string) => c().delete<Ok>('cms/media', { data: { key } }),
+
+    remove: (id: Id, options: { force?: boolean } = {}) =>
+      c().delete<Ok>(`cms/media/${id}`, { params: options.force ? { force: 'true' } : undefined }),
+    bulkRemove: (ids: Id[], options: { force?: boolean } = {}) =>
+      c().post<{ status: 'ok'; deleted: Id[]; in_use: Array<{ id: Id; original_name: string; usages: MediaUsage[] }>; not_found: Id[] }>(
+        'cms/media/bulk-delete',
+        { ids, force: options.force },
+      ),
+    /** Delete by storage key (unregistered files). */
+    removeByKey: (key: string) => c().delete<Ok>('cms/media', { data: { key } }),
+
+    folders: {
+      list: () => c().get<{ status: 'ok'; folders: MediaFolder[]; unfiled_count: number }>('cms/media-folders'),
+      create: (payload: { name: string; parent_id?: Id | null }) =>
+        c().post<{ status: 'ok'; folder: MediaFolder }>('cms/media-folders', payload),
+      update: (id: Id, payload: Partial<{ name: string; parent_id: Id | null }>) =>
+        c().patch<{ status: 'ok'; folder: MediaFolder }>(`cms/media-folders/${id}`, payload),
+      remove: (id: Id) => c().delete<Ok>(`cms/media-folders/${id}`),
+    },
   },
 }
 
-/** Uploads a large file directly to object storage and returns its key. */
+function progressHandler(onProgress?: (percent: number) => void) {
+  return onProgress
+    ? (event: { loaded: number; total?: number }) => onProgress(event.total ? Math.round((event.loaded / event.total) * 100) : 0)
+    : undefined
+}
+
+/**
+ * Uploads a large document or audio file directly to object storage, then
+ * registers it in the media library. Returns the storage key to save on the record.
+ */
 export async function uploadLargeAsset(
-  kind: AssetKind,
+  assetType: MediaAssetType,
   file: File,
   onProgress?: (percent: number) => void,
-): Promise<{ key: string; public_url: string | null }> {
-  const { data } = await cms.media.presign(kind, file.type || 'application/octet-stream', file.name)
+  options: { folderId?: Id | null } = {},
+): Promise<{ key: string; asset: MediaAsset | null }> {
+  const contentType = file.type || 'application/octet-stream'
+  const { data } = await cms.media.presign(assetType, contentType, file.name, file.size)
   // The presigned PUT goes to MinIO, not to the API: no auth header, no baseURL.
   await getClient().put(data.upload.url, file, {
     baseURL: '',
     headers: { ...data.upload.headers, Authorization: undefined as unknown as string },
     transformRequest: [(body) => body],
-    onUploadProgress: onProgress
-      ? (event) => onProgress(event.total ? Math.round((event.loaded / event.total) * 100) : 0)
-      : undefined,
+    onUploadProgress: progressHandler(onProgress),
   })
-  return { key: data.upload.key, public_url: data.public_url }
+  const registered = await cms.media.complete({
+    key: data.upload.key,
+    asset_type: assetType,
+    original_name: file.name,
+    folder_id: options.folderId ?? null,
+  })
+  return { key: registered.data.key, asset: registered.data.asset }
 }
 
 // ── Public (storefront) endpoints backed by the CMS ─────────────────────────

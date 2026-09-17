@@ -14,6 +14,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Media rules are shared with the backend; the web build compiles them from source.
+      '@loikmon/media-standards': fileURLToPath(new URL('../media-standards/src/index.ts', import.meta.url)),
     },
   },
   server: {

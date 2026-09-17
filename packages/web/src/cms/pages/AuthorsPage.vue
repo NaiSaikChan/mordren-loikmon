@@ -242,7 +242,7 @@ async function remove(author: CmsAuthor) {
         </div>
 
         <div class="space-y-4">
-          <MediaPicker v-model="form.avatar_key" kind="avatar" label="Avatar" />
+          <MediaPicker v-model="form.avatar_key" asset-type="author_avatar" label="Avatar" />
 
           <FormField v-slot="{ id }" label="Website">
             <input :id="id" v-model="form.website" type="url" class="input" placeholder="https://" />

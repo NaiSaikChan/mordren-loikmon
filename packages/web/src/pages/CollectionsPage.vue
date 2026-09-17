@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useCollectionsStore } from '@/stores/collections'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
+import ResponsiveImg from '@/components/shared/ResponsiveImg.vue'
 
 const { t } = useI18n()
 const store = useCollectionsStore()
@@ -20,8 +21,11 @@ onMounted(() => { void store.fetchCollections().catch(() => undefined) })
         :to="`/collections/${col.id}`"
         class="card overflow-hidden group hover:border-brand-400 transition-colors">
         <div class="h-36 bg-gradient-to-br from-brand-600/80 to-indigo-700/80 flex items-center justify-center overflow-hidden">
-          <img v-if="col.thumbnail" :src="col.thumbnail" :alt="col.title" class="w-full h-full object-cover" loading="lazy" />
-          <span v-else class="text-5xl">📦</span>
+          <!-- Cards follow the 1 / 2 / 3 column grid inside max-w-screen-xl. -->
+          <ResponsiveImg :image="col.cover_image" :fallback="col.thumbnail" :alt="col.title" asset-type="collection_cover" fill
+            sizes="(min-width: 1024px) 400px, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw">
+            <template #empty><span class="text-5xl">📦</span></template>
+          </ResponsiveImg>
         </div>
         <div class="p-4">
           <h3 class="font-semibold text-gray-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">

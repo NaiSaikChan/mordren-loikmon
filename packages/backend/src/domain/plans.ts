@@ -1,3 +1,4 @@
+import { responsiveImage, type ResponsiveImage, type UrlResolver } from '@loikmon/media-standards'
 import type { SubscriptionPlan } from '../db/types.js'
 
 /** Public representation of a plan, consumed by the web and mobile paywalls. */
@@ -15,9 +16,12 @@ export interface PlanDto {
   apple_product_id: string | null
   google_product_id: string | null
   google_base_plan_id: string | null
+  /** 16:9 membership plan artwork (storage key + responsive URLs). */
+  image_key: string | null
+  image: ResponsiveImage | null
 }
 
-export function serializePlan(plan: SubscriptionPlan, monthlyReferenceCents?: number): PlanDto {
+export function serializePlan(plan: SubscriptionPlan, monthlyReferenceCents?: number, urlFor?: UrlResolver): PlanDto {
   const monthly = Math.round(plan.price_cents / plan.period_months)
   const reference = monthlyReferenceCents ?? monthly
   const savings = reference > 0 ? Math.max(0, Math.round((1 - monthly / reference) * 100)) : 0
@@ -34,13 +38,15 @@ export function serializePlan(plan: SubscriptionPlan, monthlyReferenceCents?: nu
     apple_product_id: plan.apple_product_id,
     google_product_id: plan.google_product_id,
     google_base_plan_id: plan.google_base_plan_id,
+    image_key: plan.image_key ?? null,
+    image: urlFor ? responsiveImage(plan.image_key, urlFor) : null,
   }
 }
 
-export function serializePlans(plans: SubscriptionPlan[]): PlanDto[] {
+export function serializePlans(plans: SubscriptionPlan[], urlFor?: UrlResolver): PlanDto[] {
   const sorted = [...plans].sort((a, b) => a.display_order - b.display_order)
   const monthly = sorted.find((p) => p.period_months === 1)
-  return sorted.map((p) => serializePlan(p, monthly?.price_cents))
+  return sorted.map((p) => serializePlan(p, monthly?.price_cents, urlFor))
 }
 
 export function findPlanForAppleProduct(plans: SubscriptionPlan[], productId: string): SubscriptionPlan | undefined {

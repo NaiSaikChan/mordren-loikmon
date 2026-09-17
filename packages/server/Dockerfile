@@ -2,11 +2,14 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY packages/media-standards/package.json ./packages/media-standards/
 COPY packages/api/package.json ./packages/api/
 COPY packages/server/package.json ./packages/server/
-RUN npm ci --workspace=packages/api --workspace=packages/server --ignore-scripts
+RUN npm ci --workspace=packages/media-standards --workspace=packages/api --workspace=packages/server --ignore-scripts
+COPY packages/media-standards ./packages/media-standards
 COPY packages/api ./packages/api
 COPY packages/server ./packages/server
+# `prebuild` of @loikmon/api compiles @loikmon/media-standards, whose types it imports.
 RUN npm run build -w @loikmon/api
 RUN npm run build -w @loikmon/server
 

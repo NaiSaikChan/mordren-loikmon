@@ -39,7 +39,7 @@ export function subscriptionsRouter(ctx: AppContext, limiters: ReturnType<typeof
     res.set('Cache-Control', 'public, max-age=300')
     res.json({
       status: 'ok',
-      plans: serializePlans(plans),
+      plans: serializePlans(plans, (key) => ctx.storage.publicUrl(key)),
       // Web has no native billing: subscriptions are bought in the apps and apply to the account everywhere.
       platforms: { ios: Boolean(ctx.apple), android: Boolean(ctx.google), web: false },
     })

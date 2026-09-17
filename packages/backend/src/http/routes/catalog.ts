@@ -11,6 +11,8 @@ import {
   serializeBook,
   serializeCategory,
   serializeChapter,
+  serializeCollectionSummary,
+  serializeSlider,
 } from '../serializers.js'
 import { idParam, pageInfo, pagination, parse, queryBool } from '../validate.js'
 
@@ -83,7 +85,7 @@ export function catalogRouter(ctx: AppContext) {
     const books = (rows: typeof latest.rows) => rows.map((b) => serializeBook(b, ctx.storage))
     res.json({
       status: 'ok',
-      sliders: sliders.map((s) => ({ id: s.id, name: s.title, title: s.title, link: s.link, thumbnail: ctx.storage.publicUrl(s.image_key) })),
+      sliders: sliders.map((s) => serializeSlider(s, ctx.storage)),
       latest_books: books(latest.rows),
       popular_books: books(popular.rows),
       recommended_books: books(recommended.rows),
@@ -306,14 +308,7 @@ export function catalogRouter(ctx: AppContext) {
     const { rows, total } = await catalog.listCollections(q.page, q.limit)
     res.json({
       status: 'ok',
-      collections: rows.map((c) => ({
-        id: c.id,
-        title: c.title,
-        name: c.title,
-        description: c.description,
-        thumbnail: ctx.storage.publicUrl(c.thumbnail_key),
-        items_count: Number(c.items_count ?? 0),
-      })),
+      collections: rows.map((c) => ({ ...serializeCollectionSummary(c, ctx.storage), items_count: Number(c.items_count ?? 0) })),
       total,
       pagination: pageInfo(q.page, q.limit, total),
     })
@@ -327,11 +322,7 @@ export function catalogRouter(ctx: AppContext) {
     res.json({
       status: 'ok',
       collection: {
-        id: collection.id,
-        title: collection.title,
-        name: collection.title,
-        description: collection.description,
-        thumbnail: ctx.storage.publicUrl(collection.thumbnail_key),
+        ...serializeCollectionSummary(collection, ctx.storage),
         books: books.map((b) => serializeBook(b, ctx.storage)),
         articles: articles.map((a) => serializeArticle(a, ctx.storage)),
       },

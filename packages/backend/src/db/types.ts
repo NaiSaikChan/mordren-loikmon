@@ -42,6 +42,7 @@ export type TicketPriority = 'low' | 'normal' | 'high' | 'urgent'
 export type TicketStatus = 'open' | 'pending' | 'resolved' | 'closed'
 export type PolicyKind = 'terms' | 'privacy' | 'refund' | 'content' | 'custom'
 export type PolicyVersionStatus = 'draft' | 'published' | 'archived'
+export type MediaCategory = 'image' | 'document' | 'audio'
 export type SliderAudience = 'all' | 'guests' | 'members' | 'subscribers' | 'non_subscribers'
 
 export interface UsersTable {
@@ -66,6 +67,7 @@ export interface CategoriesTable {
   type: Generated<CategoryType>
   name: string
   thumbnail_key: string | null
+  cover_key: string | null
   display_order: Generated<number>
   legacy_id: string | null
   created_at: CreatedAt
@@ -129,6 +131,8 @@ export interface BooksTable {
   legacy_id: string | null
   created_at: CreatedAt
   updated_at: UpdatedAt
+  /** Explicit social card; generated from the cover when null. */
+  og_image_key: string | null
 }
 
 export interface BookAudioChaptersTable {
@@ -169,6 +173,8 @@ export interface ArticlesTable {
   legacy_id: string | null
   created_at: CreatedAt
   updated_at: UpdatedAt
+  /** Explicit social card; generated from the cover when null. */
+  og_image_key: string | null
 }
 
 export interface CollectionsTable {
@@ -195,6 +201,8 @@ export interface SlidersTable {
   id: Generated<number>
   title: string | null
   image_key: string
+  /** 4:5 banner for phones; falls back to image_key when null. */
+  mobile_image_key: string | null
   link: string | null
   display_order: Generated<number>
   is_active: Generated<boolean>
@@ -269,6 +277,7 @@ export interface SubscriptionPlansTable {
   apple_product_id: string | null
   google_product_id: string | null
   google_base_plan_id: string | null
+  image_key: string | null
   display_order: Generated<number>
   is_active: Generated<boolean>
   created_at: CreatedAt
@@ -419,6 +428,7 @@ export interface CouponsTable {
   code: string
   name: string
   description: string | null
+  banner_key: string | null
   created_by_user_id: string | null
   /** Owning author; NULL for platform-wide campaigns. */
   author_id: number | null
@@ -489,6 +499,7 @@ export interface PoliciesTable {
   slug: string
   title: string
   kind: Generated<PolicyKind>
+  thumbnail_key: string | null
   published_version: number | null
   created_at: CreatedAt
   updated_at: UpdatedAt
@@ -515,6 +526,48 @@ export interface SettingsTable {
   value: Json<unknown>
   is_public: Generated<boolean>
   updated_by: string | null
+  updated_at: UpdatedAt
+}
+
+export interface MediaFoldersTable {
+  id: Generated<number>
+  parent_id: number | null
+  name: string
+  created_by: string | null
+  created_at: CreatedAt
+  updated_at: UpdatedAt
+}
+
+export interface MediaVariantRecord {
+  key: string
+  width: number
+  height: number
+  bytes: number
+}
+
+export interface MediaAssetsTable {
+  id: Generated<number>
+  storage_key: string
+  storage_kind: string
+  /** A MediaAssetType from @loikmon/media-standards. */
+  asset_type: string
+  category: MediaCategory
+  folder_id: number | null
+  original_name: string
+  title: string | null
+  alt_text: string | null
+  mime_type: string
+  format: string
+  size_bytes: number
+  width: number | null
+  height: number | null
+  has_alpha: Generated<boolean>
+  dominant_color: string | null
+  checksum: string
+  variants: Json<Record<string, MediaVariantRecord>> | null
+  total_bytes: number
+  uploaded_by: string | null
+  created_at: CreatedAt
   updated_at: UpdatedAt
 }
 
@@ -554,6 +607,8 @@ export interface Database {
   policies: PoliciesTable
   policy_versions: PolicyVersionsTable
   settings: SettingsTable
+  media_folders: MediaFoldersTable
+  media_assets: MediaAssetsTable
 }
 
 export type Book = Selectable<BooksTable>
@@ -579,3 +634,5 @@ export type PolicyVersion = Selectable<PolicyVersionsTable>
 export type Setting = Selectable<SettingsTable>
 export type AuditLog = Selectable<AuditLogsTable>
 export type Review = Selectable<ReviewsTable>
+export type MediaAsset = Selectable<MediaAssetsTable>
+export type MediaFolder = Selectable<MediaFoldersTable>

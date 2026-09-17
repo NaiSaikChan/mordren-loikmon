@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { cms } from '@loikmon/api'
 import type { CmsPolicyDetail, CmsPolicySummary } from '@loikmon/api'
 import FormField from '@/cms/components/FormField.vue'
+import MediaPicker from '@/cms/components/MediaPicker.vue'
 import ModalDialog from '@/cms/components/ModalDialog.vue'
 import PageHeader from '@/cms/components/PageHeader.vue'
 import RichTextEditor from '@/cms/components/RichTextEditor.vue'
@@ -45,6 +46,18 @@ async function loadList() {
     toast.failure(err, 'Could not load the policies')
   } finally {
     loading.value = false
+  }
+}
+
+/** The listing thumbnail is not versioned: it is saved as soon as it changes. */
+async function saveThumbnail(key: string | null) {
+  if (!selected.value) return
+  try {
+    const { data } = await cms.policies.setThumbnail(selected.value, key)
+    if (detail.value) detail.value = { ...detail.value, thumbnail_key: data.policy.thumbnail_key }
+    toast.success(key ? 'Thumbnail saved' : 'Thumbnail removed')
+  } catch (err) {
+    toast.failure(err, 'Could not save the thumbnail')
   }
 }
 
@@ -249,6 +262,14 @@ async function createPolicy() {
               <input :id="id" v-model="draft.effective_at" type="datetime-local" class="input" :disabled="!canEdit" />
             </FormField>
           </div>
+
+          <MediaPicker
+            :model-value="detail?.thumbnail_key ?? null"
+            asset-type="policy_thumbnail"
+            label="Listing thumbnail"
+            :disabled="!canEdit"
+            @update:model-value="saveThumbnail"
+          />
 
           <FormField v-slot="{ id }" label="Summary of changes" help="A one-line note for the version list.">
             <input :id="id" v-model="draft.summary" type="text" class="input" maxlength="500" :disabled="!canEdit" />

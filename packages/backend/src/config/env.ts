@@ -78,7 +78,10 @@ const EnvSchema = z.object({
   /** Browser-reachable origin of MinIO, e.g. https://storage.loikmon.org */
   MINIO_PUBLIC_URL: z.string().url().default('http://127.0.0.1:9000'),
   SIGNED_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(7 * 24 * 3600).default(3600),
+  /** Can only lower the per-category limits in @loikmon/media-standards (images 10 MB, documents 250 MB, audio 1 GB). */
   UPLOAD_MAX_MB: z.coerce.number().int().positive().default(1024),
+  /** Optional CDN origin in front of the public bucket, e.g. https://cdn.loikmon.org — public asset URLs use it. */
+  MEDIA_CDN_URL: optionalString.pipe(z.string().url().optional()),
 
   APPLE_BUNDLE_ID: optionalString,
   APPLE_APP_APPLE_ID: z.coerce.number().int().positive().optional(),
@@ -147,6 +150,7 @@ export interface AppConfig {
     publicBucket: string
     privateBucket: string
     publicUrl: string
+    cdnUrl?: string
     signedUrlTtlSeconds: number
     uploadMaxBytes: number
   }
@@ -234,6 +238,7 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       publicBucket: e.MINIO_BUCKET_PUBLIC,
       privateBucket: e.MINIO_BUCKET_PRIVATE,
       publicUrl: e.MINIO_PUBLIC_URL.replace(/\/+$/, ''),
+      cdnUrl: e.MEDIA_CDN_URL?.replace(/\/+$/, ''),
       signedUrlTtlSeconds: e.SIGNED_URL_TTL_SECONDS,
       uploadMaxBytes: e.UPLOAD_MAX_MB * 1024 * 1024,
     },

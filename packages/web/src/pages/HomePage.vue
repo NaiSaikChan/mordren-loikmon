@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { misc } from '@loikmon/api'
 import type { HomeResponse, Slider } from '@loikmon/api'
+import { IMAGE_STANDARDS } from '@loikmon/media-standards'
 import BookCard from '@/components/shared/BookCard.vue'
 import BookCarousel from '@/components/shared/BookCarousel.vue'
 import ArticleCard from '@/components/shared/ArticleCard.vue'
@@ -21,6 +22,28 @@ const currentSlideIndex = ref(0)
 let autoRotateTimer: ReturnType<typeof setInterval> | null = null
 
 const sliders = () => home.value?.sliders ?? []
+
+// Phones get the 4:5 mobile artwork only when every slide has its own (the
+// server otherwise repeats the desktop artwork, which would crop badly into a
+// portrait frame); the frame then switches to the mobile ratio below `sm`.
+const heroMobileRatio = (() => {
+  const r = IMAGE_STANDARDS.hero_mobile.aspectRatio
+  return r ? `${r.width} / ${r.height}` : null
+})()
+const useMobileArtwork = computed(() => {
+  const list = sliders()
+  return !!heroMobileRatio && list.length > 0 && list.every((s) => {
+    const mobile = s.mobile_image?.original ?? s.mobile_thumbnail
+    const desktop = s.image?.original ?? s.thumbnail
+    return !!mobile && mobile !== desktop
+  })
+})
+// The slider spans the page width (capped by max-w-screen-xl).
+const HERO_SIZES = '(min-width: 1280px) 1280px, 100vw'
+
+function mobileSrcset(slider: Slider): string {
+  return slider.mobile_image?.srcset ?? slider.mobile_image?.src ?? slider.mobile_thumbnail ?? ''
+}
 
 function nextSlide() {
   const count = sliders().length
@@ -82,7 +105,11 @@ onUnmounted(() => {
     <template v-else-if="home">
       <!-- Sliders Carousel -->
       <div v-if="home.sliders.length" class="mb-8 rounded-2xl overflow-hidden bg-gray-100 dark:bg-surface-800 shadow-lg">
-        <div class="relative w-full aspect-16/6 md:aspect-16/5 overflow-hidden bg-gray-200 dark:bg-surface-700">
+        <div
+          class="relative w-full aspect-16/6 md:aspect-16/5 overflow-hidden bg-gray-200 dark:bg-surface-700"
+          :class="{ 'max-sm:aspect-(--hero-mobile-ratio)': useMobileArtwork }"
+          :style="useMobileArtwork ? { '--hero-mobile-ratio': heroMobileRatio ?? undefined } : undefined"
+        >
           <div class="relative w-full h-full">
             <button
               v-for="(slider, idx) in home.sliders"
@@ -94,15 +121,24 @@ onUnmounted(() => {
               :class="idx === currentSlideIndex ? 'opacity-100 visible' : 'opacity-0 invisible'"
               @click="handleSliderClick(slider)"
             >
-              <img
-                v-if="slider.thumbnail"
-                :src="slider.thumbnail"
-                :alt="slider.title || slider.name || `Slider ${idx + 1}`"
-                class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                :loading="idx === 0 ? 'eager' : 'lazy'"
-                :fetchpriority="idx === 0 ? 'high' : 'auto'"
-                decoding="async"
-              />
+              <picture v-if="slider.image?.src || slider.thumbnail" class="block w-full h-full">
+                <source
+                  v-if="useMobileArtwork"
+                  media="(max-width: 639px)"
+                  :srcset="mobileSrcset(slider)"
+                  sizes="100vw"
+                />
+                <img
+                  :src="slider.image?.src || slider.thumbnail || ''"
+                  :srcset="(slider.image?.src && slider.image.srcset) || undefined"
+                  :sizes="slider.image?.srcset ? HERO_SIZES : undefined"
+                  :alt="slider.title || slider.name || `Slider ${idx + 1}`"
+                  class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  :loading="idx === 0 ? 'eager' : 'lazy'"
+                  :fetchpriority="idx === 0 ? 'high' : 'auto'"
+                  decoding="async"
+                />
+              </picture>
               <div v-else class="w-full h-full flex items-center justify-center bg-gray-300 dark:bg-surface-600 text-gray-400">📸</div>
             </button>
           </div>

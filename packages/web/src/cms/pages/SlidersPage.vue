@@ -88,6 +88,7 @@ const form = reactive({
   id: null as number | null,
   title: '',
   image_key: null as string | null,
+  mobile_image_key: null as string | null,
   link: '',
   is_active: true,
   starts_at: '',
@@ -101,6 +102,7 @@ function open(slider?: CmsSlider) {
     id: slider?.id ?? null,
     title: slider?.title ?? '',
     image_key: slider?.image_key ?? null,
+    mobile_image_key: slider?.mobile_image_key ?? null,
     link: slider?.link ?? '',
     is_active: slider?.is_active ?? true,
     starts_at: toLocalInput(slider?.starts_at ?? null),
@@ -121,6 +123,7 @@ async function save() {
     const payload = {
       title: form.title || null,
       image_key: form.image_key,
+      mobile_image_key: form.mobile_image_key,
       link: form.link || null,
       is_active: form.is_active,
       starts_at: fromLocalInput(form.starts_at),
@@ -244,7 +247,11 @@ async function remove(slider: CmsSlider) {
       @submit="save"
     >
       <div class="space-y-4">
-        <MediaPicker v-model="form.image_key" kind="slider" label="Banner image" />
+        <MediaPicker v-model="form.image_key" asset-type="hero_desktop" label="Desktop banner" />
+        <MediaPicker v-model="form.mobile_image_key" asset-type="hero_mobile" label="Mobile banner" />
+        <p v-if="!form.mobile_image_key" class="-mt-2 text-xs text-gray-500 dark:text-gray-400">
+          Without a mobile banner, phones show the desktop artwork cropped to fit.
+        </p>
 
         <FormField v-slot="{ id }" label="Title" help="Optional caption shown over the image.">
           <input :id="id" v-model="form.title" type="text" class="input" maxlength="255" />

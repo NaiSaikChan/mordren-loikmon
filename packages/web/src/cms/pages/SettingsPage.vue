@@ -162,7 +162,7 @@ function discard() {
               <MediaPicker
                 v-if="kindOf(setting) === 'image'"
                 :model-value="(valueOf(setting) as string | null) ?? null"
-                kind="thumbnail"
+                :asset-type="setting.key === 'seo.og_image_key' ? 'og_image' : 'brand_logo'"
                 :label="label(setting)"
                 @update:model-value="update(setting, $event)"
               />

@@ -201,6 +201,7 @@ const form = reactive({
   type: 'all' as 'book' | 'article' | 'all',
   parent_id: null as number | null,
   thumbnail_key: null as string | null,
+  cover_key: null as string | null,
 })
 
 function open(node?: CategoryNode, parentId: number | null = null) {
@@ -210,6 +211,7 @@ function open(node?: CategoryNode, parentId: number | null = null) {
     type: node?.type ?? 'all',
     parent_id: node?.parent_id ?? parentId,
     thumbnail_key: node?.thumbnail_key ?? null,
+    cover_key: node?.cover_key ?? null,
   })
   modal.value = true
 }
@@ -221,7 +223,7 @@ async function save() {
   }
   saving.value = true
   try {
-    const payload = { name: form.name, type: form.type, parent_id: form.parent_id, thumbnail_key: form.thumbnail_key }
+    const payload = { name: form.name, type: form.type, parent_id: form.parent_id, thumbnail_key: form.thumbnail_key, cover_key: form.cover_key }
     if (form.id) await cms.categories.update(form.id, payload)
     else await cms.categories.create(payload)
     modal.value = false
@@ -373,7 +375,8 @@ const parentOptions = computed(() => {
           </select>
         </FormField>
 
-        <MediaPicker v-model="form.thumbnail_key" kind="category" label="Icon" />
+        <MediaPicker v-model="form.thumbnail_key" asset-type="category_icon" label="Icon" />
+        <MediaPicker v-model="form.cover_key" asset-type="category_cover" label="Cover image" />
       </div>
 
       <template #footer>

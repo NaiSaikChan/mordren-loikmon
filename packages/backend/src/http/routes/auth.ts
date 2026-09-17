@@ -1,3 +1,4 @@
+import { IMAGE_STANDARDS } from '@loikmon/media-standards'
 import { fromNodeHeaders } from 'better-auth/node'
 import { isAPIError } from 'better-auth/api'
 import { Router, type Request } from 'express'
@@ -41,7 +42,7 @@ const ProfileBody = z
  */
 export function authRouter(ctx: AppContext, limiters: ReturnType<typeof createRateLimiters>) {
   const router = Router()
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } })
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: IMAGE_STANDARDS.user_avatar.maxBytes, files: 1 } })
 
   const headersOf = (req: Request) => fromNodeHeaders(req.headers)
 
@@ -147,11 +148,12 @@ export function authRouter(ctx: AppContext, limiters: ReturnType<typeof createRa
   router.post('/me/avatar', requireAuth, upload.single('file'), async (req, res) => {
     const file = req.file
     if (!file) throw errors.validation([{ path: 'file', message: 'An image file is required' }])
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
-      throw errors.validation([{ path: 'file', message: 'Avatar must be a JPEG, PNG or WebP image' }])
-    }
     const user = requireUser(req)
-    const key = await ctx.storage.putObject('avatar', file.buffer, file.size, file.mimetype, file.originalname)
+    // Same standard, validation and variants as CMS uploads — but not a library asset.
+    const { key } = await ctx.services.media.upload(
+      { id: user.id, email: user.email, role: user.role, ip: req.ip ?? null },
+      { assetType: 'user_avatar', buffer: file.buffer, mimeType: file.mimetype, originalName: file.originalname, register: false },
+    )
     await ctx.auth.api.updateUser({ body: { image: key }, headers: headersOf(req) })
     if (user.image && !ctx.storage.isAbsoluteUrl(user.image)) {
       await ctx.storage.removeObject(user.image).catch((err: unknown) => ctx.logger.warn({ err }, 'failed to delete old avatar'))

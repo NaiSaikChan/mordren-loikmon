@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Loikmon eBook & Audio Platform — Vue 3 + Node.js + Expo rebuild",
   "scripts": {
+    "build:media-standards": "npm run build -w @loikmon/media-standards",
     "dev:web": "npm run dev -w @loikmon/web",
     "dev:server": "npm run dev -w @loikmon/server",
     "build:web": "npm run build -w @loikmon/web",
@@ -15,6 +16,7 @@
   },
   "packageManager": "npm@10.9.8",
   "workspaces": [
+    "packages/media-standards",
     "packages/api",
     "packages/server",
     "packages/web",

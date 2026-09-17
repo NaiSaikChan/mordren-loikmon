@@ -15,6 +15,7 @@
   "dependencies": {
     "@fontsource/padauk": "^5.3.0",
     "@loikmon/api": "*",
+    "@loikmon/media-standards": "*",
     "@types/dompurify": "^3.0.5",
     "@vueuse/core": "^10.10.0",
     "axios": "^1.7.2",

@@ -271,7 +271,7 @@ async function saveItems() {
           <textarea :id="id" v-model="form.description as string" rows="3" class="input resize-y" maxlength="2000" />
         </FormField>
 
-        <MediaPicker v-model="form.thumbnail_key" kind="thumbnail" label="Cover image" />
+        <MediaPicker v-model="form.thumbnail_key" asset-type="collection_cover" label="Cover image" />
 
         <div class="space-y-2">
           <label class="flex items-center gap-2 text-sm">

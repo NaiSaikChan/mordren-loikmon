@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { cms } from '@loikmon/api'
-import type { CmsSubscriptionRow, Plan } from '@loikmon/api'
+import type { CmsPlan, CmsSubscriptionRow } from '@loikmon/api'
 import DataTable from '@/cms/components/DataTable.vue'
 import FilterBar from '@/cms/components/FilterBar.vue'
 import FormField from '@/cms/components/FormField.vue'
+import MediaPicker from '@/cms/components/MediaPicker.vue'
 import ModalDialog from '@/cms/components/ModalDialog.vue'
 import PageHeader from '@/cms/components/PageHeader.vue'
 import PagerBar from '@/cms/components/PagerBar.vue'
@@ -24,7 +25,7 @@ import { useToastStore } from '@/cms/stores/toast'
 const session = useCmsSessionStore()
 const toast = useToastStore()
 
-const plans = ref<Plan[]>([])
+const plans = ref<CmsPlan[]>([])
 const plansLoading = ref(true)
 
 const canManagePlans = computed(() => session.can('plans.manage'))
@@ -51,6 +52,7 @@ const form = reactive({
   code: '',
   name: '',
   description: '',
+  image_key: null as string | null,
   price_cents: 0,
   apple_product_id: '',
   google_product_id: '',
@@ -59,11 +61,12 @@ const form = reactive({
   is_active: true,
 })
 
-function open(plan: Plan) {
+function open(plan: CmsPlan) {
   Object.assign(form, {
     code: plan.code,
     name: plan.name,
     description: plan.description ?? '',
+    image_key: plan.image_key ?? null,
     price_cents: plan.price_cents,
     apple_product_id: plan.apple_product_id ?? '',
     google_product_id: plan.google_product_id ?? '',
@@ -80,6 +83,7 @@ async function savePlan() {
     await cms.plans.update(form.code, {
       name: form.name,
       description: form.description || null,
+      image_key: form.image_key,
       price_cents: form.price_cents,
       apple_product_id: form.apple_product_id || null,
       google_product_id: form.google_product_id || null,
@@ -310,6 +314,8 @@ const STORE_LABELS: Record<string, string> = { app_store: 'App Store', google_pl
         <FormField v-slot="{ id }" label="Description">
           <input :id="id" v-model="form.description" type="text" class="input" maxlength="255" />
         </FormField>
+
+        <MediaPicker v-model="form.image_key" asset-type="membership_plan" label="Plan image" />
 
         <FormField
           v-slot="{ id }"

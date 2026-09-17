@@ -60,6 +60,7 @@ export interface BookInput {
   cover_key?: string | null
   pdf_key?: string | null
   epub_key?: string | null
+  og_image_key?: string | null
   is_free?: boolean
   is_recommended?: boolean
   is_top?: boolean
@@ -76,6 +77,7 @@ export interface ArticleInput {
   subcategory_id?: number | null
   thumbnail_key?: string | null
   audio_key?: string | null
+  og_image_key?: string | null
   is_free?: boolean
   published_at?: string | null
   status?: WorkflowStatus
@@ -95,8 +97,8 @@ export interface CmsRequestContext {
   audit: AuditActorInfo
 }
 
-const BOOK_FILE_COLUMNS = ['cover_key', 'pdf_key', 'epub_key'] as const
-const ARTICLE_FILE_COLUMNS = ['thumbnail_key', 'audio_key'] as const
+const BOOK_FILE_COLUMNS = ['cover_key', 'pdf_key', 'epub_key', 'og_image_key'] as const
+const ARTICLE_FILE_COLUMNS = ['thumbnail_key', 'audio_key', 'og_image_key'] as const
 
 export class CmsContentService {
   constructor(
@@ -251,7 +253,7 @@ export class CmsContentService {
     const out: Record<string, unknown> = {}
     if (input.title !== undefined) out.title = sanitizePlainText(input.title)
     if (input.description !== undefined) out.description = input.description === null ? null : sanitizeHtml(input.description)
-    for (const key of ['author_id', 'category_id', 'subcategory_id', 'pages', 'cover_key', 'pdf_key', 'epub_key'] as const) {
+    for (const key of ['author_id', 'category_id', 'subcategory_id', 'pages', 'cover_key', 'pdf_key', 'epub_key', 'og_image_key'] as const) {
       if (input[key] !== undefined) out[key] = input[key]
     }
     if (input.language !== undefined) out.language = input.language
@@ -443,7 +445,7 @@ export class CmsContentService {
     if (input.excerpt !== undefined) out.excerpt = input.excerpt === null ? null : sanitizePlainText(input.excerpt)
     // An editor that leaves the excerpt empty gets one derived from the body.
     if (out.content && !out.excerpt) out.excerpt = makeExcerpt(String(out.content))
-    for (const key of ['author_id', 'category_id', 'subcategory_id', 'thumbnail_key', 'audio_key'] as const) {
+    for (const key of ['author_id', 'category_id', 'subcategory_id', 'thumbnail_key', 'audio_key', 'og_image_key'] as const) {
       if (input[key] !== undefined) out[key] = input[key]
     }
     if (input.is_free !== undefined) out.is_free = input.is_free
@@ -828,6 +830,7 @@ const RESTORABLE_BOOK_COLUMNS = [
   'cover_key',
   'pdf_key',
   'epub_key',
+  'og_image_key',
   'is_free',
   'is_recommended',
   'is_top',
@@ -842,6 +845,7 @@ const RESTORABLE_ARTICLE_COLUMNS = [
   'subcategory_id',
   'thumbnail_key',
   'audio_key',
+  'og_image_key',
   'is_free',
   'published_at',
 ] as const

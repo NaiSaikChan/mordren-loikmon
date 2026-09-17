@@ -2,10 +2,13 @@
 import { computed } from 'vue'
 import type { Book } from '@loikmon/api'
 import AccessBadge from './AccessBadge.vue'
+import ResponsiveImg from './ResponsiveImg.vue'
 
 const props = defineProps<{ book: Book }>()
 
 const cover = computed(() => props.book.thumbnail ?? props.book.cover_url ?? props.book.coverphoto ?? '')
+// Matches `.content-grid` (2/3/4/5 columns inside max-w-screen-xl) and the carousel card widths.
+const COVER_SIZES = '(min-width: 1024px) 240px, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw'
 const rating = computed(() => Number(props.book.rating ?? 0))
 </script>
 
@@ -13,16 +16,17 @@ const rating = computed(() => Number(props.book.rating ?? 0))
   <RouterLink :to="`/books/${book.id}`" class="group block">
     <div class="card overflow-hidden">
       <div class="aspect-[3/4] bg-gray-100 dark:bg-surface-800 overflow-hidden relative">
-        <img
-          v-if="cover"
-          :src="cover"
+        <ResponsiveImg
+          :image="book.cover_image"
+          :fallback="cover"
           :alt="book.title"
-          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
-          @error="($event.target as HTMLImageElement).style.display='none'"
-        />
-        <div v-else class="w-full h-full flex items-center justify-center text-4xl">📚</div>
+          asset-type="book_cover"
+          fill
+          :sizes="COVER_SIZES"
+          img-class="transition-transform duration-300 group-hover:scale-105"
+        >
+          <template #empty><span class="text-4xl">📚</span></template>
+        </ResponsiveImg>
         <span
           v-if="book.has_audio"
           class="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white"

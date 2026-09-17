@@ -8,6 +8,7 @@ import ArticleCard from '@/components/shared/ArticleCard.vue'
 import Pagination from '@/components/shared/Pagination.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
+import ResponsiveImg from '@/components/shared/ResponsiveImg.vue'
 import { getCategoryIcon } from '@/composables/categoryIcons'
 
 const props = defineProps<{ id: string }>()
@@ -90,8 +91,10 @@ watch(() => props.id, loadCategory, { immediate: true })
     <!-- Category header -->
     <div class="flex items-center gap-3 mb-8">
       <div class="w-12 h-12 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-2xl shrink-0 overflow-hidden">
-        <img v-if="category?.thumbnail" :src="category.thumbnail" :alt="category.name" class="w-full h-full object-cover" />
-        <span v-else>{{ getCategoryIcon(props.id) }}</span>
+        <ResponsiveImg :image="category?.thumbnail_image" :fallback="category?.thumbnail" :alt="category?.name ?? ''"
+          fill eager sizes="48px">
+          <template #empty><span>{{ getCategoryIcon(props.id) }}</span></template>
+        </ResponsiveImg>
       </div>
       <div>
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ category?.name ?? t('categories.title') }}</h1>

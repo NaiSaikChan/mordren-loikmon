@@ -7,6 +7,8 @@
  * `books.getFileUrl()` / `books.getChapters()` / `articles.getArticle()`.
  */
 
+import type { ResponsiveImage } from '@loikmon/media-standards'
+
 export type Id = number
 
 export interface Pagination {
@@ -46,6 +48,8 @@ export interface User {
   email_verified: boolean
   thumbnail: string | null
   avatar: string | null
+  /** Responsive renditions of `thumbnail`; `srcset` is null for legacy keys. */
+  avatar_image?: ResponsiveImage | null
   created_at: string | null
 }
 
@@ -160,6 +164,9 @@ export interface Book {
   thumbnail: string | null
   coverphoto: string | null
   cover_url: string | null
+  /** Responsive renditions of the cover (2:3); fall back to `thumbnail` / `cover_url`. */
+  cover_image?: ResponsiveImage | null
+  og_image_url?: string | null
   pages: number | null
   publisher: string | null
   published_at: string | null
@@ -232,6 +239,9 @@ export interface Article {
   subcategory: Id | null
   thumbnail: string | null
   thumbnail_url: string | null
+  /** Responsive renditions of the cover (16:9); fall back to `thumbnail_url` / `thumbnail`. */
+  thumbnail_image?: ResponsiveImage | null
+  og_image_url?: string | null
   has_audio: boolean
   is_free: boolean
   views: number
@@ -262,6 +272,8 @@ export interface Author {
   description: string
   thumbnail: string | null
   avatar_url: string | null
+  /** Responsive renditions of the avatar (1:1, shown as a circle). */
+  avatar_image?: ResponsiveImage | null
   website: string | null
   facebook: string | null
   youtube: string | null
@@ -283,6 +295,11 @@ export interface Category {
   name: string
   parent_id: Id | null
   thumbnail: string | null
+  /** Responsive renditions of the icon (1:1). */
+  thumbnail_image?: ResponsiveImage | null
+  /** Category cover (16:9) URL, when one was uploaded. */
+  cover?: string | null
+  cover_image?: ResponsiveImage | null
   display_order: number
   books_count: number
   bookscount: number
@@ -309,6 +326,9 @@ export interface Collection {
   name: string
   description: string | null
   thumbnail: string | null
+  /** Responsive renditions of the cover (3:1). */
+  cover_image?: ResponsiveImage | null
+  og_image_url?: string | null
   items_count?: number
   books?: Book[]
   articles?: Article[]
@@ -320,6 +340,12 @@ export interface Slider {
   title: string | null
   link: string | null
   thumbnail: string | null
+  /** Desktop artwork (21:9). */
+  image?: ResponsiveImage | null
+  /** Mobile artwork URL; the server falls back to the desktop artwork. */
+  mobile_thumbnail?: string | null
+  /** Mobile artwork (4:5); the server falls back to the desktop artwork. */
+  mobile_image?: ResponsiveImage | null
 }
 
 export interface FaqItem {

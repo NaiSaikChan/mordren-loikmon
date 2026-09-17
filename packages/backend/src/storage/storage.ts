@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { extname } from 'node:path'
 import type { Readable } from 'node:stream'
+import {
+  allVariantKeys,
+  MEDIA_FORMATS,
+  MEDIA_STANDARDS,
+  STORAGE_KINDS,
+  type StorageKind,
+  type Visibility,
+  visibilityOfKey,
+} from '@loikmon/media-standards'
 import { Client } from 'minio'
 import type { AppConfig } from '../config/env.js'
 import type { Logger } from '../lib/logger.js'
@@ -9,7 +18,8 @@ import type { Logger } from '../lib/logger.js'
  * Object storage on MinIO.
  *
  * Two buckets:
- *  - public  — covers, thumbnails, avatars, slider images. Anonymous read.
+ *  - public  — covers, thumbnails, avatars, banners and their variants.
+ *              Anonymous read, immutable cache headers, optionally behind a CDN.
  *  - private — PDFs, EPUBs, audio. Only reachable through short-lived
  *              presigned URLs issued to entitled users.
  *
@@ -18,30 +28,27 @@ import type { Logger } from '../lib/logger.js'
  * keep working before its files are copied into MinIO.
  */
 
-export type AssetKind = 'cover' | 'thumbnail' | 'avatar' | 'slider' | 'category' | 'pdf' | 'epub' | 'audio'
-export type Visibility = 'public' | 'private'
+export type AssetKind = StorageKind
+export type { Visibility }
+export { visibilityOfKey }
 
-export const ASSET_VISIBILITY: Record<AssetKind, Visibility> = {
-  cover: 'public',
-  thumbnail: 'public',
-  avatar: 'public',
-  slider: 'public',
-  category: 'public',
-  pdf: 'private',
-  epub: 'private',
-  audio: 'private',
-}
+export const ASSET_VISIBILITY: Record<AssetKind, Visibility> = Object.fromEntries(
+  Object.values(STORAGE_KINDS).map((spec) => [spec.kind, spec.visibility]),
+) as Record<AssetKind, Visibility>
 
-export const ASSET_CONTENT_TYPES: Record<AssetKind, readonly string[]> = {
-  cover: ['image/jpeg', 'image/png', 'image/webp'],
-  thumbnail: ['image/jpeg', 'image/png', 'image/webp'],
-  avatar: ['image/jpeg', 'image/png', 'image/webp'],
-  slider: ['image/jpeg', 'image/png', 'image/webp'],
-  category: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
-  pdf: ['application/pdf'],
-  epub: ['application/epub+zip'],
-  audio: ['audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/x-m4a', 'audio/ogg'],
-}
+/** MIME types accepted per storage kind: the union over every asset standard stored under that kind. */
+export const ASSET_CONTENT_TYPES: Record<AssetKind, readonly string[]> = (() => {
+  const out = Object.fromEntries(Object.keys(STORAGE_KINDS).map((kind) => [kind, new Set<string>()])) as Record<AssetKind, Set<string>>
+  for (const standard of Object.values(MEDIA_STANDARDS)) {
+    for (const id of standard.formats) {
+      for (const mime of MEDIA_FORMATS[id].mimeTypes) out[standard.storageKind].add(mime)
+    }
+  }
+  return Object.fromEntries(Object.entries(out).map(([kind, set]) => [kind, [...set]])) as unknown as Record<AssetKind, readonly string[]>
+})()
+
+/** Object keys are unique and never overwritten, so public objects can be cached forever. */
+export const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
 export interface PresignedUpload {
   key: string
@@ -59,6 +66,11 @@ export interface StorageService {
   signedUrl(key: string, options?: { ttlSeconds?: number; downloadName?: string }): Promise<{ url: string; expiresAt: Date }>
   presignUpload(kind: AssetKind, contentType: string, filename?: string): Promise<PresignedUpload>
   putObject(kind: AssetKind, body: Buffer | Readable, size: number, contentType: string, filename?: string): Promise<string>
+  /** Write to an exact key (processed images and their variants). */
+  putObjectAt(key: string, body: Buffer | Readable, size: number, contentType: string): Promise<void>
+  /** Size and type of a stored object, or null when it does not exist. */
+  statObject(key: string): Promise<{ size: number; contentType: string | null } | null>
+  /** Removes the object and, for processed images, every derived variant. */
   removeObject(key: string): Promise<void>
   ensureBuckets(): Promise<void>
   ping(): Promise<void>
@@ -68,12 +80,6 @@ export function buildObjectKey(kind: AssetKind, filename?: string): string {
   const ext = filename ? extname(filename).toLowerCase().replace(/[^a-z0-9.]/g, '').slice(0, 10) : ''
   const date = new Date().toISOString().slice(0, 7) // YYYY-MM
   return `${kind}/${date}/${randomUUID()}${ext}`
-}
-
-/** `public/` and `private/` prefixes are not used: the kind at the start of the key decides the bucket. */
-export function visibilityOfKey(key: string): Visibility {
-  const kind = key.split('/', 1)[0] as AssetKind
-  return ASSET_VISIBILITY[kind] ?? 'private'
 }
 
 function encodeKey(key: string): string {
@@ -121,6 +127,8 @@ export class MinioStorageService implements StorageService {
   publicUrl(key: string | null | undefined): string | null {
     if (!key) return null
     if (this.isAbsoluteUrl(key)) return key
+    // A CDN in front of the public bucket serves the same keys from its own origin.
+    if (this.config.cdnUrl) return `${this.config.cdnUrl}/${encodeKey(key)}`
     return `${this.config.publicUrl}/${this.config.publicBucket}/${encodeKey(key)}`
   }
 
@@ -151,13 +159,34 @@ export class MinioStorageService implements StorageService {
 
   async putObject(kind: AssetKind, body: Buffer | Readable, size: number, contentType: string, filename?: string) {
     const key = buildObjectKey(kind, filename)
-    await this.internal.putObject(this.bucketFor(key), key, body, size, { 'Content-Type': contentType })
+    await this.putObjectAt(key, body, size, contentType)
     return key
+  }
+
+  async putObjectAt(key: string, body: Buffer | Readable, size: number, contentType: string): Promise<void> {
+    const meta: Record<string, string> = { 'Content-Type': contentType }
+    if (visibilityOfKey(key) === 'public') meta['Cache-Control'] = IMMUTABLE_CACHE_CONTROL
+    await this.internal.putObject(this.bucketFor(key), key, body, size, meta)
+  }
+
+  async statObject(key: string) {
+    if (this.isAbsoluteUrl(key)) return null
+    try {
+      const stat = await this.internal.statObject(this.bucketFor(key), key)
+      const meta = stat.metaData as Record<string, string> | undefined
+      return { size: stat.size, contentType: meta?.['content-type'] ?? null }
+    } catch (err) {
+      if ((err as { code?: string }).code === 'NotFound' || (err as { code?: string }).code === 'NoSuchKey') return null
+      throw err
+    }
   }
 
   async removeObject(key: string): Promise<void> {
     if (this.isAbsoluteUrl(key)) return
-    await this.internal.removeObject(this.bucketFor(key), key)
+    const bucket = this.bucketFor(key)
+    await this.internal.removeObject(bucket, key)
+    const variants = allVariantKeys(key)
+    if (variants.length) await this.internal.removeObjects(bucket, variants)
   }
 
   async ensureBuckets(): Promise<void> {

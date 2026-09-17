@@ -19,8 +19,10 @@ import { SettingsService } from './services/cms/settings.js'
 import { TaxonomyService } from './services/cms/taxonomy.js'
 import { EngagementService } from './services/engagement.js'
 import { LegacyAuthService } from './services/legacyAuth.js'
+import { MediaService } from './services/media.js'
 import { RbacService } from './services/rbac.js'
 import { SubscriptionService } from './services/subscriptions.js'
+import { LibraryAwareStorage } from './storage/libraryAware.js'
 import { MinioStorageService, type StorageService } from './storage/storage.js'
 
 export interface ContainerOverrides {
@@ -65,7 +67,10 @@ export async function createContainer(
     }
   }
 
-  const storage = overrides.storage ?? new MinioStorageService(config.storage, logger.child({ component: 'storage' }))
+  const storageLogger = logger.child({ component: 'storage' })
+  const objectStore = overrides.storage ?? new MinioStorageService(config.storage, storageLogger)
+  // Everything except the media library itself goes through the library-aware store.
+  const storage = new LibraryAwareStorage(objectStore, dbHandle.db, storageLogger)
   const apple = overrides.apple !== undefined ? overrides.apple : AppleStoreService.fromConfig(config, logger.child({ component: 'apple' }))
   const google = overrides.google !== undefined ? overrides.google : GooglePlayService.fromConfig(config, logger.child({ component: 'google' }))
   const legacyAuth =
@@ -102,6 +107,9 @@ export async function createContainer(
       policies: new PolicyService(dbHandle.db, audit, now),
       settings: new SettingsService(dbHandle.db, audit),
       analytics: new AnalyticsService(dbHandle.db),
+      media: new MediaService(dbHandle.db, objectStore, audit, logger.child({ component: 'media' }), {
+        uploadMaxBytes: config.storage.uploadMaxBytes,
+      }),
     },
     healthChecks: {
       database: () => pingDb(dbHandle.db),

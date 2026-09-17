@@ -23,6 +23,7 @@ const CategoryInput = z.object({
   name: z.string().trim().min(1).max(255),
   parent_id: foreignKey,
   thumbnail_key: storageKey,
+  cover_key: storageKey,
   display_order: z.number().int().min(0).max(10_000).optional(),
 })
 
@@ -39,6 +40,7 @@ const CollectionInput = z.object({
 const SliderInput = z.object({
   title: z.string().trim().max(255).nullable().optional(),
   image_key: z.string().trim().min(1).max(1024),
+  mobile_image_key: storageKey,
   link: z.string().trim().max(1024).nullable().optional(),
   display_order: z.number().int().min(0).max(10_000).optional(),
   is_active: z.boolean().optional(),
@@ -51,9 +53,10 @@ const SliderInput = z.object({
 export function taxonomyRouter(ctx: AppContext) {
   const router = Router()
   const taxonomy = ctx.services.cmsTaxonomy
-  const withSliderImageUrl = <T extends { image_key: string }>(slider: T) => ({
+  const withSliderImageUrl = <T extends { image_key: string; mobile_image_key: string | null }>(slider: T) => ({
     ...slider,
     image_url: ctx.storage.publicUrl(slider.image_key) ?? slider.image_key,
+    mobile_image_url: ctx.storage.publicUrl(slider.mobile_image_key),
   })
 
   // ── Authors ────────────────────────────────────────────────────────────

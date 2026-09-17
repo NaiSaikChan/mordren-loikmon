@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useCategoriesStore } from '@/stores/categories'
 import { getCategoryIcon } from '@/composables/categoryIcons'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import ResponsiveImg from '@/components/shared/ResponsiveImg.vue'
 
 const { t } = useI18n()
 const store = useCategoriesStore()
@@ -19,8 +20,9 @@ onMounted(() => store.fetchCategories())
         :to="`/categories/${cat.id}`"
         class="card p-5 flex flex-col items-center gap-3 text-center hover:border-brand-400 transition-colors">
         <div class="w-12 h-12 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-2xl overflow-hidden">
-          <img v-if="cat.thumbnail" :src="cat.thumbnail" :alt="cat.name" class="w-full h-full object-cover" loading="lazy" />
-          <span v-else>{{ getCategoryIcon(cat.id) }}</span>
+          <ResponsiveImg :image="cat.thumbnail_image" :fallback="cat.thumbnail" :alt="cat.name" fill sizes="48px">
+            <template #empty><span>{{ getCategoryIcon(cat.id) }}</span></template>
+          </ResponsiveImg>
         </div>
         <div>
           <p class="font-semibold text-sm text-gray-900 dark:text-white">{{ cat.name }}</p>

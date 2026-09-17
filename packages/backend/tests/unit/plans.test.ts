@@ -6,6 +6,7 @@ const plan = (code: string, cents: number, months: number, order: number): Subsc
   code,
   name: code,
   description: null,
+  image_key: null,
   price_cents: cents,
   currency: 'USD',
   period_months: months,

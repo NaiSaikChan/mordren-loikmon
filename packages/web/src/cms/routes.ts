@@ -66,6 +66,7 @@ export const cmsRoutes: RouteRecordRaw[] = [
       route('feedback', 'cms-feedback', 'Feedback', () => import('@/cms/pages/FeedbackPage.vue')),
 
       // Site
+      route('media', 'cms-media', 'Media library', () => import('@/cms/pages/MediaLibraryPage.vue')),
       route('sliders', 'cms-sliders', 'Sliders & banners', () => import('@/cms/pages/SlidersPage.vue')),
       route('policies', 'cms-policies', 'Policies & terms', () => import('@/cms/pages/PoliciesPage.vue')),
       route('settings', 'cms-settings', 'Website settings', () => import('@/cms/pages/SettingsPage.vue')),

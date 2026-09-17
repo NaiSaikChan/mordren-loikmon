@@ -175,7 +175,7 @@ as PDF*. CSV export is available from the list (client-side) and from
 | XSS | `lib/sanitize.ts` allow-lists elements and attributes on write, drops every `on*` handler and `style`, and rejects non-`http(s)/mailto/tel/relative` URLs (control characters stripped first). DOMPurify sanitises again in the editor and at render time |
 | SQL injection | Kysely parameterises everything; the few `sql` fragments interpolate bound values, never concatenated strings; `likePattern` escapes `%`, `_` and backslash |
 | CSRF | The API authenticates with a bearer token from `localStorage`, not an ambient cookie, so a cross-site form post carries no credentials. CORS is an explicit origin allow-list with `credentials: true` |
-| File uploads | Asset kind decides the bucket and the allowed content types (`ASSET_VISIBILITY` / `ASSET_CONTENT_TYPES`); Multer caps the size; large files go straight to MinIO with a 15-minute presigned PUT so untrusted bytes never buffer in Node; private assets are only ever served through short-lived signed GETs |
+| File uploads | Every upload names an asset type from `@loikmon/media-standards` ([MEDIA-STANDARDS.md](MEDIA-STANDARDS.md)), which decides the bucket, formats, byte limit and minimum dimensions; images are decoded server-side (real format and size, pixel-count cap) and SVGs with scriptable content are refused; documents and audio are identified by magic bytes; large files go straight to MinIO with a 15-minute presigned PUT and are verified on `/media/complete`; private assets are only ever served through short-lived signed GETs |
 | Rate limiting | `express-rate-limit` on the API (300/min per user or IP), auth (30/15 min) and purchases; the public feedback form uses the API limiter |
 | Audit | Every role, permission, publish, coupon, settings, grant and moderation action writes an `audit_logs` row with actor, IP, user agent, request id and the before/after values |
 | Secret hygiene | `redactSnapshot` strips anything matching `password|token|secret|private_key|authorization` before it reaches the audit table; Pino redacts the same in logs |
@@ -305,7 +305,7 @@ the same advisory lock. The confirmation flag is required on purpose. Set
 * **Jobs.** `publishDue()` (scheduled content) and `expireDue()` (lapsed
   campaigns) run on the existing reconciliation schedule under the same advisory
   lock — nothing new to configure.
-* **Storage.** CMS uploads reuse the existing MinIO buckets and key conventions.
+* **Storage.** CMS uploads reuse the existing MinIO buckets. Processed images use the `<kind>/<yyyy-mm>/<uuid>/original.<ext>` layout with derived variants beside the original, and files registered in the media library are kept when content releases them (see [MEDIA-STANDARDS.md](MEDIA-STANDARDS.md)).
   No new bucket or policy is needed.
 * **Growth.** `audit_logs` is append-only. It is indexed on
   `(entity_type, entity_id, created_at)`, `(actor_id, created_at)` and

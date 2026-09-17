@@ -40,6 +40,10 @@ const categories = ref<CategoryNode[]>([])
 const tagSuggestions = ref<string[]>([])
 
 const canEdit = computed(() => session.canAny('books.edit', 'own_content.manage'))
+/** An audio-only title (chapters, no reading edition) uses the square audiobook cover standard. */
+const coverAssetType = computed(() =>
+  book.value?.chapters.length && !form.pdf_key && !form.epub_key ? ('audiobook_cover' as const) : ('book_cover' as const),
+)
 const canPublish = computed(() => session.canAny('books.publish', 'own_content.publish'))
 
 const form = reactive({
@@ -55,6 +59,7 @@ const form = reactive({
   cover_key: null as string | null,
   pdf_key: null as string | null,
   epub_key: null as string | null,
+  og_image_key: null as string | null,
   is_free: false,
   is_recommended: false,
   is_top: false,
@@ -79,6 +84,7 @@ function hydrate(data: CmsBookDetail) {
     cover_key: data.cover_key,
     pdf_key: data.pdf_key,
     epub_key: data.epub_key,
+    og_image_key: data.og_image_key ?? null,
     is_free: data.is_free,
     is_recommended: data.is_recommended,
     is_top: data.is_top,
@@ -392,9 +398,10 @@ async function restore(version: ContentVersionSummary) {
 
       <!-- ── Files ───────────────────────────────────────────────────── -->
       <div v-show="tab === 'files'" class="grid gap-4 md:grid-cols-3">
-        <MediaPicker v-model="form.cover_key" kind="cover" label="Cover image" :disabled="!canEdit" />
-        <MediaPicker v-model="form.pdf_key" kind="pdf" label="PDF edition" preview="file" :disabled="!canEdit" />
-        <MediaPicker v-model="form.epub_key" kind="epub" label="EPUB edition" preview="file" :disabled="!canEdit" />
+        <MediaPicker v-model="form.cover_key" :asset-type="coverAssetType" label="Cover image" :disabled="!canEdit" />
+        <MediaPicker v-model="form.pdf_key" asset-type="book_pdf" :disabled="!canEdit" />
+        <MediaPicker v-model="form.epub_key" asset-type="book_epub" :disabled="!canEdit" />
+        <MediaPicker v-model="form.og_image_key" asset-type="og_image" label="Social share image (optional)" :disabled="!canEdit" />
         <p class="text-xs text-gray-500 md:col-span-3 dark:text-gray-400">
           Book files live in the private bucket and are only ever served through short-lived signed links to readers with access.
           Changes here are saved with the rest of the form.
@@ -488,7 +495,12 @@ async function restore(version: ContentVersionSummary) {
         </FormField>
 
         <FormField label="Audio file" help="MP3, M4A, AAC or OGG. Uploaded straight to storage.">
-          <MediaPicker v-model="chapterForm.audio_key" kind="audio" label="Chapter audio" preview="audio" />
+          <MediaPicker
+            :model-value="chapterForm.audio_key || null"
+            asset-type="audio_chapter"
+            label="Chapter audio"
+            @update:model-value="chapterForm.audio_key = $event ?? ''"
+          />
         </FormField>
 
         <div class="grid grid-cols-2 gap-3">

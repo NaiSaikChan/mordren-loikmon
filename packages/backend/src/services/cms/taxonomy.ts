@@ -32,6 +32,7 @@ export interface CategoryInput {
   name: string
   parent_id?: number | null
   thumbnail_key?: string | null
+  cover_key?: string | null
   display_order?: number
 }
 
@@ -48,6 +49,7 @@ export interface CollectionInput {
 export interface SliderInput {
   title?: string | null
   image_key: string
+  mobile_image_key?: string | null
   link?: string | null
   display_order?: number
   is_active?: boolean
@@ -63,6 +65,7 @@ export interface CategoryNode {
   type: ItemType | 'all'
   name: string
   thumbnail_key: string | null
+  cover_key: string | null
   display_order: number
   books_count: number
   articles_count: number
@@ -230,7 +233,7 @@ export class TaxonomyService {
   async categoryTree(): Promise<CategoryNode[]> {
     const rows = await this.db
       .selectFrom('categories')
-      .select(['id', 'parent_id', 'type', 'name', 'thumbnail_key', 'display_order'])
+      .select(['id', 'parent_id', 'type', 'name', 'thumbnail_key', 'cover_key', 'display_order'])
       .select((eb) => [
         eb
           .selectFrom('books')
@@ -257,6 +260,7 @@ export class TaxonomyService {
         type: row.type,
         name: row.name,
         thumbnail_key: row.thumbnail_key,
+        cover_key: row.cover_key,
         display_order: row.display_order,
         books_count: Number(row.books_count ?? 0),
         articles_count: Number(row.articles_count ?? 0),
@@ -278,6 +282,7 @@ export class TaxonomyService {
       name: sanitizePlainText(input.name),
       parent_id: input.parent_id ?? null,
       thumbnail_key: input.thumbnail_key ?? null,
+      cover_key: input.cover_key ?? null,
       display_order: input.display_order ?? 0,
     }
     const inserted = await this.db.insertInto('categories').values(values).executeTakeFirstOrThrow()
@@ -298,11 +303,13 @@ export class TaxonomyService {
     if (input.type !== undefined) patch.type = input.type
     if (input.parent_id !== undefined) patch.parent_id = input.parent_id
     if (input.thumbnail_key !== undefined) patch.thumbnail_key = input.thumbnail_key
+    if (input.cover_key !== undefined) patch.cover_key = input.cover_key
     if (input.display_order !== undefined) patch.display_order = input.display_order
     if (!Object.keys(patch).length) throw errors.badRequest('Nothing to update')
 
     await this.db.updateTable('categories').set(patch as never).where('id', '=', id).execute()
     await this.cleanupReplaced(before.thumbnail_key, patch.thumbnail_key)
+    await this.cleanupReplaced(before.cover_key, patch.cover_key)
     const diff = diffSnapshots(before as unknown as Record<string, unknown>, { ...before, ...patch } as Record<string, unknown>)
     await this.audit.record({
       actor: ctx.audit,
@@ -323,6 +330,7 @@ export class TaxonomyService {
     if (child) throw errors.conflict('Move or delete the subcategories first')
     await this.db.deleteFrom('categories').where('id', '=', id).execute()
     if (before.thumbnail_key) await this.storage.removeObject(before.thumbnail_key).catch(() => undefined)
+    if (before.cover_key) await this.storage.removeObject(before.cover_key).catch(() => undefined)
     await this.audit.record({ actor: ctx.audit, action: 'delete', entityType: 'category', entityId: id, summary: before.name, before })
   }
 
@@ -527,6 +535,7 @@ export class TaxonomyService {
     if (!Object.keys(patch).length) throw errors.badRequest('Nothing to update')
     await this.db.updateTable('sliders').set(patch as never).where('id', '=', id).execute()
     await this.cleanupReplaced(before.image_key, patch.image_key)
+    await this.cleanupReplaced(before.mobile_image_key, patch.mobile_image_key)
     const diff = diffSnapshots(before as unknown as Record<string, unknown>, { ...before, ...patch } as Record<string, unknown>)
     await this.audit.record({
       actor: ctx.audit,
@@ -545,6 +554,7 @@ export class TaxonomyService {
     if (!before) throw errors.notFound('Slider')
     await this.db.deleteFrom('sliders').where('id', '=', id).execute()
     if (before.image_key) await this.storage.removeObject(before.image_key).catch(() => undefined)
+    if (before.mobile_image_key) await this.storage.removeObject(before.mobile_image_key).catch(() => undefined)
     await this.audit.record({ actor: ctx.audit, action: 'delete', entityType: 'slider', entityId: id, summary: before.title ?? 'Slider', before })
   }
 
@@ -568,6 +578,7 @@ export class TaxonomyService {
     const out: Record<string, unknown> = {}
     if (input.title !== undefined) out.title = input.title === null ? null : sanitizePlainText(input.title)
     if (input.image_key !== undefined) out.image_key = input.image_key
+    if (input.mobile_image_key !== undefined) out.mobile_image_key = input.mobile_image_key
     if (input.link !== undefined) out.link = input.link
     if (input.display_order !== undefined) out.display_order = input.display_order
     if (input.is_active !== undefined) out.is_active = input.is_active
