@@ -6,7 +6,9 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
+    "preandroid": "node scripts/adb-reverse.js",
     "android": "expo run:android",
+    "android:reverse": "node scripts/adb-reverse.js",
     "ios": "expo run:ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",

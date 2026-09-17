@@ -2,7 +2,10 @@
   "permissions": {
     "allow": [
       "Bash(git add *)",
-      "Bash(git commit -m 'feat: implement comprehensive media asset standards system *)"
+      "Bash(git commit -m 'feat: implement comprehensive media asset standards system *)",
+      "Bash(git push *)",
+      "Bash(docker exec *)",
+      "Bash(grep -E \"\\\\.\\(ts|js|sh\\)$\")"
     ]
   }
 }

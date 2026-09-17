@@ -89,16 +89,25 @@ Resolution order: `EXPO_PUBLIC_API_BASE` → `app.json` `expo.extra.apiBaseUrl` 
 
 Local backend (`packages/backend`, port 4001):
 
-| Target            | `EXPO_PUBLIC_API_BASE`              |
-| ----------------- | ----------------------------------- |
-| Android emulator  | `http://10.0.2.2:4001/api/v1`       |
-| iOS simulator     | `http://localhost:4001/api/v1`      |
-| Physical device   | `http://<your-LAN-IP>:4001/api/v1`  |
+| Target                            | `EXPO_PUBLIC_API_BASE`              |
+| --------------------------------- | ----------------------------------- |
+| Android emulator / USB device     | `http://localhost:4001/api/v1` + `npm run android:reverse` |
+| iOS simulator                     | `http://localhost:4001/api/v1`      |
 
-Signed file/audio URLs point at the backend's object storage public URL, so for
-emulator testing configure the backend's storage public URL with a host the
-device can reach (e.g. `http://10.0.2.2:9000`). Plain-HTTP URLs only work in
-debug builds.
+### Images, PDF, EPUB and audio (MinIO)
+
+The backend returns media URLs on its `MINIO_PUBLIC_URL`: public URLs for covers
+and avatars, and presigned URLs for PDF, EPUB and audio. **A presigned
+signature covers the host**, so the device must fetch the URL exactly as issued.
+Do not point `MINIO_PUBLIC_URL`/`MEDIA_CDN_URL` at `10.0.2.2`: the web app
+cannot reach that address, and rewriting the host makes MinIO answer 403.
+
+- **Local (Docker `loikmon-dev`, `MINIO_PUBLIC_URL=http://localhost:9000`):** run
+  `npm run android:reverse`. It forwards the device's `localhost:4001` and
+  `localhost:9000` to your computer. `npm run android` runs it automatically.
+  Re-run it after the emulator restarts. Plain HTTP only works in debug builds.
+- **Production:** `MINIO_PUBLIC_URL=https://<STORAGE_DOMAIN>` (docker-compose.prod.yml),
+  a public HTTPS host every phone can reach. No app-side configuration is needed.
 
 ## Subscriptions (expo-iap)
 
