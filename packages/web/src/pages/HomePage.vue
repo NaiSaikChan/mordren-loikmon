@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import { misc } from '@loikmon/api'
 import type { HomeResponse, Slider } from '@loikmon/api'
 import { IMAGE_STANDARDS } from '@loikmon/media-standards'
-import BookCard from '@/components/shared/BookCard.vue'
 import BookCarousel from '@/components/shared/BookCarousel.vue'
 import ArticleCard from '@/components/shared/ArticleCard.vue'
 import AuthorCard from '@/components/shared/AuthorCard.vue'
@@ -175,12 +174,16 @@ onUnmounted(() => {
       </div>
 
       <!-- Latest books -->
-      <template v-if="home.latest_books.length">
-        <SectionHeader :title="t('home.latestBooks')" :viewAllPath="'/books'" />
-        <div class="content-grid mb-8">
-          <BookCard v-for="book in home.latest_books.slice(0, 12)" :key="book.id" :book="book" />
-        </div>
-      </template>
+      <BookCarousel v-if="home.latest_books.length" :title="t('home.latestBooks')" :books="home.latest_books.slice(0, 10)" class="mb-8">
+        <template #actions>
+          <RouterLink
+            to="/books"
+            class="text-xs text-brand-600 hover:text-brand-500 dark:text-brand-400 font-medium leading-tight px-3 py-1 rounded-lg hover:bg-brand-50 dark:hover:bg-brand-900/20 transition-colors"
+          >
+            View all →
+          </RouterLink>
+        </template>
+      </BookCarousel>
 
       <BookCarousel v-if="home.popular_books.length" :title="t('home.popularBooks')" :books="home.popular_books" class="mb-8" />
       <BookCarousel v-if="home.recommended_books.length" :title="t('home.recommendedBooks')" :books="home.recommended_books" class="mb-8" />

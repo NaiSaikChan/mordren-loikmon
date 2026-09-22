@@ -215,7 +215,7 @@ const policyCards = [
           :description="policy.description"
           :points="policy.points"
           :href="policy.href"
-          action-label="Read full policy"
+          :action-label="`Read full ${policy.title}`"
         />
       </div>
     </section>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import i18n from '@/i18n'
 import type { AudioTrack } from '@/stores/bookAudio'
 import { usePaywallStore } from '@/stores/paywall'
@@ -20,6 +20,18 @@ const currentIndex = ref(0)
 const expanded = ref(false)
 /** Track ids whose expired signed URL has already been re-requested once. */
 const refreshedTracks = new Set<string>()
+
+/*
+ * The mini player is fixed to the bottom of the viewport, so page chrome that
+ * sits at the very bottom (the site footer) needs to know when it is there.
+ */
+watch(current, (track) => {
+  document.documentElement.classList.toggle('audio-player-open', Boolean(track))
+})
+
+onUnmounted(() => {
+  document.documentElement.classList.remove('audio-player-open')
+})
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds < 0) return '0:00'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   icon: string
   title: string
   description: string
@@ -7,6 +7,10 @@ defineProps<{
   href: string
   actionLabel: string
 }>()
+
+// Internal policy pages (published in the CMS) navigate within the SPA;
+// anything else is treated as an external link and opens in a new tab.
+const isInternal = props.href.startsWith('/')
 </script>
 
 <template>
@@ -28,7 +32,15 @@ defineProps<{
       </li>
     </ul>
 
+    <RouterLink
+      v-if="isInternal"
+      :to="href"
+      class="mt-auto inline-flex items-center justify-center rounded-2xl border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-bold text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-200 dark:hover:bg-brand-900/50"
+    >
+      {{ actionLabel }} →
+    </RouterLink>
     <a
+      v-else
       :href="href"
       target="_blank"
       rel="noopener noreferrer"

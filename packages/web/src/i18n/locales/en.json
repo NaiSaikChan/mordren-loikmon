@@ -23,6 +23,22 @@
     "subscription": "Subscription",
     "cms": "CMS"
   },
+  "footer": {
+    "tagline": "A digital home for Mon literature — read, listen, and support Mon authors anywhere.",
+    "discover": "Discover",
+    "account": "Your account",
+    "support": "Support",
+    "legal": "Legal",
+    "getTheApp": "Get the app",
+    "getTheAppBody": "Subscriptions are purchased in the mobile apps.",
+    "contact": "Contact us",
+    "callUs": "Call us",
+    "website": "Website",
+    "terms": "Terms & Conditions",
+    "privacy": "Privacy Policy",
+    "rights": "All rights reserved.",
+    "madeFor": "Preserving Mon heritage through modern publishing."
+  },
   "common": {
     "loading": "Loading…",
     "more": "Load More",
