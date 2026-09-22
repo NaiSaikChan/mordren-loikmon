@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { cms } from '@loikmon/api'
-import type { CmsAuthor, VerificationStatus } from '@loikmon/api'
+import type { CmsAuthor, CmsUserRow, VerificationStatus } from '@loikmon/api'
 import DataTable from '@/cms/components/DataTable.vue'
 import FilterBar from '@/cms/components/FilterBar.vue'
 import FormField from '@/cms/components/FormField.vue'
@@ -71,6 +71,32 @@ const form = reactive({
   instagram: '',
 })
 
+// ── Linked account picker (users with the "author" role) ────────────────────
+
+const authorUsers = ref<CmsUserRow[]>([])
+const usersLoaded = ref(false)
+// Fallback so an already-linked account still shows up even if it lost the "author" role since.
+const currentUserOption = ref<{ id: string; email: string | null } | null>(null)
+
+const userOptions = computed(() => {
+  const options = [...authorUsers.value]
+  if (currentUserOption.value && !options.some((u) => u.id === currentUserOption.value!.id)) {
+    options.unshift({ id: currentUserOption.value.id, email: currentUserOption.value.email ?? '', name: '' } as CmsUserRow)
+  }
+  return options
+})
+
+async function loadAuthorUsers() {
+  if (usersLoaded.value || !session.can('users.view')) return
+  usersLoaded.value = true
+  try {
+    const { data } = await cms.users.list({ role: 'author', limit: 100 })
+    authorUsers.value = data.users
+  } catch {
+    usersLoaded.value = false
+  }
+}
+
 function open(author?: CmsAuthor) {
   Object.assign(form, {
     id: author?.id ?? null,
@@ -83,6 +109,8 @@ function open(author?: CmsAuthor) {
     youtube: author?.youtube ?? '',
     instagram: author?.instagram ?? '',
   })
+  currentUserOption.value = author?.user_id ? { id: author.user_id, email: author.user_email ?? null } : null
+  loadAuthorUsers()
   modal.value = true
 }
 
@@ -233,29 +261,36 @@ async function remove(author: CmsAuthor) {
           </FormField>
 
           <FormField
-            v-slot="{ id }"
-            label="Linked account (user id)"
+            v-slot="{ id, describedBy }"
+            label="Linked account"
             help="Links this profile to an account. An Author-role user can then manage only this profile's content."
           >
-            <input :id="id" v-model="form.user_id" type="text" class="input font-mono text-xs" placeholder="uuid" />
+            <select :id="id" v-model="form.user_id" class="input" :aria-describedby="describedBy">
+              <option value="">— Not linked —</option>
+              <option v-for="u in userOptions" :key="u.id" :value="u.id">{{ u.name ? `${u.name} (${u.email})` : u.email }}</option>
+            </select>
           </FormField>
         </div>
 
         <div class="space-y-4">
           <MediaPicker v-model="form.avatar_key" asset-type="author_avatar" label="Avatar" />
 
-          <FormField v-slot="{ id }" label="Website">
-            <input :id="id" v-model="form.website" type="url" class="input" placeholder="https://" />
-          </FormField>
-          <FormField v-slot="{ id }" label="Facebook">
-            <input :id="id" v-model="form.facebook" type="url" class="input" placeholder="https://" />
-          </FormField>
-          <FormField v-slot="{ id }" label="YouTube">
-            <input :id="id" v-model="form.youtube" type="url" class="input" placeholder="https://" />
-          </FormField>
-          <FormField v-slot="{ id }" label="Instagram">
-            <input :id="id" v-model="form.instagram" type="url" class="input" placeholder="https://" />
-          </FormField>
+          <fieldset class="space-y-4">
+            <legend class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">Social links</legend>
+
+            <FormField v-slot="{ id }" label="Website">
+              <input :id="id" v-model="form.website" type="url" class="input" autocomplete="url" placeholder="https://" />
+            </FormField>
+            <FormField v-slot="{ id }" label="Facebook">
+              <input :id="id" v-model="form.facebook" type="url" class="input" autocomplete="url" placeholder="https://" />
+            </FormField>
+            <FormField v-slot="{ id }" label="YouTube">
+              <input :id="id" v-model="form.youtube" type="url" class="input" autocomplete="url" placeholder="https://" />
+            </FormField>
+            <FormField v-slot="{ id }" label="Instagram">
+              <input :id="id" v-model="form.instagram" type="url" class="input" autocomplete="url" placeholder="https://" />
+            </FormField>
+          </fieldset>
         </div>
       </div>
 

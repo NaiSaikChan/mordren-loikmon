@@ -5,7 +5,9 @@
       "Bash(git commit -m 'feat: implement comprehensive media asset standards system *)",
       "Bash(git push *)",
       "Bash(docker exec *)",
-      "Bash(grep -E \"\\\\.\\(ts|js|sh\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|js|sh\\)$\")",
+      "Bash(docker compose *)",
+      "Bash(xargs docker inspect --format '{{.Created}}')"
     ]
   }
 }

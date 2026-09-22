@@ -102,6 +102,26 @@ function referenceKeyExpr(ref: (typeof MEDIA_REFERENCES)[number]): RawBuilder<st
   return ref.keyExpression ? sql.raw(ref.keyExpression) : sql.ref(`${ref.table}.${ref.column}`)
 }
 
+/**
+ * Width of `media_assets.checksum` (migration 0004, repaired by 0005).
+ * A checksum is stored with its algorithm prefix, so the prefix counts too:
+ * anything longer is rejected by MySQL with "Data too long for column".
+ */
+export const CHECKSUM_MAX_LENGTH = 80
+
+/** `sha256:<hex>` of the bytes — identical re-uploads of the same asset type are reused. */
+export function contentChecksum(buffer: Buffer): string {
+  return `sha256:${createHash('sha256').update(buffer).digest('hex')}`
+}
+
+/**
+ * `key:<hex>` for direct-to-storage uploads, whose bytes never reach the API.
+ * It identifies the object rather than its content, so these never deduplicate.
+ */
+export function keyChecksum(key: string): string {
+  return `key:${createHash('sha256').update(key).digest('hex')}`
+}
+
 export class MediaService {
   constructor(
     private readonly db: Executor,
@@ -116,7 +136,7 @@ export class MediaService {
   async upload(actor: AuditActorInfo, input: UploadInput): Promise<UploadResult> {
     const standard = MEDIA_STANDARDS[input.assetType]
     const register = input.register ?? true
-    const checksum = `sha256:${createHash('sha256').update(input.buffer).digest('hex')}`
+    const checksum = contentChecksum(input.buffer)
 
     let imageInfo: ImageInfo | null = null
     let mimeType: string
@@ -265,7 +285,7 @@ export class MediaService {
         mime_type: validation.format!.mimeTypes[0]!,
         format: validation.format!.id,
         size_bytes: stat.size,
-        checksum: `key:${createHash('sha256').update(input.key).digest('hex')}`,
+        checksum: keyChecksum(input.key),
         total_bytes: stat.size,
         uploaded_by: actor.id,
       })

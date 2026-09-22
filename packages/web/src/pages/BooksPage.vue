@@ -17,7 +17,7 @@ const route = useRoute()
 const store = useBooksStore()
 const catStore = useCategoriesStore()
 
-const PAGE_SIZE = 18
+const PAGE_SIZE = 20
 const page = ref(1)
 const initialCat = Number(route.query.cat ?? route.query.category ?? 0)
 const selectedCat = ref<number>(Number.isFinite(initialCat) && initialCat > 0 ? initialCat : 0)

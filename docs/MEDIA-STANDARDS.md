@@ -126,7 +126,11 @@ artwork on phones.
 **Tables** (migration `0004_media`):
 
 - `media_assets` stores one row per upload: type, dimensions, dominant color,
-  checksum, a variants map, total bytes, folder, title and alt text.
+  checksum, a variants map, total bytes, folder, title and alt text. The
+  checksum keeps its algorithm prefix (`sha256:<hex>`, or `key:<hex>` for
+  direct-to-storage uploads), so the column is `varchar(80)`, not the width of
+  the digest alone — see `CHECKSUM_MAX_LENGTH` in `services/media.ts` and
+  migration `0005_media_checksum`.
 - `media_folders` stores the folder tree.
 - The same migration adds `sliders.mobile_image_key`, `categories.cover_key`,
   `subscription_plans.image_key`, `coupons.banner_key`,

@@ -7,6 +7,7 @@ import * as m0001 from './migrations/0001_content.js'
 import * as m0002 from './migrations/0002_subscriptions.js'
 import * as m0003 from './migrations/0003_cms.js'
 import * as m0004 from './migrations/0004_media.js'
+import * as m0005 from './migrations/0005_media_checksum.js'
 import type { Database } from './types.js'
 
 /** Migrations are bundled in code (no filesystem scanning), so dist/ and tsx behave the same. */
@@ -17,6 +18,7 @@ const provider: MigrationProvider = {
       '0002_subscriptions': m0002,
       '0003_cms': m0003,
       '0004_media': m0004,
+      '0005_media_checksum': m0005,
     }
   },
 }

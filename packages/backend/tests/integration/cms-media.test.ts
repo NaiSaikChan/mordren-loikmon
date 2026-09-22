@@ -1,7 +1,9 @@
 import { isProcessedImageKey, variantKey } from '@loikmon/media-standards'
+import { sql } from 'kysely'
 import sharp from 'sharp'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { CHECKSUM_MAX_LENGTH, contentChecksum } from '../../src/services/media.js'
 import { bearer, createTestApp, hasTestDatabase, registerUser, type TestApp } from '../helpers/testApp.js'
 
 const image = (width: number, height: number, format: 'jpeg' | 'png' | 'webp' = 'webp', seed = 0) =>
@@ -31,6 +33,20 @@ describe.skipIf(!hasTestDatabase)('CMS media library (MySQL)', () => {
     ;({ token: reader } = await registerUser(t.app, 'reader@example.com'))
   })
   afterAll(async () => t?.close())
+
+  it('migrates a checksum column wide enough for the prefixed digest', async () => {
+    // An early 0004 created char(64), which fits the digest but not the
+    // `sha256:` prefix, so every upload failed with "Data too long for column
+    // 'checksum'". 0005 repairs it; this asserts the migrated schema, since a
+    // column too narrow only shows up against a real database.
+    const [column] = await sql<{ length: number | null }>`
+      SELECT CHARACTER_MAXIMUM_LENGTH AS length FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'media_assets' AND COLUMN_NAME = 'checksum'`
+      .execute(t.container.ctx.db)
+      .then((r) => r.rows)
+    expect(column?.length ?? 0).toBeGreaterThanOrEqual(CHECKSUM_MAX_LENGTH)
+    expect(contentChecksum(Buffer.from('x')).length).toBeLessThanOrEqual(CHECKSUM_MAX_LENGTH)
+  })
 
   it('rejects a book cover below the minimum dimensions with a clear message', async () => {
     const res = await upload('book_cover', await image(600, 900), 'small.webp')

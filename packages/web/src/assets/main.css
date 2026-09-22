@@ -222,6 +222,18 @@
     @apply transition-colors text-sm;
   }
 
+  /*
+   * Required-field feedback: only flag an empty/invalid required field once the
+   * user has actually interacted with it (or tried to submit), never on load.
+   * Border width changes alongside colour so the state isn't colour-only.
+   */
+  .input:user-invalid {
+    @apply border-2 border-red-500 dark:border-red-500;
+  }
+  .input:required:user-valid {
+    @apply border-green-600 dark:border-green-500;
+  }
+
   /* Badges */
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;

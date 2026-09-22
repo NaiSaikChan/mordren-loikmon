@@ -83,6 +83,27 @@ function onSubmit() {
   if (props.busy || submitting.value) return
   emit('submit')
 }
+
+/**
+ * `:user-invalid` is visual only, so mirror it onto `aria-invalid` for
+ * assistive tech: on blur/input for interactive feedback, and on the native
+ * `invalid` event (fired per-control, doesn't bubble) when a submit attempt
+ * fails constraint validation.
+ */
+function syncAriaInvalid(target: EventTarget | null) {
+  const el = target as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement) | null
+  if (!el || typeof el.checkValidity !== 'function' || !el.hasAttribute('required')) return
+  // NOTE: don't call this from an `invalid` handler — checkValidity() re-fires
+  // `invalid` on a still-invalid control, causing infinite recursion. Use
+  // markAriaInvalid there instead, since that event only fires when invalid.
+  if (el.checkValidity()) el.removeAttribute('aria-invalid')
+  else el.setAttribute('aria-invalid', 'true')
+}
+
+function markAriaInvalid(target: EventTarget | null) {
+  const el = target as HTMLElement | null
+  el?.setAttribute?.('aria-invalid', 'true')
+}
 </script>
 
 <template>
@@ -99,7 +120,13 @@ function onSubmit() {
           aria-modal="true"
           :aria-labelledby="titleId"
         >
-          <form @submit.prevent="onSubmit">
+          <form
+            @submit.prevent="onSubmit"
+            @blur.capture="syncAriaInvalid($event.target)"
+            @input="syncAriaInvalid($event.target)"
+            @change="syncAriaInvalid($event.target)"
+            @invalid.capture="markAriaInvalid($event.target)"
+          >
             <header class="flex items-start gap-4 border-b border-gray-100 px-5 py-4 dark:border-gray-800">
               <div class="min-w-0 flex-1">
                 <h2 :id="titleId" class="truncate text-base font-semibold text-gray-900 dark:text-white">{{ title }}</h2>

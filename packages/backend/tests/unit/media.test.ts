@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { AppError } from '../../src/lib/errors.js'
 import { assertSafeSvg, generateVariants, inspectImage } from '../../src/media/imageProcessor.js'
 import { MEDIA_REFERENCES } from '../../src/media/references.js'
+import { CHECKSUM_MAX_LENGTH, contentChecksum, keyChecksum } from '../../src/services/media.js'
 import { looksLikeSvg, sniffFormat } from '../../src/media/sniff.js'
 import { ASSET_CONTENT_TYPES, ASSET_VISIBILITY } from '../../src/storage/storage.js'
 
@@ -88,6 +89,23 @@ describe('content sniffing', () => {
     expect(sniffFormat(pad(Buffer.from('\x00\x00\x00\x20ftypM4A ', 'latin1')))).toBe('m4a')
     expect(sniffFormat(pad(Buffer.from([0xff, 0xf1, 0x50, 0x80])))).toBe('aac')
     expect(sniffFormat(pad(Buffer.from('<html>')))).toBeNull()
+  })
+})
+
+describe('checksums', () => {
+  it('fits the media_assets.checksum column, prefix included', () => {
+    // char(64) held the digest but not the `sha256:` prefix, so every upload
+    // failed with "Data too long for column 'checksum'" (fixed in 0005).
+    const content = contentChecksum(Buffer.from('any file'))
+    const byKey = keyChecksum('audio/2026-09/a-very-long-object-key/original.mp3')
+    expect(content).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(byKey).toMatch(/^key:[0-9a-f]{64}$/)
+    for (const value of [content, byKey]) expect(value.length).toBeLessThanOrEqual(CHECKSUM_MAX_LENGTH)
+  })
+
+  it('deduplicates by content, not by name', () => {
+    expect(contentChecksum(Buffer.from('same bytes'))).toBe(contentChecksum(Buffer.from('same bytes')))
+    expect(contentChecksum(Buffer.from('a'))).not.toBe(contentChecksum(Buffer.from('b')))
   })
 })
 

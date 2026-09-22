@@ -195,7 +195,7 @@ onBeforeUnmount(() => releasePreview(pending.value))
 
 <template>
   <div
-    class="rounded-xl border border-dashed p-3 transition"
+    class="relative rounded-xl border border-dashed p-3 transition"
     :class="dragging ? 'border-brand-500 bg-brand-50/60 dark:bg-brand-950/20' : 'border-gray-300 dark:border-gray-700'"
     @dragover.prevent="!disabled && (dragging = true)"
     @dragleave.prevent="dragging = false"

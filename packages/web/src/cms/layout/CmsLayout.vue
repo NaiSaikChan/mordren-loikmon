@@ -39,7 +39,7 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
 </script>
 
 <template>
-  <div class="flex h-full bg-surface-50 dark:bg-surface-950">
+  <div class="flex h-dvh bg-surface-50 dark:bg-surface-950">
     <a
       href="#cms-content"
       class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-lg focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-white"
@@ -53,7 +53,7 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
       <div v-if="sidebarOpen" class="fixed inset-0 z-30 bg-black/50 lg:hidden" @click="sidebarOpen = false" />
     </Transition>
 
-    <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden [container-type:inline-size]">
       <header
         class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-gray-100 bg-white px-4 dark:border-gray-800 dark:bg-surface-900 print:hidden"
       >
@@ -88,8 +88,8 @@ const themeIcon = { light: '☀️', dark: '🌙', system: '💻' }
         </div>
       </header>
 
-      <main id="cms-content" class="flex-1 overflow-y-auto" tabindex="-1">
-        <div class="mx-auto w-full max-w-7xl p-4 sm:p-6">
+      <main id="cms-content" class="relative flex-1 overflow-y-auto overscroll-contain" tabindex="-1">
+        <div class="mx-auto w-full max-w-[min(94cqi,100rem)] p-4 sm:p-6">
           <RouterView v-slot="{ Component }">
             <Suspense>
               <component :is="Component" />
