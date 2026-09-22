@@ -1,40 +1,41 @@
 /**
- * Full-screen Audiobook Player
+ * Full-screen audiobook player.
  *
- * Design: warm gold (#C9922A / #D4A843) accent on light (#F5F5F0) background.
- * Layout:
- *   ─ Header: back arrow  |  "Read" button
- *   ─ Cover art (rounded square, shadow)
- *   ─ Book title + author
- *   ─ Large arc/semicircle decorative shape behind playback controls
- *   ─ Playback controls: skip-back-15  play/pause  skip-forward-15
- *   ─ Seek bar with current / total time
- *   ─ Chapter playlist (locked chapters show a lock and open the paywall)
- *   ─ Footer: < Chapter N of M >
+ * Styled with NativeWind against the shared `audio` / `surface` tokens and the
+ * listener's own theme and font preferences, so it belongs to the same app as
+ * every other screen. Chapters come from `books.getChapters`: locked chapters
+ * have no audio URL and are never queued or played.
  *
- * Chapters come from `books.getChapters`: locked chapters have no audio URL
- * and are never queued or played.
+ * Playback does not start on its own — opening a screen should not spend
+ * someone's mobile data.
  */
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Animated,
-  Dimensions,
+  ActivityIndicator,
   Image,
-  Platform,
+  Modal,
+  PanResponder,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   View,
-  ActivityIndicator,
+  type LayoutChangeEvent,
 } from 'react-native'
 import { router, useLocalSearchParams, Stack } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { BookChapter } from '@loikmon/api'
-import { useAudio } from '@/context/AudioContext'
+import {
+  PLAYBACK_RATES,
+  SKIP_MILLIS,
+  SLEEP_MINUTES,
+  useAudio,
+  type SleepMode,
+} from '@/context/AudioContext'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
+import { useTheme } from '@/context/ThemeContext'
+import { useTypography } from '@/context/TypographyContext'
 import { useBookAudioChapters } from '@/hooks/useBookAudioChapters'
 import { useBookDetail } from '@/hooks/useBooks'
 import { accessAction } from '@/lib/access'
@@ -42,127 +43,218 @@ import type { AudioTrack } from '@/lib/audio'
 import { firstParam } from '@/lib/normalize'
 import { pickCover } from '@/lib/url'
 
-const GOLD = '#C9922A'
-const GOLD_LIGHT = '#D4A843'
-const BG = '#F9F7F2'
-const TEXT_DARK = '#1A1A1A'
-const TEXT_MID = '#6B6B6B'
-const TEXT_LIGHT = '#A0A0A0'
-const TRACK_BG = '#E0D8CC'
-
-const { width: SW } = Dimensions.get('window')
-const COVER_SIZE = Math.min(SW * 0.42, 180)
-const ARC_RADIUS = SW * 0.62
-
-function formatTime(ms: number): string {
-  if (!ms || ms < 0) return '0:00'
-  const s = Math.floor(ms / 1000)
-  const m = Math.floor(s / 60)
-  return `${m}:${String(s % 60).padStart(2, '0')}`
+/** Ionicons take a colour prop, so the few icon colours live here rather than in classes. */
+function iconPalette(isDark: boolean) {
+  return {
+    accent: isDark ? '#d4a843' : '#c9922a',
+    strong: isDark ? '#f8fafc' : '#0f172a',
+    muted: isDark ? '#94a3b8' : '#64748b',
+    onAccent: '#ffffff',
+  }
 }
 
+function formatTime(ms: number): string {
+  if (!ms || ms < 0 || !isFinite(ms)) return '0:00'
+  const total = Math.floor(ms / 1000)
+  const hrs = Math.floor(total / 3600)
+  const mins = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  const mm = hrs ? String(mins).padStart(2, '0') : String(mins)
+  return `${hrs ? `${hrs}:` : ''}${mm}:${String(secs).padStart(2, '0')}`
+}
+
+function formatChapterLength(seconds: number | null | undefined): string | null {
+  if (!seconds || seconds <= 0) return null
+  return formatTime(seconds * 1000)
+}
+
+/* ────────────────────────────────────────────────────────────── seek bar */
+
+/**
+ * Draggable scrubber.
+ *
+ * The previous version only accepted a tap. This tracks the finger, shows the
+ * position it would land on while dragging, and commits on release — and is
+ * exposed to screen readers as an adjustable control.
+ */
 function SeekBar({
   positionMillis,
   durationMillis,
   onSeek,
+  isDark,
+  label,
 }: {
   positionMillis: number
   durationMillis: number
-  onSeek: (ms: number) => void
+  onSeek: (millis: number) => void
+  isDark: boolean
+  label: string
 }) {
-  const progress = durationMillis > 0 ? positionMillis / durationMillis : 0
-  const barRef = useRef<View>(null)
+  const [width, setWidth] = useState(0)
+  const [dragMillis, setDragMillis] = useState<number | null>(null)
 
-  const handlePress = useCallback(
-    (e: { nativeEvent: { locationX: number } }) => {
-      if (!barRef.current) return
-      barRef.current.measure((_x: number, _y: number, width: number) => {
-        if (!width) return
-        const ratio = Math.max(0, Math.min(1, e.nativeEvent.locationX / width))
-        onSeek(ratio * durationMillis)
-      })
-    },
-    [durationMillis, onSeek],
+  // PanResponder callbacks are created once, so live values are read from refs.
+  const widthRef = useRef(0)
+  const durationRef = useRef(0)
+  widthRef.current = width
+  durationRef.current = durationMillis
+
+  const shown = dragMillis ?? positionMillis
+  const pct = durationMillis > 0 ? Math.min(1, Math.max(0, shown / durationMillis)) : 0
+
+  const millisAt = useCallback((x: number) => {
+    if (!widthRef.current || !durationRef.current) return 0
+    return Math.max(0, Math.min(durationRef.current, (x / widthRef.current) * durationRef.current))
+  }, [])
+
+  const responder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (e) => setDragMillis(millisAt(e.nativeEvent.locationX)),
+        onPanResponderMove: (e) => setDragMillis(millisAt(e.nativeEvent.locationX)),
+        onPanResponderRelease: (e) => {
+          const value = millisAt(e.nativeEvent.locationX)
+          setDragMillis(null)
+          onSeek(value)
+        },
+        onPanResponderTerminate: () => setDragMillis(null),
+      }),
+    [millisAt, onSeek],
   )
 
+  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)
+
   return (
-    <View style={styles.seekContainer}>
-      <Pressable
-        ref={barRef as any}
-        onPress={handlePress as any}
-        style={styles.trackOuter}
-        hitSlop={12}
+    <View className="px-6">
+      <View
+        {...responder.panHandlers}
+        onLayout={onLayout}
+        className="justify-center py-3"
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityValue={{
+          min: 0,
+          max: Math.max(1, Math.floor(durationMillis / 1000)),
+          now: Math.floor(shown / 1000),
+          text: formatTime(shown),
+        }}
+        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        onAccessibilityAction={(e) => {
+          const step = e.nativeEvent.actionName === 'increment' ? 5000 : -5000
+          onSeek(Math.max(0, Math.min(durationMillis, positionMillis + step)))
+        }}
       >
-        <View style={styles.trackBg} />
-        <View style={[styles.trackFill, { width: `${Math.min(progress * 100, 100)}%` as any }]} />
-        <View style={[styles.thumb, { left: `${Math.min(progress * 100, 100)}%` as any, marginLeft: -7 }]} />
-      </Pressable>
-      <View style={styles.timeRow}>
-        <Text style={styles.timeText}>{formatTime(positionMillis)}</Text>
-        <Text style={styles.timeText}>{formatTime(durationMillis)}</Text>
+        <View className="h-1.5 w-full overflow-hidden rounded-full bg-surface-200 dark:bg-surface-800">
+          <View className="h-full rounded-full bg-audio-500" style={{ width: `${pct * 100}%` }} />
+        </View>
+        <View
+          className="absolute h-4 w-4 rounded-full border-2 border-white bg-audio-500 dark:border-surface-900"
+          style={{ left: Math.max(0, pct * width - 8) }}
+          pointerEvents="none"
+        />
+      </View>
+      <View className="-mt-1 flex-row items-center justify-between">
+        <Text className="text-xs tabular-nums text-surface-500 dark:text-surface-400">{formatTime(shown)}</Text>
+        <Text className="text-xs tabular-nums text-surface-500 dark:text-surface-400">
+          {formatTime(durationMillis)}
+        </Text>
       </View>
     </View>
   )
 }
 
-function ControlBtn({
-  icon,
-  size,
-  onPress,
-  primary,
-  disabled,
+/* ──────────────────────────────────────────────────────── option sheet */
+
+interface SheetOption {
+  value: SleepMode | number
+  label: string
+}
+
+/** Bottom sheet for a single choice (speed, sleep timer). */
+function OptionSheet({
+  visible,
+  title,
+  options,
+  selected,
+  onSelect,
+  onClose,
+  isDark,
 }: {
-  icon: React.ComponentProps<typeof Ionicons>['name']
-  size: number
-  onPress: () => void
-  primary?: boolean
-  disabled?: boolean
+  visible: boolean
+  title: string
+  options: SheetOption[]
+  selected: SleepMode | number
+  onSelect: (value: SleepMode | number) => void
+  onClose: () => void
+  isDark: boolean
 }) {
-  const scale = useRef(new Animated.Value(1)).current
-
-  const onPressIn = () =>
-    Animated.spring(scale, { toValue: 0.9, useNativeDriver: true, speed: 30 }).start()
-  const onPressOut = () =>
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30 }).start()
-
+  const colors = iconPalette(isDark)
   return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-      disabled={disabled}
-      hitSlop={12}
-    >
-      <Animated.View
-        style={[
-          primary ? styles.playBtn : styles.skipBtn,
-          { transform: [{ scale }] },
-          disabled && { opacity: 0.4 },
-        ]}
-      >
-        <Ionicons name={icon} size={size} color={primary ? '#fff' : GOLD} />
-      </Animated.View>
-    </Pressable>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable className="flex-1 justify-end bg-black/50" onPress={onClose} accessibilityLabel={title}>
+        <Pressable
+          className="rounded-t-3xl bg-white px-5 pb-8 pt-4 dark:bg-surface-900"
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View className="mb-3 h-1 w-10 self-center rounded-full bg-surface-300 dark:bg-surface-700" />
+          <Text className="mb-2 text-base font-bold text-surface-900 dark:text-white">{title}</Text>
+          {options.map((option) => {
+            const active = option.value === selected
+            return (
+              <Pressable
+                key={String(option.value)}
+                onPress={() => onSelect(option.value)}
+                className="flex-row items-center justify-between rounded-2xl px-3 py-3"
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={option.label}
+              >
+                <Text
+                  className={
+                    active
+                      ? 'text-base font-bold text-audio-600 dark:text-audio-400'
+                      : 'text-base text-surface-700 dark:text-surface-200'
+                  }
+                >
+                  {option.label}
+                </Text>
+                {active ? <Ionicons name="checkmark" size={18} color={colors.accent} /> : null}
+              </Pressable>
+            )
+          })}
+        </Pressable>
+      </Pressable>
+    </Modal>
   )
 }
 
-function chapterLabel(chapter: BookChapter, index: number): string {
-  return (chapter.chapter_title || chapter.title || '').trim() || `#${chapter.chapter_number || index + 1}`
-}
+/* ────────────────────────────────────────────────────────────── screen */
 
-export default function AudiobookPlayerScreen() {
-  const params = useLocalSearchParams<{ id: string }>()
+export default function AudiobookScreen() {
+  const params = useLocalSearchParams<{ id?: string | string[] }>()
   const id = firstParam(params.id)
   const { t } = useI18n()
   const { isLoggedIn } = useAuth()
+  const { isDark } = useTheme()
+  const { bodyTextStyle, headerTextStyle } = useTypography()
+  const colors = iconPalette(isDark)
 
   const { book } = useBookDetail(id, { trackView: false })
   const cover = book ? pickCover(book) : ''
   const title = book?.title ?? ''
   const author = book?.authorname ?? ''
 
-  const { chapters, tracks, access, lockedCount, loading: chaptersLoading } = useBookAudioChapters(id, book ?? undefined)
-  const sortedChapters = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number)
+  const { chapters, tracks, access, lockedCount, loading: chaptersLoading } = useBookAudioChapters(
+    id,
+    book ?? undefined,
+  )
+  const sortedChapters = useMemo(
+    () => [...chapters].sort((a, b) => a.chapter_number - b.chapter_number),
+    [chapters],
+  )
 
   const {
     current,
@@ -175,36 +267,43 @@ export default function AudiobookPlayerScreen() {
     play,
     toggle,
     seek,
+    skip,
     next,
     previous,
+    rate,
+    setRate,
+    sleepMode,
+    sleepRemainingMs,
+    setSleep,
+    error: playbackError,
+    lockedAction,
+    retry,
   } = useAudio()
+
+  const [speedOpen, setSpeedOpen] = useState(false)
+  const [sleepOpen, setSleepOpen] = useState(false)
 
   // Signed URLs change on every fetch, so identify the book's queue by book id.
   const isThisBook = current?.sourceType === 'book' && String(current.sourceBookId) === String(id)
 
+  // Access lost mid-session (signed out elsewhere, subscription lapsed): send
+  // them where they can fix it rather than leaving a player that will not start.
   useEffect(() => {
-    if (tracks.length > 0 && !current) {
-      void play(tracks[0], tracks)
-    }
-  }, [tracks, current, play])
+    if (!lockedAction) return
+    router.push(lockedAction === 'login' ? '/(auth)/login' : '/subscribe')
+  }, [lockedAction])
 
   const displayIndex = isThisBook ? currentIndex : 0
   const chapterCount = isThisBook ? queue.length : tracks.length
   const currentTrack = isThisBook ? current : (tracks[0] ?? null)
   const chapterDisplayTitle = currentTrack?.chapterTitle ?? currentTrack?.title ?? ''
+  const hasTracks = tracks.length > 0
 
-  const onSkipBack = useCallback(
-    () => void seek(Math.max(0, positionMillis - 15_000)),
-    [positionMillis, seek],
-  )
-  const onSkipForward = useCallback(
-    () => void seek(positionMillis + 15_000),
-    [positionMillis, seek],
-  )
   const onToggle = useCallback(() => {
-    if (!isThisBook && tracks.length > 0) void play(tracks[0], tracks)
+    // First press on a fresh screen starts the book; there is no autoplay.
+    if (!isThisBook && hasTracks) void play(tracks[0], tracks)
     else void toggle()
-  }, [isThisBook, tracks, play, toggle])
+  }, [isThisBook, hasTracks, tracks, play, toggle])
 
   const onPrev = useCallback(() => {
     if (positionMillis > 3000) void seek(0)
@@ -224,140 +323,311 @@ export default function AudiobookPlayerScreen() {
     [play, tracks, access, isLoggedIn],
   )
 
+  const speedOptions = useMemo<SheetOption[]>(
+    () => PLAYBACK_RATES.map((value) => ({ value, label: value === 1 ? t('audio.normalSpeed') : `${value}×` })),
+    [t],
+  )
+
+  const sleepOptions = useMemo<SheetOption[]>(
+    () => [
+      { value: 'off' as SleepMode, label: t('audio.sleepOff') },
+      ...SLEEP_MINUTES.map((m) => ({ value: m as SleepMode, label: t('audio.sleepMinutes', { count: m }) })),
+      { value: 'end-of-chapter' as SleepMode, label: t('audio.sleepEndOfChapter') },
+    ],
+    [t],
+  )
+
+  const sleepLabel =
+    sleepMode === 'off'
+      ? t('audio.sleepTimer')
+      : sleepMode === 'end-of-chapter'
+        ? t('audio.sleepEndOfChapter')
+        : sleepRemainingMs !== null
+          ? formatTime(sleepRemainingMs)
+          : `${sleepMode}m`
+
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+    <SafeAreaView className="flex-1 bg-surface-50 dark:bg-surface-950" edges={['top', 'bottom']}>
       <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerIconBtn}>
-          <Ionicons name="chevron-back" size={22} color={TEXT_DARK} />
+      <View className="flex-row items-center justify-between px-4 py-2">
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          className="h-10 w-10 items-center justify-center rounded-full"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.strong} />
         </Pressable>
         <Pressable
           onPress={() => router.push({ pathname: '/book/[id]', params: { id: String(id) } })}
           hitSlop={12}
-          style={styles.readBtn}
+          className="flex-row items-center gap-1 rounded-full bg-surface-100 px-3 py-1.5 dark:bg-surface-800"
+          accessibilityRole="button"
+          accessibilityLabel={t('audio.read')}
         >
-          <Ionicons name="book-outline" size={15} color={GOLD} />
-          <Text style={styles.readBtnText}>{t('audio.read')}</Text>
+          <Ionicons name="book-outline" size={14} color={colors.muted} />
+          <Text className="text-xs font-semibold text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
+            {t('audio.read')}
+          </Text>
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-      >
-        {/* Cover */}
-        <View style={styles.coverShadow}>
-          {cover ? (
-            <Image source={{ uri: cover }} style={styles.cover} resizeMode="cover" />
-          ) : (
-            <View style={[styles.cover, styles.coverFallback]}>
-              <Text style={{ fontSize: 52 }}>{'📚'}</Text>
-            </View>
-          )}
-        </View>
+      <ScrollView contentContainerClassName="pb-10" showsVerticalScrollIndicator={false}>
+        <View className="items-center px-6 pt-2">
+          <View className="h-44 w-44 overflow-hidden rounded-3xl bg-audio-100 shadow-lg dark:bg-audio-950">
+            {cover ? (
+              <Image source={{ uri: cover }} className="h-full w-full" resizeMode="cover" accessibilityIgnoresInvertColors />
+            ) : (
+              <View className="h-full w-full items-center justify-center">
+                <Ionicons name="headset-outline" size={48} color={colors.accent} />
+              </View>
+            )}
+          </View>
 
-        {/* Title / Author */}
-        <View style={styles.metaCard}>
-          <Text style={styles.bookTitle} numberOfLines={2}>
+          <Text
+            className="mt-5 text-center text-xl font-bold text-surface-900 dark:text-white"
+            numberOfLines={2}
+            style={headerTextStyle}
+          >
             {title}
           </Text>
-          <Text style={styles.bookAuthor} numberOfLines={1}>
-            {author ? `${t('common.by')} ${author}` : ''}
-          </Text>
+          {author ? (
+            <Text className="mt-1 text-sm text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
+              {author}
+            </Text>
+          ) : null}
+
           {chapterDisplayTitle ? (
-            <Text style={styles.nowPlayingText} numberOfLines={1}>
-              {t('audio.nowPlaying', { title: chapterDisplayTitle })}
+            <Text
+              className="mt-3 text-center text-sm font-semibold text-audio-600 dark:text-audio-400"
+              numberOfLines={1}
+              accessibilityLiveRegion="polite"
+              style={bodyTextStyle}
+            >
+              {chapterDisplayTitle}
             </Text>
           ) : null}
         </View>
 
-        {/* Arc + Controls */}
-        <View style={styles.arcWrapper}>
-          <View style={styles.arc} />
-          <View style={styles.controls}>
-            {chaptersLoading && chapters.length === 0 ? (
-              <ActivityIndicator color={GOLD} size="large" />
-            ) : (
-              <>
-                <ControlBtn icon="play-back-outline" size={28} onPress={onSkipBack} disabled={!isThisBook} />
-                <ControlBtn
-                  icon={isPlaying && isThisBook ? 'pause' : 'play'}
-                  size={30}
-                  onPress={onToggle}
-                  primary
-                  disabled={isLoading || tracks.length === 0}
-                />
-                <ControlBtn icon="play-forward-outline" size={28} onPress={onSkipForward} disabled={!isThisBook} />
-              </>
-            )}
-          </View>
+        <View className="mt-4">
+          <SeekBar
+            positionMillis={isThisBook ? positionMillis : 0}
+            durationMillis={isThisBook ? durationMillis : 0}
+            onSeek={(ms) => void seek(ms)}
+            isDark={isDark}
+            label={t('audio.position')}
+          />
         </View>
 
-        {/* Seek bar */}
-        <SeekBar
-          positionMillis={isThisBook ? positionMillis : 0}
-          durationMillis={isThisBook ? durationMillis : 0}
-          onSeek={seek}
-        />
-
-        {/* Locked chapters notice */}
-        {lockedCount > 0 ? (
+        {/* Transport */}
+        <View className="mt-2 flex-row items-center justify-center gap-4 px-6">
           <Pressable
-            onPress={() => router.push(accessAction(access, isLoggedIn) === 'login' ? '/(auth)/login' : '/subscribe')}
-            style={styles.lockBanner}
+            onPress={onPrev}
+            disabled={!isThisBook}
+            hitSlop={8}
+            className="h-11 w-11 items-center justify-center rounded-full disabled:opacity-40"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.previousChapter')}
+            accessibilityState={{ disabled: !isThisBook }}
           >
-            <Ionicons name="lock-closed" size={16} color={GOLD} />
-            <Text style={styles.lockBannerText}>{t('audio.lockedHint', { count: lockedCount })}</Text>
-            <Ionicons name="chevron-forward" size={16} color={GOLD} />
+            <Ionicons name="play-skip-back" size={22} color={colors.strong} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => void skip(-SKIP_MILLIS)}
+            disabled={!isThisBook}
+            hitSlop={8}
+            className="h-11 w-11 items-center justify-center rounded-full disabled:opacity-40"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.skipBack', { seconds: SKIP_MILLIS / 1000 })}
+            accessibilityState={{ disabled: !isThisBook }}
+          >
+            <Ionicons name="play-back" size={22} color={colors.strong} />
+          </Pressable>
+
+          <Pressable
+            onPress={onToggle}
+            disabled={!hasTracks}
+            className="h-20 w-20 items-center justify-center rounded-full bg-audio-500 shadow-lg disabled:opacity-40"
+            accessibilityRole="button"
+            accessibilityLabel={isPlaying && isThisBook ? t('audio.pause') : t('audio.play')}
+            accessibilityState={{ disabled: !hasTracks }}
+          >
+            {isLoading && isThisBook ? (
+              <ActivityIndicator color={colors.onAccent} />
+            ) : (
+              <Ionicons
+                name={isPlaying && isThisBook ? 'pause' : 'play'}
+                size={34}
+                color={colors.onAccent}
+                style={{ marginLeft: isPlaying && isThisBook ? 0 : 3 }}
+              />
+            )}
+          </Pressable>
+
+          <Pressable
+            onPress={() => void skip(SKIP_MILLIS)}
+            disabled={!isThisBook}
+            hitSlop={8}
+            className="h-11 w-11 items-center justify-center rounded-full disabled:opacity-40"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.skipForward', { seconds: SKIP_MILLIS / 1000 })}
+            accessibilityState={{ disabled: !isThisBook }}
+          >
+            <Ionicons name="play-forward" size={22} color={colors.strong} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => void next()}
+            disabled={!isThisBook || currentIndex >= queue.length - 1}
+            hitSlop={8}
+            className="h-11 w-11 items-center justify-center rounded-full disabled:opacity-40"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.nextChapter')}
+            accessibilityState={{ disabled: !isThisBook || currentIndex >= queue.length - 1 }}
+          >
+            <Ionicons name="play-skip-forward" size={22} color={colors.strong} />
+          </Pressable>
+        </View>
+
+        {/* Speed + sleep timer */}
+        <View className="mt-5 flex-row items-center justify-center gap-3 px-6">
+          <Pressable
+            onPress={() => setSpeedOpen(true)}
+            className={`flex-row items-center gap-1.5 rounded-full px-3 py-2 ${
+              rate !== 1 ? 'bg-audio-100 dark:bg-audio-950' : 'bg-surface-100 dark:bg-surface-800'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.speed')}
+          >
+            <Ionicons name="speedometer-outline" size={16} color={rate !== 1 ? colors.accent : colors.muted} />
+            <Text
+              className={`text-xs font-bold ${
+                rate !== 1 ? 'text-audio-600 dark:text-audio-400' : 'text-surface-600 dark:text-surface-300'
+              }`}
+            >
+              {rate === 1 ? '1×' : `${rate}×`}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => setSleepOpen(true)}
+            className={`flex-row items-center gap-1.5 rounded-full px-3 py-2 ${
+              sleepMode !== 'off' ? 'bg-audio-100 dark:bg-audio-950' : 'bg-surface-100 dark:bg-surface-800'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.sleepTimer')}
+          >
+            <Ionicons name="moon-outline" size={16} color={sleepMode !== 'off' ? colors.accent : colors.muted} />
+            <Text
+              className={`text-xs font-bold ${
+                sleepMode !== 'off' ? 'text-audio-600 dark:text-audio-400' : 'text-surface-600 dark:text-surface-300'
+              }`}
+            >
+              {sleepLabel}
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Playback failed even after re-signing the URL: offer a retry. */}
+        {playbackError && isThisBook ? (
+          <Pressable
+            onPress={() => void retry()}
+            className="mx-6 mt-5 flex-row items-center gap-2 rounded-2xl bg-audio-50 px-4 py-3 dark:bg-audio-950"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+          >
+            <Ionicons name="alert-circle" size={16} color={colors.accent} />
+            <Text className="flex-1 text-xs font-semibold text-audio-700 dark:text-audio-300" style={bodyTextStyle}>
+              {playbackError === 'unavailable' ? t('audio.unavailable') : t('audio.playbackFailed')}
+            </Text>
+            <Text className="text-xs font-bold text-audio-600 underline dark:text-audio-400">
+              {t('common.retry')}
+            </Text>
           </Pressable>
         ) : null}
 
-        {/* Chapter playlist */}
-        <View style={styles.playlistBox}>
-          <Text style={styles.sectionTitle}>{t('audio.playlist')}</Text>
+        {lockedCount > 0 ? (
+          <Pressable
+            onPress={() => router.push(accessAction(access, isLoggedIn) === 'login' ? '/(auth)/login' : '/subscribe')}
+            className="mx-6 mt-4 flex-row items-center gap-2 rounded-2xl bg-surface-100 px-4 py-3 dark:bg-surface-800"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.lockedHint', { count: lockedCount })}
+          >
+            <Ionicons name="lock-closed" size={16} color={colors.accent} />
+            <Text className="flex-1 text-xs font-semibold text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
+              {t('audio.lockedHint', { count: lockedCount })}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
+        ) : null}
+
+        {/* Chapters */}
+        <View className="mt-6 px-6">
+          <View className="mb-3 flex-row items-center justify-between">
+            <Text
+              className="text-xs font-bold uppercase tracking-widest text-surface-500 dark:text-surface-400"
+              style={headerTextStyle}
+            >
+              {t('audio.playlist')}
+            </Text>
+            <Text className="text-xs text-surface-400 dark:text-surface-500">
+              {chapterCount ? t('audio.chapterOf', { current: displayIndex + 1, total: chapterCount }) : ''}
+            </Text>
+          </View>
+
           {sortedChapters.length === 0 ? (
-            <Text style={styles.emptyPlaylistText}>{chaptersLoading ? t('common.loading') : t('audio.noChapters')}</Text>
+            <Text className="py-6 text-center text-sm text-surface-400 dark:text-surface-500" style={bodyTextStyle}>
+              {chaptersLoading ? t('common.loading') : t('audio.noChapters')}
+            </Text>
           ) : (
             sortedChapters.map((chapter, idx) => {
               const locked = chapter.locked || !chapter.audio_url
-              const active = !locked && isThisBook && String(current?.id) === String(chapter.id)
-
+              const active = isThisBook && String(current?.chapterId ?? '') === String(chapter.id)
+              const length = formatChapterLength(chapter.duration_seconds ?? chapter.duration)
               return (
                 <Pressable
-                  key={`${String(chapter.id)}-${idx}`}
+                  key={String(chapter.id)}
                   onPress={() => onSelectChapter(chapter)}
-                  style={[styles.playlistItem, active && styles.playlistItemActive, locked && styles.playlistItemLocked]}
-                  accessibilityState={{ disabled: locked }}
+                  className={`mb-2 flex-row items-center gap-3 rounded-2xl border px-3 py-3 ${
+                    active
+                      ? 'border-audio-400 bg-audio-50 dark:border-audio-700 dark:bg-audio-950'
+                      : 'border-surface-200 bg-white dark:border-surface-800 dark:bg-surface-900'
+                  }`}
+                  accessibilityRole="button"
+                  accessibilityLabel={chapter.chapter_title || chapter.title}
+                  accessibilityHint={locked ? t('audio.locked') : undefined}
                 >
-                  <View style={[styles.playlistIndex, active && styles.playlistIndexActive]}>
-                    <Text style={[styles.playlistIndexText, active && styles.playlistIndexTextActive]}>
+                  <View
+                    className={`h-8 w-8 items-center justify-center rounded-xl ${
+                      active ? 'bg-audio-500' : 'bg-surface-100 dark:bg-surface-800'
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-bold ${active ? 'text-white' : 'text-surface-500 dark:text-surface-300'}`}
+                    >
                       {idx + 1}
                     </Text>
                   </View>
-                  <View style={styles.playlistTextWrap}>
+                  <View className="min-w-0 flex-1">
                     <Text
-                      style={[styles.playlistTitle, active && styles.playlistTitleActive, locked && styles.playlistTitleLocked]}
+                      className="text-sm font-semibold text-surface-900 dark:text-white"
                       numberOfLines={1}
+                      style={bodyTextStyle}
                     >
-                      {chapterLabel(chapter, idx)}
+                      {chapter.chapter_title || chapter.title}
                     </Text>
-                    <Text style={styles.playlistMeta} numberOfLines={1}>
-                      {locked
-                        ? t('audio.locked')
-                        : active
-                          ? isPlaying
-                            ? t('audio.playing')
-                            : t('audio.paused')
-                          : t('audio.tapToPlay')}
+                    <Text className="text-xs text-surface-400 dark:text-surface-500">
+                      {locked ? t('audio.locked') : active && isPlaying ? t('audio.playing') : t('audio.tapToPlay')}
+                      {length ? ` · ${length}` : ''}
                     </Text>
                   </View>
                   <Ionicons
-                    name={locked ? 'lock-closed' : active && isPlaying ? 'pause-circle' : 'play-circle'}
-                    size={locked ? 20 : 26}
-                    color={locked ? TEXT_LIGHT : active ? GOLD : '#B8A88D'}
+                    name={locked ? 'lock-closed' : active && isPlaying ? 'pause' : 'play'}
+                    size={18}
+                    color={locked ? colors.muted : colors.accent}
                   />
                 </Pressable>
               )
@@ -366,301 +636,30 @@ export default function AudiobookPlayerScreen() {
         </View>
       </ScrollView>
 
-      {/* Chapter navigation footer */}
-      <View style={styles.footer}>
-        <Pressable
-          onPress={onPrev}
-          hitSlop={12}
-          disabled={!isThisBook || displayIndex <= 0}
-          style={styles.footerArrow}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={20}
-            color={!isThisBook || displayIndex <= 0 ? TEXT_LIGHT : TEXT_DARK}
-          />
-        </Pressable>
-
-        <View style={styles.footerCenter}>
-          <Text style={styles.footerChapter}>
-            {t('audio.chapterOf', { current: chapterCount ? displayIndex + 1 : 0, total: chapterCount || '—' })}
-          </Text>
-        </View>
-
-        <Pressable
-          onPress={next}
-          hitSlop={12}
-          disabled={!isThisBook || displayIndex >= chapterCount - 1}
-          style={styles.footerArrow}
-        >
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={!isThisBook || displayIndex >= chapterCount - 1 ? TEXT_LIGHT : TEXT_DARK}
-          />
-        </Pressable>
-      </View>
-
-      <View style={styles.homeIndicator} />
+      <OptionSheet
+        visible={speedOpen}
+        title={t('audio.speed')}
+        options={speedOptions}
+        selected={rate}
+        onSelect={(v) => {
+          setRate(v as number)
+          setSpeedOpen(false)
+        }}
+        onClose={() => setSpeedOpen(false)}
+        isDark={isDark}
+      />
+      <OptionSheet
+        visible={sleepOpen}
+        title={t('audio.sleepTimer')}
+        options={sleepOptions}
+        selected={sleepMode}
+        onSelect={(v) => {
+          setSleep(v as SleepMode)
+          setSleepOpen(false)
+        }}
+        onClose={() => setSleepOpen(false)}
+        isDark={isDark}
+      />
     </SafeAreaView>
   )
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 8 : 4,
-    paddingBottom: 10,
-  },
-  headerIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#ECE7DB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  readBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#ECE7DB',
-  },
-  readBtnText: { color: GOLD, fontSize: 14, fontWeight: '600' },
-
-  scroll: { alignItems: 'center', paddingBottom: 20 },
-
-  coverShadow: {
-    marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.14,
-    shadowRadius: 12,
-    elevation: 8,
-    borderRadius: 20,
-  },
-  cover: { width: COVER_SIZE, height: COVER_SIZE, borderRadius: 20 },
-  coverFallback: { backgroundColor: '#E8E0D0', alignItems: 'center', justifyContent: 'center' },
-
-  metaCard: {
-    marginTop: 18,
-    width: SW - 40,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9E2D6',
-    backgroundColor: '#FFFDF8',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-
-  bookTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: GOLD,
-    textAlign: 'center',
-    paddingHorizontal: 8,
-    lineHeight: 24,
-  },
-  bookAuthor: { marginTop: 4, fontSize: 13, color: TEXT_MID, textAlign: 'center' },
-  nowPlayingText: {
-    marginTop: 10,
-    fontSize: 12,
-    color: '#8C744A',
-    fontWeight: '600',
-  },
-
-  arcWrapper: {
-    width: SW,
-    height: ARC_RADIUS * 0.72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    overflow: 'hidden',
-  },
-  arc: {
-    position: 'absolute',
-    width: ARC_RADIUS * 2,
-    height: ARC_RADIUS * 2,
-    borderRadius: ARC_RADIUS,
-    backgroundColor: '#E8E4DC',
-    bottom: -ARC_RADIUS * 0.8,
-    alignSelf: 'center',
-  },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 36,
-    zIndex: 2,
-    marginBottom: 2,
-  },
-  playBtn: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: GOLD_LIGHT,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: GOLD,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  skipBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-
-  seekContainer: { width: SW - 40, marginTop: 8 },
-  trackOuter: { height: 20, justifyContent: 'center' },
-  trackBg: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: TRACK_BG,
-  },
-  trackFill: { position: 'absolute', left: 0, height: 4, borderRadius: 2, backgroundColor: GOLD_LIGHT },
-  thumb: {
-    position: 'absolute',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: GOLD,
-    top: 3,
-  },
-  timeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  timeText: { fontSize: 11, color: TEXT_MID },
-
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: TEXT_DARK,
-    marginBottom: 8,
-  },
-  playlistBox: {
-    width: SW - 30,
-    marginTop: 18,
-    marginBottom: 8,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#E8E0D0',
-    backgroundColor: '#FFFCF6',
-    padding: 12,
-  },
-  playlistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    backgroundColor: '#F7F3EA',
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#ECE3D4',
-  },
-  playlistItemLocked: {
-    opacity: 0.7,
-  },
-  playlistTitleLocked: {
-    color: TEXT_MID,
-  },
-  lockBanner: {
-    width: SW - 30,
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E9C177',
-    backgroundColor: '#FDF2DD',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  lockBannerText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#8C744A',
-    fontWeight: '600',
-  },
-  playlistItemActive: {
-    backgroundColor: '#FDF2DD',
-    borderColor: '#E9C177',
-  },
-  playlistIndex: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#EBE4D7',
-  },
-  playlistIndexActive: {
-    backgroundColor: GOLD,
-  },
-  playlistIndexText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#8B795B',
-  },
-  playlistIndexTextActive: {
-    color: '#fff',
-  },
-  playlistTextWrap: {
-    flex: 1,
-    marginLeft: 10,
-    marginRight: 8,
-  },
-  playlistTitle: {
-    fontSize: 13,
-    color: TEXT_DARK,
-    fontWeight: '600',
-  },
-  playlistTitleActive: {
-    color: GOLD,
-  },
-  playlistMeta: {
-    marginTop: 2,
-    fontSize: 11,
-    color: TEXT_MID,
-  },
-  emptyPlaylistText: {
-    fontSize: 12,
-    color: TEXT_MID,
-    paddingVertical: 8,
-  },
-
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#DDD9D0',
-    backgroundColor: BG,
-  },
-  footerArrow: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  footerCenter: { alignItems: 'center', flex: 1 },
-  footerChapter: { fontSize: 14, fontWeight: '700', color: GOLD },
-  footerPage: { fontSize: 11, color: TEXT_LIGHT, marginTop: 2 },
-
-  homeIndicator: {
-    alignSelf: 'center',
-    width: 134,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: '#C8C4BB',
-    marginBottom: Platform.OS === 'ios' ? 8 : 4,
-    marginTop: 4,
-  },
-})

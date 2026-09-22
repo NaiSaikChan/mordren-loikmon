@@ -1,14 +1,44 @@
 import { View, Text, Pressable, Image, ActivityIndicator } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { useAudio } from '@/context/AudioContext'
+import { SKIP_MILLIS, useAudio } from '@/context/AudioContext'
+import { useI18n } from '@/context/I18nContext'
+import { useTheme } from '@/context/ThemeContext'
 import { useTypography } from '@/context/TypographyContext'
+
+function formatTime(ms: number): string {
+  if (!ms || ms < 0 || !isFinite(ms)) return '0:00'
+  const total = Math.floor(ms / 1000)
+  const hrs = Math.floor(total / 3600)
+  const mins = Math.floor((total % 3600) / 60)
+  const secs = total % 60
+  const mm = hrs ? String(mins).padStart(2, '0') : String(mins)
+  return `${hrs ? `${hrs}:` : ''}${mm}:${String(secs).padStart(2, '0')}`
+}
 
 /** Global mini audio player shown above the tab bar while a track is loaded. */
 export function MiniPlayer() {
-  const { current, queue, isPlaying, isLoading, positionMillis, durationMillis, toggle, stop, next, previous } = useAudio()
+  const {
+    current,
+    queue,
+    isPlaying,
+    isLoading,
+    positionMillis,
+    durationMillis,
+    toggle,
+    stop,
+    next,
+    previous,
+    skip,
+  } = useAudio()
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const { isDark } = useTheme()
+  const { t } = useI18n()
   if (!current) return null
+
+  // Icon colours follow the theme; they used to be hard-coded light-mode hexes.
+  const accent = isDark ? '#d4a843' : '#c9922a'
+  const muted = isDark ? '#94a3b8' : '#64748b'
 
   const progress = durationMillis > 0 ? positionMillis / durationMillis : 0
   const hasQueue = queue.length > 1
@@ -28,19 +58,24 @@ export function MiniPlayer() {
       onPress={openPlayer}
       className="mx-2 mb-2 overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-800"
       accessibilityRole="button"
-      accessibilityLabel="Open audiobook player"
+      accessibilityLabel={t('audio.openPlayer')}
     >
       <View className="h-1 w-full bg-surface-200 dark:bg-surface-700">
-        <View className="h-full bg-brand-500" style={{ width: `${Math.min(progress * 100, 100)}%` }} />
+        <View className="h-full bg-audio-500" style={{ width: `${Math.min(progress * 100, 100)}%` }} />
       </View>
 
       <View className="flex-row items-center px-3 py-2.5">
-        <View className="h-11 w-11 overflow-hidden rounded-lg bg-surface-200 dark:bg-surface-700">
+        <View className="h-11 w-11 overflow-hidden rounded-lg bg-audio-100 dark:bg-audio-950">
           {current.cover ? (
-            <Image source={{ uri: current.cover }} className="h-full w-full" resizeMode="cover" />
+            <Image
+              source={{ uri: current.cover }}
+              className="h-full w-full"
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
           ) : (
             <View className="h-full w-full items-center justify-center">
-              <Text>🎧</Text>
+              <Ionicons name="headset-outline" size={20} color={accent} />
             </View>
           )}
         </View>
@@ -53,8 +88,11 @@ export function MiniPlayer() {
           >
             {current.chapterTitle || current.title}
           </Text>
-          <Text numberOfLines={1} className="text-xs text-brand-500" style={bodyTextStyle}>
-            {current.artist || 'Audiobook'}
+          {/* Elapsed / total replaces a static label that said nothing useful. */}
+          <Text numberOfLines={1} className="text-xs tabular-nums text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
+            {durationMillis > 0
+              ? `${formatTime(positionMillis)} / ${formatTime(durationMillis)}`
+              : current.artist || t('books.audiobook')}
           </Text>
         </View>
 
@@ -66,10 +104,25 @@ export function MiniPlayer() {
             }}
             hitSlop={8}
             className="mr-1 rounded-full p-1.5"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.previousChapter')}
           >
-            <Ionicons name="play-skip-back" size={18} color="#64748b" />
+            <Ionicons name="play-skip-back" size={18} color={muted} />
           </Pressable>
-        ) : null}
+        ) : (
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation()
+              void skip(-SKIP_MILLIS)
+            }}
+            hitSlop={8}
+            className="mr-1 rounded-full p-1.5"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.skipBack', { seconds: SKIP_MILLIS / 1000 })}
+          >
+            <Ionicons name="play-back" size={18} color={muted} />
+          </Pressable>
+        )}
 
         <Pressable
           onPress={(event) => {
@@ -77,12 +130,14 @@ export function MiniPlayer() {
             void toggle()
           }}
           hitSlop={8}
-          className="mr-1 rounded-full bg-brand-50 p-2 dark:bg-brand-900/30"
+          className="mr-1 rounded-full bg-audio-100 p-2 dark:bg-audio-950"
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? t('audio.pause') : t('audio.play')}
         >
           {isLoading ? (
-            <ActivityIndicator color="#2563eb" />
+            <ActivityIndicator color={accent} />
           ) : (
-            <Ionicons name={isPlaying ? 'pause' : 'play'} size={18} color="#2563eb" />
+            <Ionicons name={isPlaying ? 'pause' : 'play'} size={18} color={accent} />
           )}
         </Pressable>
 
@@ -94,10 +149,25 @@ export function MiniPlayer() {
             }}
             hitSlop={8}
             className="mr-1 rounded-full p-1.5"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.nextChapter')}
           >
-            <Ionicons name="play-skip-forward" size={18} color="#64748b" />
+            <Ionicons name="play-skip-forward" size={18} color={muted} />
           </Pressable>
-        ) : null}
+        ) : (
+          <Pressable
+            onPress={(event) => {
+              event.stopPropagation()
+              void skip(SKIP_MILLIS)
+            }}
+            hitSlop={8}
+            className="mr-1 rounded-full p-1.5"
+            accessibilityRole="button"
+            accessibilityLabel={t('audio.skipForward', { seconds: SKIP_MILLIS / 1000 })}
+          >
+            <Ionicons name="play-forward" size={18} color={muted} />
+          </Pressable>
+        )}
 
         <Pressable
           onPress={(event) => {
@@ -106,8 +176,10 @@ export function MiniPlayer() {
           }}
           hitSlop={8}
           className="rounded-full p-1"
+          accessibilityRole="button"
+          accessibilityLabel={t('audio.closePlayer')}
         >
-          <Ionicons name="close" size={19} color="#94a3b8" />
+          <Ionicons name="close" size={19} color={muted} />
         </Pressable>
       </View>
     </Pressable>

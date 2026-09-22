@@ -98,7 +98,8 @@
     "subscribeToRead": "Subscribe to read",
     "lockedTitle": "Included with Loikmon Premium",
     "lockedHint": "Subscribe to read every book and article and listen to all audiobooks.",
-    "loginHint": "Sign in to open this book."
+    "loginHint": "Sign in to open this book.",
+    "audiobook": "Audiobook"
   },
   "articles": {
     "title": "လိခ်ပရေၚ်ဂမၠိုၚ်",
@@ -203,7 +204,24 @@
     "tapToPlay": "Tap to play",
     "locked": "Premium",
     "lockedHint": "{count} chapters require Loikmon Premium.",
-    "read": "ဗှ်"
+    "playbackFailed": "Playback stopped. Check your connection and try again.",
+    "unavailable": "This chapter is unavailable right now.",
+    "read": "ဗှ်",
+    "play": "Play",
+    "pause": "Pause",
+    "position": "Playback position",
+    "previousChapter": "Previous chapter",
+    "nextChapter": "Next chapter",
+    "skipBack": "Back {seconds} seconds",
+    "skipForward": "Forward {seconds} seconds",
+    "speed": "Playback speed",
+    "normalSpeed": "Normal",
+    "sleepTimer": "Sleep timer",
+    "sleepOff": "Off",
+    "sleepEndOfChapter": "End of chapter",
+    "sleepMinutes": "{count} minutes",
+    "openPlayer": "Open audiobook player",
+    "closePlayer": "Close player"
   },
   "subscribe": {
     "title": "Loikmon Premium",

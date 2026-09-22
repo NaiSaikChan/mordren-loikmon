@@ -49,6 +49,22 @@ describe('chapterToTrack', () => {
   it('returns null for locked chapters', () => {
     expect(chapterToTrack(chapter({ locked: true, audio_url: null }), BOOK)).toBeNull()
   })
+
+  it('carries the chapter id, length and URL expiry the player needs', () => {
+    const track = chapterToTrack(chapter({ audio_expires_at: '2026-09-22T12:00:00.000Z' }), BOOK)
+    // chapterId keys the stored listening position; expiresAt drives re-signing.
+    expect(track).toMatchObject({
+      chapterId: 1,
+      durationSeconds: 963,
+      expiresAt: '2026-09-22T12:00:00.000Z',
+    })
+  })
+
+  it('falls back to the legacy duration field and a null expiry', () => {
+    const track = chapterToTrack(chapter({ duration_seconds: null, duration: 500 }), BOOK)
+    expect(track?.durationSeconds).toBe(500)
+    expect(track?.expiresAt).toBeNull()
+  })
 })
 
 describe('chaptersToTracks', () => {

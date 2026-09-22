@@ -29,7 +29,8 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     // @loikmon/api is TypeScript source using ESM-style `./file.js` specifiers.
-    '^(\\.{1,2}/(?:endpoints/)?(?:client|types|auth|books|articles|authors|categories|library|media|misc|reviews|search|subscriptions))\\.js$':
+    // `cms-types` must precede `cms` so the longer name is not shadowed.
+    '^(\\.{1,2}/(?:endpoints/)?(?:client|cms-types|cms|types|auth|books|articles|authors|categories|library|media|misc|reviews|search|subscriptions))\\.js$':
       '$1',
   },
   testPathIgnorePatterns: ['/node_modules/', '/dist/'],

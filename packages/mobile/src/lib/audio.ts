@@ -13,6 +13,12 @@ export interface AudioTrack {
   sourceBookId?: string | number
   sourceType?: 'book' | 'article'
   queueLength?: number
+  /** Chapter this track came from; the listening position is stored against it. */
+  chapterId?: string | number
+  /** Chapter length as the API reports it, so a duration can be shown before the file loads. */
+  durationSeconds?: number | null
+  /** When `url` stops working. A signed URL outlives few listening sessions, so it is re-requested. */
+  expiresAt?: string | null
 }
 
 export interface TrackSource {
@@ -49,6 +55,9 @@ export function chapterToTrack(chapter: BookChapter, book?: TrackSource): AudioT
     sourceBookId: chapter.book_id ?? book?.id,
     sourceType: 'book',
     queueLength: 1,
+    chapterId: chapter.id,
+    durationSeconds: chapter.duration_seconds ?? chapter.duration ?? null,
+    expiresAt: chapter.audio_expires_at ?? null,
   }
 }
 
@@ -62,7 +71,7 @@ export function chaptersToTracks(chapters: BookChapter[], book?: TrackSource): A
 }
 
 /** Track for an article's narration, or null when locked / no audio. */
-export function articleToTrack(article: Pick<ArticleDetail, 'id' | 'title' | 'authorname' | 'thumbnail' | 'thumbnail_url' | 'audio_url' | 'locked'>): AudioTrack | null {
+export function articleToTrack(article: Pick<ArticleDetail, 'id' | 'title' | 'authorname' | 'thumbnail' | 'thumbnail_url' | 'audio_url' | 'locked'> & { audio_expires_at?: string | null }): AudioTrack | null {
   if (article.locked || !article.audio_url) return null
   const url = fixUrl(article.audio_url)
   if (!url) return null
@@ -76,5 +85,6 @@ export function articleToTrack(article: Pick<ArticleDetail, 'id' | 'title' | 'au
     sourceBookId: article.id,
     sourceType: 'article',
     queueLength: 1,
+    expiresAt: article.audio_expires_at ?? null,
   }
 }

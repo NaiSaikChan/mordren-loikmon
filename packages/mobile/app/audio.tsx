@@ -10,25 +10,35 @@ import { useBooks } from '@/hooks/useBooks'
 import { useAudio } from '@/context/AudioContext'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
+import { useTheme } from '@/context/ThemeContext'
 import { pickCover } from '@/lib/url'
 
 function AudioRow({ book }: { book: Book }) {
-  const { current, isPlaying } = useAudio()
+  const { current, isPlaying, toggle } = useAudio()
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const { isDark } = useTheme()
+  const { t } = useI18n()
   const cover = pickCover(book)
   const isCurrent = current?.sourceType === 'book' && String(current.sourceBookId) === String(book.id)
+  const accent = isDark ? '#d4a843' : '#c9922a'
+  const muted = isDark ? '#94a3b8' : '#64748b'
 
   // Chapters (and their lock state) are loaded by the player screen from `books.getChapters`.
   const onPress = () => router.push({ pathname: '/audiobook/[id]', params: { id: String(book.id) } })
 
   return (
-    <Pressable onPress={onPress} className="mb-3 flex-row items-center rounded-xl bg-white dark:bg-surface-800 p-3">
+    <Pressable
+      onPress={onPress}
+      className="mb-3 flex-row items-center rounded-xl bg-white dark:bg-surface-800 p-3"
+      accessibilityRole="button"
+      accessibilityLabel={book.title}
+    >
       <View className="h-14 w-14 overflow-hidden rounded-lg bg-surface-200 dark:bg-surface-700">
         {cover ? (
           <Image source={{ uri: cover }} className="h-full w-full" resizeMode="cover" />
         ) : (
           <View className="h-full w-full items-center justify-center">
-            <Text className="text-2xl" style={headerTextStyle}>🎵</Text>
+            <Ionicons name="headset-outline" size={22} color={accent} />
           </View>
         )}
       </View>
@@ -43,7 +53,21 @@ function AudioRow({ book }: { book: Book }) {
           <PriceBadge item={book} />
         </View>
       </View>
-      <Ionicons name={isCurrent && isPlaying ? 'pause-circle' : 'play-circle'} size={34} color="#2563eb" />
+      {isCurrent ? (
+        <Pressable
+          onPress={(event) => {
+            event.stopPropagation()
+            void toggle()
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? t('audio.pause') : t('audio.play')}
+        >
+          <Ionicons name={isPlaying ? 'pause-circle' : 'play-circle'} size={34} color={accent} />
+        </Pressable>
+      ) : (
+        <Ionicons name="chevron-forward" size={22} color={muted} />
+      )}
     </Pressable>
   )
 }

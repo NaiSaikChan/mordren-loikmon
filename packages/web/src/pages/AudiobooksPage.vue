@@ -5,6 +5,7 @@ import { useMediaStore } from '@/stores/media'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
 import AccessBadge from '@/components/shared/AccessBadge.vue'
+import PlayerIcon from '@/components/ui/PlayerIcon.vue'
 
 /** Audiobooks: books with audio chapters (`media.fetchAudioBooks`). Chapters are opened from the book page. */
 const { t } = useI18n()
@@ -24,7 +25,10 @@ onMounted(() => {
 
 <template>
   <div class="page-wrapper">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">🎧 {{ t('music.title') }}</h1>
+    <h1 class="mb-6 flex items-center gap-2 text-2xl font-bold text-gray-900 dark:text-white">
+      <PlayerIcon name="headphones" :size="26" class="text-audio-600 dark:text-audio-400" />
+      {{ t('music.title') }}
+    </h1>
 
     <LoadingSpinner v-if="store.loading && !store.books.length" />
     <EmptyState v-else-if="!store.loading && !store.books.length" icon="🎧" :title="t('music.noMusic')" />
@@ -40,9 +44,12 @@ onMounted(() => {
             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
             @error="($event.target as HTMLImageElement).style.display='none'" />
-          <div v-else class="w-full h-full flex items-center justify-center text-4xl">🎧</div>
-          <div class="absolute bottom-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-white text-xs flex items-center gap-1">
-            🎧 {{ book.audio_chapters_count || t('music.audioBadge') }}
+          <div v-else class="flex h-full w-full items-center justify-center">
+            <PlayerIcon name="headphones" :size="40" class="text-audio-600 dark:text-audio-400" />
+          </div>
+          <div class="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-xs text-white">
+            <PlayerIcon name="headphones" :size="12" />
+            {{ book.audio_chapters_count || t('music.audioBadge') }}
           </div>
         </div>
         <div class="p-2.5 space-y-1">

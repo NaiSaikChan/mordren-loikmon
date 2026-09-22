@@ -21,6 +21,21 @@ module.exports = {
           800: '#1e40af',
           900: '#1e3a8a',
         },
+        // Audio accent — the audiobook identity, distinct from the blue brand
+        // ramp. Mirrors --color-audio-* on the web. Listening surfaces only.
+        audio: {
+          50: '#fbf6ec',
+          100: '#f5e9cf',
+          200: '#ebd5a3',
+          300: '#dfbe72',
+          400: '#d4a843',
+          500: '#c9922a',
+          600: '#a87722',
+          700: '#855d1b',
+          800: '#634515',
+          900: '#422e0e',
+          950: '#26190a',
+        },
         surface: {
           50: '#f8fafc',
           100: '#f1f5f9',

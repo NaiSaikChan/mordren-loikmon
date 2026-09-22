@@ -20,6 +20,8 @@ export interface AudioTrack {
   locked?: boolean
   lockReason?: LockReason
   source?: AudioSource
+  /** Chapter length as the API reports it, so a duration shows before the file loads. */
+  durationSeconds?: number | null
 }
 
 export interface BookAudioMeta {
@@ -44,6 +46,7 @@ export function chapterToTrack(
     locked,
     lockReason: locked ? lockReason : undefined,
     source: { kind: 'book', bookId: chapter.book_id, chapterId: chapter.id },
+    durationSeconds: chapter.duration_seconds ?? chapter.duration ?? null,
   }
 }
 
