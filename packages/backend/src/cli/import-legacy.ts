@@ -15,6 +15,9 @@ import type { AssetKind, StorageService } from '../storage/storage.js'
  *   npm run import:legacy -- --files       # also copy covers, PDFs, EPUBs and audio into MinIO
  *   npm run import:legacy -- --all-paid    # make every imported title subscriber-only
  *
+ * Covers categories, authors, books (with audio chapters), articles and the
+ * home sliders.
+ *
  * Idempotent: rows are matched on legacy_id and updated in place, so the
  * import can be re-run until the old system is switched off. `--files` only
  * copies files whose column still holds an http(s) URL.
@@ -103,7 +106,7 @@ class LegacyClient {
 
 async function upsertByLegacyId(
   db: Kysely<Database>,
-  table: 'categories' | 'authors' | 'books' | 'articles',
+  table: 'categories' | 'authors' | 'books' | 'articles' | 'sliders',
   legacyId: string,
   values: Record<string, unknown>,
 ): Promise<number> {
@@ -154,7 +157,7 @@ async function main() {
   const container = await createContainer(config, {}, { migrate: true })
   const { db, storage, logger } = container.ctx
   const legacy = new LegacyClient(config.legacyApiBase, logger)
-  const stats = { categories: 0, authors: 0, books: 0, chapters: 0, articles: 0, files: 0 }
+  const stats = { categories: 0, authors: 0, books: 0, chapters: 0, articles: 0, sliders: 0, files: 0 }
   logger.info({ copyFiles: COPY_FILES, allPaid: ALL_PAID, maxPages: MAX_PAGES }, 'legacy import starting')
 
   try {
@@ -210,6 +213,8 @@ async function main() {
     }
 
     // ── Books + audio chapters ──
+    // Slider targets are legacy ids, so the new ids are kept as they are created.
+    const bookIds = new Map<string, number>()
     for await (const page of legacy.pages('fetchbooks', 'books', (p) => ({ page: String(p) }))) {
       for (const b of page) {
         const legacyId = String(b.id)
@@ -231,6 +236,7 @@ async function main() {
           view_count: int(b.views) ?? 0,
           created_at: date(b.date) ?? new Date(),
         })
+        bookIds.set(legacyId, bookId)
         stats.books++
 
         if (b.has_audio === true || b.has_audio === 'true' || b.has_audio === 1) {
@@ -259,11 +265,12 @@ async function main() {
     }
 
     // ── Articles ──
+    const articleIds = new Map<string, number>()
     for await (const page of legacy.pages('fetcharticles', 'articles', (p) => ({ page: p, limit: 500, type: 1, query: '', category: 0 }))) {
       for (const a of page) {
         const legacyId = String(a.id)
         const content = str(a.content) ?? ''
-        await upsertByLegacyId(db, 'articles', legacyId, {
+        const articleId = await upsertByLegacyId(db, 'articles', legacyId, {
           title: (str(a.title) ?? `Article ${legacyId}`).slice(0, 500),
           // Legacy descriptions may contain HTML; excerpts are plain text.
           excerpt: makeExcerpt(str(a.description) ?? content),
@@ -277,9 +284,96 @@ async function main() {
           view_count: int(a.views) ?? 0,
           published_at: date(a.articledate),
         })
+        articleIds.set(legacyId, articleId)
         stats.articles++
       }
     }
+
+    // ── Home sliders ──
+    // The legacy API has no slider list endpoint; the banners ride along in the
+    // `initapp` bootstrap payload the old app calls on launch.
+    const initapp = await legacy.post('initapp', { email: '', lastseeninbox: 0 })
+    const legacySliders = (Array.isArray(initapp.sliders) ? initapp.sliders : []) as Json[]
+
+    /**
+     * Legacy slides carry a `type` plus the target's legacy id in `bookid` —
+     * whatever the type, and regardless of the embedded `item.type`, which is
+     * always the literal "book". This resolves that pair to an in-app path;
+     * `link` slides keep their external URL.
+     */
+    const sliderLink = async (sl: Json, item: Json | null): Promise<string | null> => {
+      const type = (str(sl.type) ?? 'link').toLowerCase()
+      const targetId = str(sl.bookid)
+
+      // An external banner, or a typed one with nothing to point at: keep the
+      // raw link. A legacy value may already be an in-app path, so it is passed
+      // through when it is not an absolute URL.
+      if (type === 'link' || !targetId || targetId === '0') return normalizeLegacyUrl(str(sl.link)) ?? str(sl.link)
+
+      switch (type) {
+        case 'book':
+          return bookIds.has(targetId) ? `/books/${bookIds.get(targetId)}` : null
+        case 'article':
+          return articleIds.has(targetId) ? `/articles/${articleIds.get(targetId)}` : null
+        case 'category':
+          return categoryIds.has(targetId) ? `/categories/${categoryIds.get(targetId)}` : null
+        case 'author': {
+          // An author promoted by a banner may not be in `fetchauthors` (that
+          // list is scoped to `type: book`), so fall back to the embedded record.
+          if (!authorIds.has(targetId) && item) {
+            const id = await upsertByLegacyId(db, 'authors', targetId, {
+              name: str(item.name) ?? `Author ${targetId}`,
+              bio: str(item.description),
+              avatar_key: normalizeLegacyUrl(str(item.thumbnail)),
+              facebook: str(item.facebook),
+              youtube: str(item.youtube),
+              instagram: str(item.instagram),
+            })
+            authorIds.set(targetId, id)
+            stats.authors++
+          }
+          return authorIds.has(targetId) ? `/authors/${authorIds.get(targetId)}` : null
+        }
+        default:
+          return null
+      }
+    }
+
+    for (const [index, sl] of legacySliders.entries()) {
+      const legacyId = String(sl.id)
+      const image = normalizeLegacyUrl(str(sl.thumbnail))
+      if (!image) {
+        logger.warn({ slider: legacyId, thumbnail: sl.thumbnail }, 'slider has no usable image — skipped')
+        continue
+      }
+      const item = (typeof sl.item === 'object' && sl.item !== null ? sl.item : null) as Json | null
+      const link = await sliderLink(sl, item)
+      if (!link) {
+        logger.warn({ slider: legacyId, type: sl.type, target: sl.bookid }, 'slider has no resolvable target — importing the banner without a link')
+      }
+
+      /*
+       * Only columns with a legacy counterpart are written, so a re-run leaves
+       * the CMS-only ones alone: mobile_image_key, audience, placement,
+       * is_active and the schedule keep whatever they hold (or their defaults on
+       * a first insert). Ordering does follow the legacy payload on every run,
+       * so reordering in the CMS is undone until the old system is retired.
+       *
+       * Legacy `published` is "0" on every row, so it carries no signal —
+       * `initapp` is the live app's own home feed, so its rows are the active set
+       * and new banners land active by column default.
+       */
+      await upsertByLegacyId(db, 'sliders', legacyId, {
+        // Legacy banner names are blank; the linked item's name is a usable label.
+        title: str(sl.name) ?? (item ? str(item.name) : null),
+        image_key: image,
+        link,
+        display_order: index,
+      })
+      stats.sliders++
+    }
+    logger.info({ count: stats.sliders }, 'sliders imported')
+
     logger.info(stats, 'metadata import finished')
 
     if (COPY_FILES) await copyFiles(db, storage, logger, stats)
@@ -300,6 +394,7 @@ async function copyFiles(db: Kysely<Database>, storage: StorageService, logger: 
     { table: 'books', column: 'epub_key', kind: 'epub' },
     { table: 'book_audio_chapters', column: 'audio_key', kind: 'audio' },
     { table: 'articles', column: 'thumbnail_key', kind: 'thumbnail' },
+    { table: 'sliders', column: 'image_key', kind: 'slider' },
     { table: 'articles', column: 'audio_key', kind: 'audio' },
   ]
   for (const job of jobs) {

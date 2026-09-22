@@ -199,6 +199,8 @@ export interface CollectionItemsTable {
 
 export interface SlidersTable {
   id: Generated<number>
+  /** Id of the matching banner in the legacy PHP API, when imported. */
+  legacy_id: string | null
   title: string | null
   image_key: string
   /** 4:5 banner for phones; falls back to image_key when null. */
