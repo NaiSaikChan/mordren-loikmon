@@ -109,6 +109,31 @@ cannot reach that address, and rewriting the host makes MinIO answer 403.
 - **Production:** `MINIO_PUBLIC_URL=https://<STORAGE_DOMAIN>` (docker-compose.prod.yml),
   a public HTTPS host every phone can reach. No app-side configuration is needed.
 
+### PDF viewer
+
+Android's WebView cannot render a PDF by itself. The reader therefore bundles
+pdf.js in `assets/pdfjs/viewer.html` and renders the book **inside the app**:
+`PdfDocumentReader` (`src/components/DocumentReader.tsx`) downloads the file to
+the app's private cache, streams it into the WebView in slices, and deletes it
+again. The document never reaches the WebView as a URL, and the page paints to
+`<canvas>` with no text layer — so there is nothing to select, copy, download or
+share, and no third party ever sees a paywalled book.
+
+This replaced `docs.google.com/gview`, which could not work here: Google's
+servers have to fetch the document themselves, and a presigned URL on
+`localhost:9000` (or any private host) is unreachable from outside the device.
+
+`viewer.html` is generated and committed, so a normal install and build need
+nothing extra. To regenerate it after a pdf.js bump:
+
+```bash
+npm i -D pdfjs-dist@<version> --legacy-peer-deps
+npm run build:pdf-viewer
+```
+
+Edit `scripts/pdf-viewer-app.js` (the code that runs inside the WebView) rather
+than the generated HTML, then re-run the command above.
+
 ## Subscriptions (expo-iap)
 
 - `SubscriptionProvider` (`src/context/SubscriptionContext.tsx`) owns the **only**

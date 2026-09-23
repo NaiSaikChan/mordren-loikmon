@@ -5,7 +5,6 @@ import {
   Dimensions,
   FlatList,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -23,6 +22,8 @@ import { detectFormat } from '@/lib/format'
 import { FONT_OPTIONS, useTypography } from '@/context/TypographyContext'
 import { storage } from '@/services/storage'
 import { buildFontFacesCss, buildRenditionFontHookScript } from '@/lib/readerUtils'
+import { chunkRanges } from '@/lib/pdfStream'
+import { useTheme } from '@/context/ThemeContext'
 
 export { detectFormat }
 
@@ -758,67 +759,199 @@ function EpubDocumentReader({
 }
 
 // ---------------------------------------------------------------------------
-// PDF reader (unchanged — WebView-based)
+// PDF reader — bundled pdf.js in a locked-down WebView
 // ---------------------------------------------------------------------------
 
-/**
- * Android WebView cannot render PDFs, so they go through the Google Docs
- * viewer. The signed URL must be passed as ONE query parameter — fully
- * percent-encoded — or its own `&X-Amz-…` parameters would be read as gview's.
+/*
+ * Android's WebView cannot render a PDF on its own, and the Google Docs viewer
+ * this used to go through fails for our files: `docs.google.com/gview` has to
+ * fetch the document itself, which it cannot do for a short-lived signed URL
+ * on a private/dev host (10.0.2.2 in the emulator), and it would hand a
+ * paywalled book to a third party regardless.
+ *
+ * Instead we bundle pdf.js (see `scripts/build-pdf-viewer.js`) and stream the
+ * bytes into it over the RN bridge. The document is only ever pixels on a
+ * canvas inside the app: no text layer to select or copy, no toolbar, no URL
+ * to download or share, and no temporary file left behind.
  */
-export function pdfViewerUri(url: string, os: string = Platform.OS): string {
-  return os === 'android' ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(url)}` : url
+
+const PDF_VIEWER_ASSET = require('../../assets/pdfjs/viewer.html')
+
+/** Applies the reader's colour scheme and re-asserts the no-selection rules. */
+function pdfViewerBootstrap(isDark: boolean): string {
+  return `
+    document.documentElement.classList.${isDark ? 'add' : 'remove'}('dark');
+    true;
+  `
+}
+
+/** Copies the bundled viewer out of the app bundle and returns its file:// URI. */
+function usePdfViewerAsset(): { uri: string | null; error: string | null } {
+  const [uri, setUri] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const asset = Asset.fromModule(PDF_VIEWER_ASSET)
+    asset
+      .downloadAsync()
+      .then(() => {
+        if (!cancelled) setUri(asset.localUri ?? asset.uri)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Viewer unavailable')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return { uri, error }
+}
+
+/**
+ * Downloads the PDF to the app's private cache, pushes it into the WebView in
+ * aligned slices, and deletes the file again — it exists on disk only for the
+ * few hundred milliseconds it takes to stream.
+ */
+async function streamPdf(
+  remoteUrl: string,
+  inject: (code: string) => void,
+  refreshUrl?: () => Promise<string | null>,
+): Promise<void> {
+  const dir = (FileSystem.cacheDirectory ?? '') + 'pdf-view/'
+  const localUri = `${dir}doc-${Date.now()}.pdf`
+  const dirInfo = await FileSystem.getInfoAsync(dir)
+  if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
+
+  try {
+    let result = await FileSystem.downloadAsync(remoteUrl, localUri)
+    // The signed URL may have expired between issuing and use: retry once.
+    if (isExpiredStatus(result.status) && refreshUrl) {
+      const fresh = await refreshUrl()
+      if (fresh) result = await FileSystem.downloadAsync(fresh, localUri)
+    }
+    if (result.status !== 200) throw new HttpStatusError(result.status)
+
+    const info = await FileSystem.getInfoAsync(localUri)
+    const size = info.exists ? (info.size ?? 0) : 0
+    if (!size) throw new Error('The file is empty')
+
+    for (const range of chunkRanges(size)) {
+      const base64 = await FileSystem.readAsStringAsync(localUri, {
+        encoding: FileSystem.EncodingType.Base64,
+        position: range.position,
+        length: range.length,
+      })
+      inject(`window.__pdfChunk(${JSON.stringify(base64)});true;`)
+    }
+    inject(`window.__pdfDone(${size});true;`)
+  } finally {
+    await FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => undefined)
+  }
 }
 
 function PdfDocumentReader({ url, refreshUrl }: { url: string; refreshUrl?: () => Promise<string | null> }) {
+  const { isDark } = useTheme()
+  const { uri: viewerUri, error: viewerError } = usePdfViewerAsset()
+  const webRef = useRef<WebView>(null)
   const [error, setError] = useState<string | null>(null)
-  const [currentUrl, setCurrentUrl] = useState(url)
-  const refreshed = useRef(false)
-  useEffect(() => {
-    setCurrentUrl(url)
-    refreshed.current = false
-  }, [url])
-  const uri = useMemo(() => pdfViewerUri(currentUrl), [currentUrl])
+  const [loading, setLoading] = useState(true)
+  const streaming = useRef(false)
+  const refreshRef = useRef(refreshUrl)
+  refreshRef.current = refreshUrl
 
-  const onHttpError = async (status: number) => {
-    // Expired signature: fetch a fresh signed URL once, then give up.
-    if (isExpiredStatus(status) && refreshUrl && !refreshed.current) {
-      refreshed.current = true
-      const fresh = await refreshUrl().catch(() => null)
-      if (fresh) {
-        setCurrentUrl(fresh)
+  // A new signed URL means a new document.
+  useEffect(() => {
+    setError(null)
+    setLoading(true)
+  }, [url])
+
+  const onMessage = useCallback(
+    (event: { nativeEvent: { data: string } }) => {
+      let message: { type?: string; message?: string }
+      try {
+        message = JSON.parse(event.nativeEvent.data)
+      } catch {
         return
       }
-    }
-    setError(`HTTP ${status}`)
-  }
 
-  const renderLoading = () => (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" color="#4f46e5" />
-    </View>
+      if (message.type === 'ready') {
+        // The page says it is empty and waiting — which is also true after the
+        // system reloads a backgrounded WebView, so stream again every time.
+        if (streaming.current) return
+        streaming.current = true
+        streamPdf(url, (code) => webRef.current?.injectJavaScript(code), refreshRef.current)
+          .catch((err: unknown) => {
+            const reason =
+              err instanceof HttpStatusError
+                ? `Could not open this book (HTTP ${err.status})`
+                : err instanceof Error
+                  ? err.message
+                  : 'Could not open this book'
+            setError(reason)
+            setLoading(false)
+          })
+          .finally(() => {
+            streaming.current = false
+          })
+      } else if (message.type === 'loaded') {
+        setLoading(false)
+      } else if (message.type === 'error') {
+        setError(message.message ?? 'This file could not be opened')
+        setLoading(false)
+      }
+    },
+    [url],
   )
 
-  if (error) {
+  const failure = error ?? viewerError
+  if (failure) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorText}>{failure}</Text>
       </View>
     )
   }
 
   return (
-    <WebView
-      source={{ uri }}
-      startInLoadingState
-      renderLoading={renderLoading}
-      onError={(e) => setError(e.nativeEvent.description)}
-      onHttpError={(e) => void onHttpError(e.nativeEvent.statusCode)}
-      allowFileAccess
-      allowUniversalAccessFromFileURLs
-      mixedContentMode="always"
-      style={{ flex: 1 }}
-    />
+    <View style={styles.container}>
+      {viewerUri ? (
+        <WebView
+          ref={webRef}
+          source={{ uri: viewerUri }}
+          originWhitelist={['file://*']}
+          // The bundled viewer is the only thing this WebView may ever show:
+          // no link, redirect or embedded resource can take it elsewhere.
+          onShouldStartLoadWithRequest={(request) =>
+            request.url.startsWith('file://') || request.url.startsWith('about:')
+          }
+          onMessage={onMessage}
+          injectedJavaScript={pdfViewerBootstrap(isDark)}
+          onError={(e) => setError(e.nativeEvent.description)}
+          // Reading only: no downloads, no share sheet, no selection callout.
+          allowFileAccess
+          allowFileAccessFromFileURLs={false}
+          allowUniversalAccessFromFileURLs={false}
+          allowsLinkPreview={false}
+          javaScriptCanOpenWindowsAutomatically={false}
+          setSupportMultipleWindows={false}
+          // Must be an array: Fabric parses this iOS prop on Android too, and a
+          // bare string aborts the process in RawValue::castValue.
+          dataDetectorTypes={['none']}
+          menuItems={[]}
+          cacheEnabled={false}
+          overScrollMode="never"
+          androidLayerType="hardware"
+          style={{ flex: 1, backgroundColor: isDark ? '#0f172a' : '#f1f5f9' }}
+        />
+      ) : null}
+      {loading ? (
+        <View style={[styles.centered, StyleSheet.absoluteFill]} pointerEvents="none">
+          <ActivityIndicator size="large" color="#4f46e5" />
+        </View>
+      ) : null}
+    </View>
   )
 }
 

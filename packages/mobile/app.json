@@ -8,11 +8,6 @@
     "scheme": "loikmon",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#e0d0d0"
-    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -35,8 +30,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0f172a"
+        "foregroundImage": "./assets/adaptive-icon-foreground.png",
+        "backgroundColor": "#e0d0d0"
       },
       "package": "org.loikmon.mobile",
       "permissions": [
@@ -53,7 +48,19 @@
       "expo-localization",
       "expo-secure-store",
       "expo-audio",
-      "expo-iap"
+      "expo-iap",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#e0d0d0",
+          "dark": {
+            "backgroundColor": "#0f172a"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
