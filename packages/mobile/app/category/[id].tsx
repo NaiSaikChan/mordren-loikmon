@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, RefreshControl, Pressable, useWindowDimensions, type NativeScrollEvent } from 'react-native'
+import { ScrollView, Text, View, RefreshControl, Pressable, Image, useWindowDimensions, type NativeScrollEvent } from 'react-native'
 import { useLocalSearchParams, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { PrimaryButton } from '@/components/PrimaryButton'
 import { useCategoryContent } from '@/hooks/useCategoryContent'
 import { getCategoryIcon } from '@/lib/categoryIcons'
+import { fixUrl } from '@/lib/url'
 import { firstParam } from '@/lib/normalize'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
@@ -31,7 +32,8 @@ export default function CategoryDetailScreen() {
   const { category, books, articles, booksTotal, articlesTotal, hasMore, loading, loadingMore, error, refresh, loadMore } =
     useCategoryContent(id)
 
-  const icon = getCategoryIcon(id ?? '')
+  const icon = getCategoryIcon(category?.id ?? id ?? '')
+  const thumbnail = fixUrl(category?.thumbnail_image?.src || category?.thumbnail)
   const columns = Math.max(2, Math.floor(width / CARD_MIN_WIDTH))
   const cardWidth = (width - 32) / columns // 32 = 16px padding each side
   const isEmpty = !loading && books.length === 0 && articles.length === 0
@@ -50,8 +52,12 @@ export default function CategoryDetailScreen() {
 
       {/* Category header */}
       <View className="flex-row items-center gap-3 px-4 pb-4 pt-1">
-        <View className="w-14 h-14 rounded-xl bg-brand-50 dark:bg-brand-900/30 items-center justify-center shrink-0">
-          <Text style={[headerTextStyle, { fontSize: 30 }]}>{icon}</Text>
+        <View className="w-14 h-14 rounded-xl bg-brand-50 dark:bg-brand-900/30 items-center justify-center shrink-0 overflow-hidden">
+          {thumbnail ? (
+            <Image source={{ uri: thumbnail }} className="w-full h-full" resizeMode="cover" />
+          ) : (
+            <Text style={[headerTextStyle, { fontSize: 30 }]}>{icon}</Text>
+          )}
         </View>
         <View className="flex-1">
           <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle}>

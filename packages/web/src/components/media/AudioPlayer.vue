@@ -30,7 +30,7 @@ defineExpose({ start: engine.playTrack })
 
 <template>
   <Transition name="player">
-    <div v-if="engine.current.value" class="fixed inset-x-0 bottom-0 z-50">
+    <div v-if="engine.current.value" class="fixed inset-x-0 bottom-0 z-50 lg:left-64">
       <MiniPlayer :engine="engine" @expand="expanded = true" />
     </div>
   </Transition>

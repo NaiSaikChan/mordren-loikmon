@@ -88,6 +88,9 @@ describe('AudioPlayer', () => {
     expect(audioEl.play).toHaveBeenCalled()
     expect(audioEl.src).toBe(track.url)
     expect(wrapper.text()).toContain('Chapter 1')
+    expect(wrapper.find('.fixed').classes()).toEqual(
+      expect.arrayContaining(['inset-x-0', 'lg:left-64']),
+    )
     wrapper.unmount()
   })
 

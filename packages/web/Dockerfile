@@ -25,5 +25,8 @@ FROM nginx:1.27-alpine AS runner
 COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
 EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost/ | grep -q '<div id="app">' || exit 1
+# 127.0.0.1, not localhost: nginx only listens on IPv4 here, and localhost can
+# resolve to ::1 first. Traefik drops unhealthy containers from its routing
+# table, so a false negative here shows up publicly as a 404.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO /dev/null http://127.0.0.1/healthz || exit 1
