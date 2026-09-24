@@ -1,17 +1,20 @@
+import { useMemo } from 'react'
 import { Stack } from 'expo-router'
-import { useTheme } from '@/context/ThemeContext'
+import { useThemeColors } from '@/theme/colors'
 
 export default function AuthLayout() {
-  const { isDark } = useTheme()
+  const colors = useThemeColors()
+  const screenOptions = useMemo(
+    () => ({
+      headerStyle: { backgroundColor: colors.surface },
+      headerTintColor: colors.text,
+      contentStyle: { backgroundColor: colors.background },
+      headerShadowVisible: false,
+    }),
+    [colors],
+  )
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: isDark ? '#0f172a' : '#ffffff' },
-        headerTintColor: isDark ? '#f8fafc' : '#0f172a',
-        contentStyle: { backgroundColor: isDark ? '#0f172a' : '#f8fafc' },
-        headerShadowVisible: false,
-      }}
-    >
+    <Stack screenOptions={screenOptions}>
       <Stack.Screen name="login" options={{ title: '' }} />
       <Stack.Screen name="register" options={{ title: '' }} />
       <Stack.Screen name="forgot-password" options={{ title: '' }} />

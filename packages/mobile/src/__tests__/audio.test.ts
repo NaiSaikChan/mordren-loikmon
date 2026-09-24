@@ -1,71 +1,129 @@
-import { toTrack, toChapterTrack, chaptersToTracks } from '@/lib/audio'
+import type { BookChapter } from '@loikmon/api'
+import {
+  LOCK_SCREEN_ART_WIDTH,
+  articleToTrack,
+  chapterToTrack,
+  chaptersToTracks,
+  isPlayableChapter,
+  trackImage,
+} from '@/lib/audio'
 
-describe('toTrack', () => {
-  it('builds a track from audio_url and normalises the URL', () => {
-    const track = toTrack({ id: 5, title: 'Song', audio_url: '/media/a.mp3', artist: 'X' })
-    expect(track).not.toBeNull()
-    expect(track?.url).toBe('https://loikmon.org/media/a.mp3')
-    expect(track?.title).toBe('Song')
-    expect(track?.artist).toBe('X')
-  })
+const SIGNED = 'https://s3.loikmon.org/private/audio/ch.mp3?X-Amz-Credential=a%2Fb&X-Amz-Signature=abc'
 
-  it('falls back to authorname/author for the artist', () => {
-    expect(toTrack({ id: 1, title: 'T', file: 'x.mp3', authorname: 'Nai' })?.artist).toBe('Nai')
-  })
+function chapter(overrides: Partial<BookChapter>): BookChapter {
+  return {
+    id: 1,
+    book_id: 72,
+    chapter_number: 1,
+    title: 'The Game',
+    chapter_title: 'The Game',
+    duration_seconds: 963,
+    duration: 963,
+    is_preview: false,
+    locked: false,
+    audio_url: SIGNED,
+    ...overrides,
+  }
+}
 
-  it('returns null when there is no audio source', () => {
-    expect(toTrack({ id: 1, title: 'T' })).toBeNull()
-  })
+const BOOK = { id: 72, title: 'The Game of Life', authorname: 'Florence Scovel Shinn', thumbnail: 'https://s3.loikmon.org/public/covers/72.jpg' }
 
-  it('falls back to audio_file and stream_url fields', () => {
-    const track = toTrack({ id: 1, title: 'T', audio_file: '/media/b.mp3' })
-    expect(track?.url).toBe('https://loikmon.org/media/b.mp3')
-  })
-
-  it('exposes sourceBookId from record id by default', () => {
-    const track = toTrack({ id: 42, title: 'Book Audio', audio_url: '/audio.mp3' })
-    expect(track?.sourceBookId).toBe(42)
+describe('isPlayableChapter', () => {
+  it('requires an unlocked chapter with an audio URL', () => {
+    expect(isPlayableChapter(chapter({}))).toBe(true)
+    expect(isPlayableChapter(chapter({ locked: true, audio_url: null }))).toBe(false)
+    expect(isPlayableChapter(chapter({ locked: false, audio_url: null }))).toBe(false)
+    // Defensive: a locked chapter must never play even if a URL slipped through.
+    expect(isPlayableChapter(chapter({ locked: true }))).toBe(false)
   })
 })
 
-describe('toChapterTrack', () => {
-  it('builds a track from an audio chapter', () => {
-    const track = toChapterTrack(
-      { id: 'c1', title: 'Chapter 1', audio: '/media/c1.mp3' },
-      'My Book',
-    )
-    expect(track?.url).toBe('https://loikmon.org/media/c1.mp3')
-    expect(track?.title).toBe('My Book – Chapter 1')
+describe('chapterToTrack', () => {
+  it('builds a track and keeps the signed URL intact', () => {
+    const track = chapterToTrack(chapter({}), BOOK)
+    expect(track).toMatchObject({
+      id: 1,
+      title: 'The Game of Life – The Game',
+      chapterTitle: 'The Game',
+      artist: 'Florence Scovel Shinn',
+      url: SIGNED,
+      cover: BOOK.thumbnail,
+      sourceBookId: 72,
+      sourceType: 'book',
+    })
   })
 
-  it('uses chapter_title when title is missing', () => {
-    const track = toChapterTrack({ id: 'c2', chapter_title: 'Intro', stream_url: '/media/c2.mp3' })
-    expect(track?.title).toBe('Intro')
-    expect(track?.chapterTitle).toBe('Intro')
+  it('returns null for locked chapters', () => {
+    expect(chapterToTrack(chapter({ locked: true, audio_url: null }), BOOK)).toBeNull()
   })
 
-  it('returns null when no audio URL is present', () => {
-    expect(toChapterTrack({ id: 'c3', title: 'Silent' })).toBeNull()
+  it('carries the chapter id, length and URL expiry the player needs', () => {
+    const track = chapterToTrack(chapter({ audio_expires_at: '2026-09-22T12:00:00.000Z' }), BOOK)
+    // chapterId keys the stored listening position; expiresAt drives re-signing.
+    expect(track).toMatchObject({
+      chapterId: 1,
+      durationSeconds: 963,
+      expiresAt: '2026-09-22T12:00:00.000Z',
+    })
+  })
+
+  it('falls back to the legacy duration field and a null expiry', () => {
+    const track = chapterToTrack(chapter({ duration_seconds: null, duration: 500 }), BOOK)
+    expect(track?.durationSeconds).toBe(500)
+    expect(track?.expiresAt).toBeNull()
   })
 })
 
 describe('chaptersToTracks', () => {
-  it('extracts tracks from a top-level array', () => {
-    const tracks = chaptersToTracks([
-      { id: 1, title: 'A', audio: '/a.mp3' },
-      { id: 2, title: 'B', audio_file: '/b.mp3' },
-    ])
-    expect(tracks).toHaveLength(2)
-    expect(tracks[0].url).toBe('https://loikmon.org/a.mp3')
+  it('skips locked chapters, orders by chapter number and sets queue length', () => {
+    const tracks = chaptersToTracks(
+      [
+        chapter({ id: 3, chapter_number: 3, chapter_title: 'Three' }),
+        chapter({ id: 2, chapter_number: 2, chapter_title: 'Two', locked: true, audio_url: null }),
+        chapter({ id: 1, chapter_number: 1, chapter_title: 'One', is_preview: true }),
+      ],
+      BOOK,
+    )
+    expect(tracks.map((t) => t.id)).toEqual([1, 3])
+    expect(tracks.every((t) => t.queueLength === 2)).toBe(true)
+  })
+})
+
+describe('articleToTrack', () => {
+  const article = { id: 9, title: 'News', authorname: 'Nai', thumbnail: null, thumbnail_url: null, audio_url: SIGNED, locked: false }
+
+  it('builds an article track routed back to the article', () => {
+    expect(articleToTrack(article)).toMatchObject({ url: SIGNED, sourceBookId: 9, sourceType: 'article' })
   })
 
-  it('unwraps chapters from data wrapper', () => {
-    const tracks = chaptersToTracks({ data: [{ id: 1, title: 'A', audio: '/a.mp3' }] })
-    expect(tracks).toHaveLength(1)
+  it('returns null when locked or without audio', () => {
+    expect(articleToTrack({ ...article, locked: true })).toBeNull()
+    expect(articleToTrack({ ...article, audio_url: null })).toBeNull()
+  })
+})
+
+describe('trackImage', () => {
+  const cover_image = {
+    src: 'https://s3.loikmon.org/public/covers/72.jpg',
+    variants: {
+      xs: 'https://s3.loikmon.org/public/covers/72-xs.webp',
+      sm: 'https://s3.loikmon.org/public/covers/72-sm.webp',
+      md: 'https://s3.loikmon.org/public/covers/72-md.webp',
+      lg: 'https://s3.loikmon.org/public/covers/72-lg.webp',
+    },
+  }
+
+  it('uses a right-sized rendition for the lock screen instead of the original', () => {
+    const track = chapterToTrack(chapter({}), { ...BOOK, cover_image })
+    expect(track?.coverImage).toEqual(cover_image)
+    // 300pt × 3 = 900px → the 1200px rendition, not the full-size original.
+    expect(trackImage(track, LOCK_SCREEN_ART_WIDTH)).toBe(cover_image.variants.lg)
+    expect(trackImage(track, 44)).toBe(cover_image.variants.xs)
   })
 
-  it('skips chapters without audio URLs', () => {
-    const tracks = chaptersToTracks([{ id: 1, title: 'A' }, { id: 2, audio: '/a.mp3' }])
-    expect(tracks).toHaveLength(1)
+  it('falls back to the legacy cover when there are no renditions', () => {
+    const track = chapterToTrack(chapter({}), BOOK)
+    expect(trackImage(track, LOCK_SCREEN_ART_WIDTH)).toBe(BOOK.thumbnail)
+    expect(trackImage(null, 44)).toBe('')
   })
 })

@@ -3,93 +3,87 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { apiError, makeArticle, makeArticleDetail, response } from './helpers'
 
 const mockFetchArticles = vi.fn()
 const mockGetArticle    = vi.fn()
 
-vi.mock('@loikmon/api', () => ({
-  articles: {
-    fetchArticles: (...a: unknown[]) => mockFetchArticles(...a),
-    getArticle:    (...a: unknown[]) => mockGetArticle(...a),
-  },
-}))
+vi.mock('@loikmon/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@loikmon/api')>()
+  return {
+    ...actual,
+    articles: {
+      ...actual.articles,
+      fetchArticles: (...a: unknown[]) => mockFetchArticles(...a),
+      getArticle:    (...a: unknown[]) => mockGetArticle(...a),
+    },
+  }
+})
 
 import { useArticlesStore } from '../stores/articles'
 
-const ARTICLE_LIST = [
-  { id: 1, title: 'Mon News A', cat: 'news' },
-  { id: 2, title: 'Mon News B', cat: 'culture' },
-]
+const pagination = { page: 1, limit: 20, total: 2, total_pages: 1, has_more: false }
 
 describe('articles store', () => {
-
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
-  it('list starts empty', () => {
+  it('starts empty', () => {
     const store = useArticlesStore()
     expect(store.list).toEqual([])
-  })
-
-  it('detail starts null', () => {
-    const store = useArticlesStore()
     expect(store.detail).toBeNull()
   })
 
-  // ── fetchArticles() ────────────────────────────────────────────────────────
   describe('fetchArticles()', () => {
-    it('populates list from articles array', async () => {
-      mockFetchArticles.mockResolvedValueOnce({ data: { articles: ARTICLE_LIST } })
+    it('populates list, total and pagination', async () => {
+      mockFetchArticles.mockReturnValueOnce(response({ status: 'ok', articles: [makeArticle({ id: 1 }), makeArticle({ id: 2 })], total: 2, pagination }))
       const store = useArticlesStore()
-      await store.fetchArticles()
+      await store.fetchArticles({ page: 1, category: 4 })
+      expect(mockFetchArticles).toHaveBeenCalledWith({ page: 1, category: 4 })
       expect(store.list).toHaveLength(2)
-      expect(store.list[0].title).toBe('Mon News A')
-    })
-
-    it('handles top-level array response', async () => {
-      mockFetchArticles.mockResolvedValueOnce({ data: ARTICLE_LIST })
-      const store = useArticlesStore()
-      await store.fetchArticles()
-      expect(store.list).toHaveLength(2)
-    })
-
-    it('loading is false after fetch', async () => {
-      mockFetchArticles.mockResolvedValueOnce({ data: { articles: [] } })
-      const store = useArticlesStore()
-      await store.fetchArticles()
+      expect(store.total).toBe(2)
+      expect(store.pagination?.has_more).toBe(false)
       expect(store.loading).toBe(false)
+    })
+
+    it('appends when asked to', async () => {
+      mockFetchArticles
+        .mockReturnValueOnce(response({ status: 'ok', articles: [makeArticle({ id: 1 })], total: 2, pagination }))
+        .mockReturnValueOnce(response({ status: 'ok', articles: [makeArticle({ id: 2 })], total: 2, pagination }))
+      const store = useArticlesStore()
+      await store.fetchArticles({ page: 1 })
+      await store.fetchArticles({ page: 2 }, true)
+      expect(store.list.map((a) => a.id)).toEqual([1, 2])
     })
   })
 
-  // ── fetchDetail() ─────────────────────────────────────────────────────────
   describe('fetchDetail()', () => {
-    it('returns from list cache when article is already loaded', async () => {
-      mockFetchArticles.mockResolvedValueOnce({ data: { articles: ARTICLE_LIST } })
+    it('always asks the server (list items have no body)', async () => {
+      mockFetchArticles.mockReturnValueOnce(response({ status: 'ok', articles: [makeArticle({ id: 11 })], total: 1, pagination }))
+      mockGetArticle.mockReturnValueOnce(response({ status: 'ok', article: makeArticleDetail({ id: 11, content: '<p>Body</p>' }) }))
       const store = useArticlesStore()
       await store.fetchArticles()
-      await store.fetchDetail(1)
-      // Should not have called getArticle — found in cache
-      expect(mockGetArticle).not.toHaveBeenCalled()
-      expect(store.detail!.title).toBe('Mon News A')
+      await store.fetchDetail(11)
+      expect(mockGetArticle).toHaveBeenCalledWith(11)
+      expect(store.detail?.content).toBe('<p>Body</p>')
     })
 
-    it('calls API when not in cache', async () => {
-      const article = { id: 99, title: 'Remote Article' }
-      mockGetArticle.mockResolvedValueOnce({ data: { article } })
+    it('keeps locked articles (content null) as the detail', async () => {
+      mockGetArticle.mockReturnValueOnce(response({ status: 'ok', article: makeArticleDetail({ locked: true, content: null }) }))
+      const store = useArticlesStore()
+      await store.fetchDetail(11)
+      expect(store.detail?.locked).toBe(true)
+      expect(store.detail?.content).toBeNull()
+    })
+
+    it('records the error code when the article cannot be loaded', async () => {
+      mockGetArticle.mockRejectedValueOnce(apiError(404, 'NOT_FOUND'))
       const store = useArticlesStore()
       await store.fetchDetail(99)
-      expect(mockGetArticle).toHaveBeenCalledWith(99)
-      expect(store.detail!.title).toBe('Remote Article')
-    })
-
-    it('handles nested data.article response', async () => {
-      const article = { id: 50, title: 'Nested Article' }
-      mockGetArticle.mockResolvedValueOnce({ data: { data: { article } } })
-      const store = useArticlesStore()
-      await store.fetchDetail(50)
-      expect(store.detail!.title).toBe('Nested Article')
+      expect(store.detail).toBeNull()
+      expect(store.detailError).toBe('NOT_FOUND')
     })
   })
 })

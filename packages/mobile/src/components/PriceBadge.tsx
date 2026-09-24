@@ -1,55 +1,48 @@
+import { memo } from 'react'
 import { View, Text } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/context/I18nContext'
-import { isFree } from '@/lib/normalize'
+import { useEntitlementActive } from '@/context/AuthContext'
 import { useTypography } from '@/context/TypographyContext'
+import { accessBadge } from '@/lib/access'
 
-/** Displays "Free" or the coin price for a book/articles/media record. */
-export function PriceBadge({ item }: { item: Record<string, unknown> }) {
+const TEXT_STYLE = {
+  fontSize: 10.5,
+  lineHeight: 14,
+  paddingTop: 0,
+  paddingBottom: 0,
+  includeFontPadding: false,
+  textAlignVertical: 'center',
+} as const
+
+/**
+ * "Free" or "Premium" badge for a book/article. Premium shows a lock until the
+ * viewer's subscription unlocks it (display only — the server enforces access).
+ */
+export const PriceBadge = memo(function PriceBadge({ item }: { item: { is_free?: boolean } }) {
   const { t } = useI18n()
-  const badgeContainerClass = 'self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 min-h-6 justify-center'
-  const badgeTextClass = 'text-emerald-700 dark:text-emerald-300'
+  // Only the entitlement flag: cards must not re-render on unrelated auth changes.
+  const entitlementActive = useEntitlementActive()
   const { bodyTextStyle } = useTypography()
-  if (isFree(item)) {
+  const kind = accessBadge(item, { active: entitlementActive })
+
+  if (kind === 'free') {
     return (
-      <View className={badgeContainerClass}>
-        <Text
-          className={badgeTextClass}
-          style={[
-            bodyTextStyle,
-            {
-              fontSize: 10.5,
-              lineHeight: 14,
-              paddingTop: 0,
-              paddingBottom: 0,
-              includeFontPadding: false,
-              textAlignVertical: 'center',
-            },
-          ]}
-        >
+      <View className="self-start rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 min-h-6 justify-center">
+        <Text className="text-emerald-700 dark:text-emerald-300" style={[bodyTextStyle, TEXT_STYLE]}>
           {t('books.free')}
         </Text>
       </View>
     )
   }
-  const price = item.amount ?? item.price
+
+  const locked = kind === 'premium-locked'
   return (
-    <View className={badgeContainerClass}>
-      <Text
-        className={badgeTextClass}
-        style={[
-          bodyTextStyle,
-          {
-            fontSize: 10.5,
-            lineHeight: 14,
-            paddingTop: 0,
-            paddingBottom: 0,
-            includeFontPadding: false,
-            textAlignVertical: 'center',
-          },
-        ]}
-      >
-        {String(price)} {t('purchases.coins')}
+    <View className="self-start flex-row items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 min-h-6">
+      <Ionicons name={locked ? 'lock-closed' : 'star'} size={10} color={locked ? '#b45309' : '#d97706'} />
+      <Text className="text-amber-700 dark:text-amber-300" style={[bodyTextStyle, TEXT_STYLE]}>
+        {t('books.premium')}
       </Text>
     </View>
   )
-}
+})

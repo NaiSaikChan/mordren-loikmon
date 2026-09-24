@@ -1,278 +1,223 @@
 /**
- * Auth store — unit tests
- * All external API calls are mocked via vi.mock so no real HTTP is made.
+ * Auth store — login / register / session restore / logout against the new
+ * `/api/v1/auth` endpoints (mocked).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { activeEntitlement, apiError, inactiveEntitlement, makeUser, response } from './helpers'
 
-// ── Mock @loikmon/api auth module ─────────────────────────────────────────────
 const mockLogin    = vi.fn()
 const mockRegister = vi.fn()
-const mockUpdateProfile = vi.fn()
+const mockLogout   = vi.fn()
+const mockMe       = vi.fn()
+const mockDelete   = vi.fn()
+const mockChangePassword = vi.fn()
 
-const mockClient = {
-  interceptors: {
-    request: { use: () => 0, eject: () => {} },
-    response: { use: () => 0, eject: () => {} },
-  },
-}
-
-vi.mock('@loikmon/api', () => ({
-  auth: {
-    login:         (...args: unknown[]) => mockLogin(...args),
-    register:      (...args: unknown[]) => mockRegister(...args),
-    updateProfile: (...args: unknown[]) => mockUpdateProfile(...args),
-  },
-  getClient: () => mockClient,
-}))
+vi.mock('@loikmon/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@loikmon/api')>()
+  return {
+    ...actual,
+    auth: {
+      login: (...a: unknown[]) => mockLogin(...a),
+      register: (...a: unknown[]) => mockRegister(...a),
+      logout: (...a: unknown[]) => mockLogout(...a),
+      me: (...a: unknown[]) => mockMe(...a),
+      deleteAccount: (...a: unknown[]) => mockDelete(...a),
+      changePassword: (...a: unknown[]) => mockChangePassword(...a),
+    },
+  }
+})
 
 import { useAuthStore } from '../stores/auth'
 
-// ── Helper: a realistic server login response ─────────────────────────────────
-function makeLoginResponse(overrides: Record<string, unknown> = {}) {
-  return {
-    data: {
-      status: 'ok',
-      message: 'User Authenticated',
-      token: 'jwt-api-token',
-      user: {
-        id: '196',
-        seller: '0',
-        author: '0',
-        email: 'maraohnonpon@gmail.com',
-        username: '',
-        firstname: '',
-        lastname: '',
-        thumbnail: '',
-        coins: '0',
-        ...overrides,
-      },
-      isadminuser: '0',
-      statuscode: 0,
-    },
-  }
-}
-
 describe('auth store', () => {
-
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.clearAllMocks()
   })
 
-  // ── Initial state ──────────────────────────────────────────────────────────
   describe('initial state', () => {
-    it('user is null before login', () => {
+    it('is signed out without a stored token', () => {
       const store = useAuthStore()
-      expect(store.user).toBeNull()
-    })
-
-    it('isLoggedIn is false before login', () => {
-      const store = useAuthStore()
-      expect(store.isLoggedIn).toBe(false)
-    })
-
-    it('loading starts false', () => {
-      const store = useAuthStore()
-      expect(store.loading).toBe(false)
-    })
-
-    it('error starts null', () => {
-      const store = useAuthStore()
-      expect(store.error).toBeNull()
-    })
-  })
-
-  // ── normaliseUser ──────────────────────────────────────────────────────────
-  describe('normaliseUser (via login)', () => {
-    it('derives name from firstname + lastname', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse({ firstname: 'Nai', lastname: 'Chan' }))
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.user!.name).toBe('Nai Chan')
-    })
-
-    it('falls back to username when no firstname/lastname', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse({ username: 'naichan', firstname: '', lastname: '' }))
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.user!.name).toBe('naichan')
-    })
-
-    it('falls back to email prefix when username also empty', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse({ username: '', firstname: '', lastname: '' }))
-      const store = useAuthStore()
-      await store.login({ email: 'maraohnonpon@gmail.com', password: 'pass' })
-      expect(store.user!.name).toBe('maraohnonpon')
-    })
-
-    it('maps thumbnail → avatar', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse({ thumbnail: '/uploads/avatar.jpg' }))
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.user!.avatar).toBe('/uploads/avatar.jpg')
-    })
-
-    it('converts coins string → number', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse({ coins: '150' }))
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.coinBalance).toBe(150)
-    })
-
-    it('coinBalance is 0 when coins is "0"', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse({ coins: '0' }))
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.coinBalance).toBe(0)
-    })
-  })
-
-  // ── login() ────────────────────────────────────────────────────────────────
-  describe('login()', () => {
-    it('sets user and token on status:ok', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse())
-      const store = useAuthStore()
-      await store.login({ email: 'maraohnonpon@gmail.com', password: 'pass' })
-      expect(store.user).not.toBeNull()
-      expect(store.token).toBe('jwt-api-token')   // generated from id when no JWT
-      expect(store.isLoggedIn).toBe(true)
-    })
-
-    it('persists token + user to localStorage', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse())
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(localStorage.getItem('token')).toBe('jwt-api-token')
-      expect(JSON.parse(localStorage.getItem('user')!).email).toBe('maraohnonpon@gmail.com')
-    })
-
-    it('uses server-provided token when present', async () => {
-      const response = makeLoginResponse()
-      response.data = { ...response.data, token: 'jwt-abc123' } as any
-      mockLogin.mockResolvedValueOnce(response)
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.token).toBe('jwt-abc123')
-    })
-
-    it('sets error and throws on status:error', async () => {
-      mockLogin.mockResolvedValueOnce({ data: { status: 'error', message: 'Invalid credentials' } })
-      const store = useAuthStore()
-      await expect(store.login({ email: 'bad@bad.com', password: 'wrong' })).rejects.toBe('Invalid credentials')
-      expect(store.error).toBe('Invalid credentials')
-      expect(store.isLoggedIn).toBe(false)
-    })
-
-    it('sets error on missing user in response', async () => {
-      mockLogin.mockResolvedValueOnce({ data: { status: 'ok', user: null } })
-      const store = useAuthStore()
-      await expect(store.login({ email: 'test@test.com', password: 'pass' })).rejects.toBeTruthy()
-      expect(store.error).toBe('No user data received')
-    })
-
-    it('loading is false after successful login', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse())
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      expect(store.loading).toBe(false)
-    })
-
-    it('loading is false after failed login', async () => {
-      mockLogin.mockResolvedValueOnce({ data: { status: 'error', message: 'Bad creds' } })
-      const store = useAuthStore()
-      await store.login({ email: 'x@x.com', password: 'x' }).catch(() => {})
-      expect(store.loading).toBe(false)
-    })
-  })
-
-  // ── logout() ───────────────────────────────────────────────────────────────
-  describe('logout()', () => {
-    it('clears user, token, localStorage', async () => {
-      mockLogin.mockResolvedValueOnce(makeLoginResponse())
-      const store = useAuthStore()
-      await store.login({ email: 'test@test.com', password: 'pass' })
-      await store.logout()
       expect(store.user).toBeNull()
       expect(store.token).toBeNull()
       expect(store.isLoggedIn).toBe(false)
-      expect(localStorage.getItem('token')).toBeNull()
+      expect(store.isSubscribed).toBe(false)
+      expect(store.restored).toBe(true)
+    })
+
+    it('ignores fake `local:` tokens from the legacy client', () => {
+      localStorage.setItem('token', 'local:196')
+      const store = useAuthStore()
+      expect(store.token).toBeNull()
+    })
+  })
+
+  describe('login()', () => {
+    it('stores the bearer token, user and entitlement', async () => {
+      mockLogin.mockReturnValueOnce(response({ status: 'ok', token: 'tok-1', user: makeUser(), entitlement: activeEntitlement() }))
+      const store = useAuthStore()
+
+      await store.login({ email: 'reader@loikmon.org', password: 'secret123' })
+
+      expect(mockLogin).toHaveBeenCalledWith({ email: 'reader@loikmon.org', password: 'secret123' })
+      expect(store.token).toBe('tok-1')
+      expect(store.user?.email).toBe('reader@loikmon.org')
+      expect(store.isLoggedIn).toBe(true)
+      expect(store.isSubscribed).toBe(true)
+      expect(localStorage.getItem('token')).toBe('tok-1')
+      // The user object is no longer cached in localStorage.
       expect(localStorage.getItem('user')).toBeNull()
     })
+
+    it('sets the error message and rethrows the ApiError on failure', async () => {
+      mockLogin.mockRejectedValueOnce(apiError(401, 'INVALID_CREDENTIALS', 'Invalid email or password'))
+      const store = useAuthStore()
+
+      await expect(store.login({ email: 'x@x.com', password: 'wrong' })).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' })
+      expect(store.error).toBe('Invalid email or password')
+      expect(store.isLoggedIn).toBe(false)
+      expect(store.loading).toBe(false)
+      expect(localStorage.getItem('token')).toBeNull()
+    })
   })
 
-  // ── restore() ─────────────────────────────────────────────────────────────
+  describe('register()', () => {
+    it('signs in when the server returns a token', async () => {
+      mockRegister.mockReturnValueOnce(response({ status: 'ok', token: 'tok-new', user: makeUser(), entitlement: inactiveEntitlement, requires_email_verification: false }))
+      const store = useAuthStore()
+
+      const result = await store.register({ name: 'Nai', email: 'new@loikmon.org', password: 'secret123' })
+
+      expect(result.requiresEmailVerification).toBe(false)
+      expect(store.token).toBe('tok-new')
+      expect(store.isSubscribed).toBe(false)
+    })
+
+    it('does not sign in when email verification is required', async () => {
+      mockRegister.mockReturnValueOnce(response({ status: 'ok', token: null, user: makeUser(), entitlement: inactiveEntitlement, requires_email_verification: true }))
+      const store = useAuthStore()
+
+      const result = await store.register({ email: 'new@loikmon.org', password: 'secret123' })
+
+      expect(result.requiresEmailVerification).toBe(true)
+      expect(store.token).toBeNull()
+      expect(store.isLoggedIn).toBe(false)
+    })
+
+    it('rethrows EMAIL_TAKEN', async () => {
+      mockRegister.mockRejectedValueOnce(apiError(409, 'EMAIL_TAKEN', 'An account with this email already exists'))
+      const store = useAuthStore()
+      await expect(store.register({ email: 'x@x.com', password: 'secret123' })).rejects.toMatchObject({ code: 'EMAIL_TAKEN' })
+      expect(store.error).toBe('An account with this email already exists')
+    })
+  })
+
   describe('restore()', () => {
-    it('restores token + user from localStorage', () => {
-      const savedUser = { id: '10', name: 'Test', email: 'test@test.com', avatar: '', coins: 0 }
-      localStorage.setItem('token', 'jwt-restored')
-      localStorage.setItem('user', JSON.stringify(savedUser))
-
+    it('validates the stored token with auth.me()', async () => {
+      localStorage.setItem('token', 'tok-stored')
+      mockMe.mockReturnValueOnce(response({ status: 'ok', user: makeUser(), entitlement: activeEntitlement() }))
       const store = useAuthStore()
-      store.restore()
+      expect(store.restored).toBe(false)
 
-      expect(store.token).toBe('jwt-restored')
-      expect(store.user!.email).toBe('test@test.com')
+      await store.restore()
+
+      expect(mockMe).toHaveBeenCalledTimes(1)
       expect(store.isLoggedIn).toBe(true)
+      expect(store.isSubscribed).toBe(true)
+      expect(store.restored).toBe(true)
     })
 
-    it('handles corrupt user JSON gracefully', () => {
-      localStorage.setItem('token', 'user_99')
-      localStorage.setItem('user', 'NOT_VALID_JSON{{{')
+    it('clears the session when the token was rejected (401)', async () => {
+      localStorage.setItem('token', 'tok-expired')
+      mockMe.mockRejectedValueOnce(apiError(401, 'UNAUTHORIZED'))
       const store = useAuthStore()
-      expect(() => store.restore()).not.toThrow()
-      expect(store.token).toBe('user_99')
+
+      await store.restore()
+
+      expect(store.token).toBeNull()
       expect(store.user).toBeNull()
+      expect(localStorage.getItem('token')).toBeNull()
     })
 
-    it('does nothing when localStorage is empty', () => {
+    it('keeps the token on network errors so a later refresh can recover', async () => {
+      localStorage.setItem('token', 'tok-offline')
+      mockMe.mockRejectedValueOnce(apiError(0, 'NETWORK_ERROR', 'Cannot reach the server'))
       const store = useAuthStore()
-      store.restore()
-      expect(store.user).toBeNull()
+
+      await store.restore()
+
+      expect(store.token).toBe('tok-offline')
+      expect(store.isLoggedIn).toBe(false)
+      expect(store.restored).toBe(true)
+    })
+
+    it('does not call the API without a token and removes the legacy cached user', async () => {
+      localStorage.setItem('user', JSON.stringify({ id: '196', name: 'legacy' }))
+      const store = useAuthStore()
+      await store.restore()
+      expect(mockMe).not.toHaveBeenCalled()
+      expect(localStorage.getItem('user')).toBeNull()
+    })
+
+    it('shares one request between concurrent callers (route guard + main.ts)', async () => {
+      localStorage.setItem('token', 'tok-stored')
+      mockMe.mockReturnValueOnce(response({ status: 'ok', user: makeUser(), entitlement: inactiveEntitlement }))
+      const store = useAuthStore()
+      await Promise.all([store.restore(), store.ensureRestored()])
+      expect(mockMe).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('logout()', () => {
+    it('revokes the server session and clears local state', async () => {
+      mockLogin.mockReturnValueOnce(response({ status: 'ok', token: 'tok-1', user: makeUser(), entitlement: activeEntitlement() }))
+      mockLogout.mockReturnValueOnce(response({ status: 'ok' }))
+      const store = useAuthStore()
+      await store.login({ email: 'reader@loikmon.org', password: 'secret123' })
+
+      await store.logout()
+
+      expect(mockLogout).toHaveBeenCalledTimes(1)
+      expect(store.token).toBeNull()
+      expect(store.entitlement).toBeNull()
+      expect(localStorage.getItem('token')).toBeNull()
+    })
+
+    it('still clears the session when the server call fails', async () => {
+      localStorage.setItem('token', 'tok-1')
+      mockLogout.mockRejectedValueOnce(apiError(0, 'NETWORK_ERROR'))
+      const store = useAuthStore()
+      await store.logout()
       expect(store.token).toBeNull()
     })
   })
 
-  // ── register() ────────────────────────────────────────────────────────────
-  describe('register()', () => {
-    it('sets user on successful register', async () => {
-      mockRegister.mockResolvedValueOnce(makeLoginResponse({ id: '200', email: 'new@test.com' }))
+  describe('account actions', () => {
+    it('changePassword() swaps in the fresh token', async () => {
+      mockLogin.mockReturnValueOnce(response({ status: 'ok', token: 'tok-old', user: makeUser(), entitlement: inactiveEntitlement }))
+      mockChangePassword.mockReturnValueOnce(response({ status: 'ok', token: 'tok-rotated' }))
       const store = useAuthStore()
-      await store.register({ name: 'New User', email: 'new@test.com', password: 'pass', password_confirmation: 'pass' })
-      expect(store.user).not.toBeNull()
+      await store.login({ email: 'reader@loikmon.org', password: 'secret123' })
+
+      await store.changePassword('secret123', 'newsecret456')
+
+      expect(mockChangePassword).toHaveBeenCalledWith('secret123', 'newsecret456', true)
+      expect(store.token).toBe('tok-rotated')
+      expect(localStorage.getItem('token')).toBe('tok-rotated')
     })
 
-    it('does not set user when no user in response (email verification pending)', async () => {
-      mockRegister.mockResolvedValueOnce({ data: { status: 'ok', message: 'Verify email' } })
+    it('deleteAccount() signs out and reports a still-renewing store subscription', async () => {
+      localStorage.setItem('token', 'tok-1')
+      mockDelete.mockReturnValueOnce(response({ status: 'ok', manage_store_subscription: 'app_store' }))
       const store = useAuthStore()
-      await store.register({ name: 'Test', email: 'x@x.com', password: 'pass', password_confirmation: 'pass' })
-      expect(store.user).toBeNull()
-    })
 
-    it('throws on status:error', async () => {
-      mockRegister.mockResolvedValueOnce({ data: { status: 'error', message: 'Email taken' } })
-      const store = useAuthStore()
-      await expect(store.register({ name: 'T', email: 'x@x.com', password: 'p', password_confirmation: 'p' }))
-        .rejects.toBe('Email taken')
-    })
-  })
+      const store_ = await store.deleteAccount('secret123')
 
-  // ── computed: displayName / avatar ─────────────────────────────────────────
-  describe('computed values', () => {
-    it('displayName returns empty string when logged out', () => {
-      const store = useAuthStore()
-      expect(store.displayName).toBe('')
-    })
-
-    it('avatar returns empty string when no user', () => {
-      const store = useAuthStore()
-      expect(store.avatar).toBe('')
-    })
-
-    it('coinBalance returns 0 when no user', () => {
-      const store = useAuthStore()
-      expect(store.coinBalance).toBe(0)
+      expect(mockDelete).toHaveBeenCalledWith('secret123')
+      expect(store_).toBe('app_store')
+      expect(store.token).toBeNull()
     })
   })
 })

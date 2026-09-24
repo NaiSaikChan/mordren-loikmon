@@ -1,0 +1,19 @@
+appId: org.loikmon.mobile
+name: Open a book from the Books tab and go back
+tags: [smoke]
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+- tapOn: "Books"
+# First card in the grid.
+- tapOn:
+    id: "book-card"
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: "book-detail"
+    timeout: 10000
+- back
+- assertVisible: "Books"

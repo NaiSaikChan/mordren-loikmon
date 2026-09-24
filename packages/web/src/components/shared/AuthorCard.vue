@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Author } from '@loikmon/api'
 import { computed } from 'vue'
+import ResponsiveImg from './ResponsiveImg.vue'
 
 const props = defineProps<{ author: Author }>()
 
-const avatarUrl = computed(() => (props.author.thumbnail ?? props.author.avatar_url ?? props.author.avatar ?? '') as string)
+const avatarUrl = computed(() => props.author.thumbnail ?? props.author.avatar_url ?? '')
 const booksCount = computed(() => Number(props.author.bookscount ?? props.author.books_count ?? 0))
 const articlesCount = computed(() => Number(props.author.articlescount ?? props.author.articles_count ?? 0))
 </script>
@@ -14,10 +15,21 @@ const articlesCount = computed(() => Number(props.author.articlescount ?? props.
     <div class="card overflow-hidden">
       <!-- Thumbnail -->
       <div class="w-full aspect-square overflow-hidden bg-gray-200 dark:bg-surface-700 relative">
-        <img v-if="avatarUrl" :src="avatarUrl" :alt="author.name" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" />
-        <div v-else class="w-full h-full flex items-center justify-center bg-linear-to-br from-brand-100 to-brand-200 dark:from-brand-900/50 dark:to-brand-800/50">
-          <span class="text-6xl text-brand-600 dark:text-brand-400">{{ author.name.charAt(0) }}</span>
-        </div>
+        <!-- Square card thumbnail (no assetType: the card keeps its square frame rather than the avatar circle). -->
+        <ResponsiveImg
+          :image="author.avatar_image"
+          :fallback="avatarUrl"
+          :alt="author.name"
+          fill
+          sizes="(min-width: 1024px) 240px, (min-width: 768px) 25vw, (min-width: 640px) 33vw, 50vw"
+          img-class="group-hover:scale-105 transition-transform duration-300"
+        >
+          <template #empty>
+            <div class="w-full h-full flex items-center justify-center bg-linear-to-br from-brand-100 to-brand-200 dark:from-brand-900/50 dark:to-brand-800/50">
+              <span class="text-6xl text-brand-600 dark:text-brand-400">{{ author.name.charAt(0) }}</span>
+            </div>
+          </template>
+        </ResponsiveImg>
       </div>
       
       <!-- Info -->

@@ -1,0 +1,29 @@
+appId: org.loikmon.mobile
+name: Sign in, session survives relaunch
+tags: [auth]
+env:
+  EMAIL: ${EMAIL}
+  PASSWORD: ${PASSWORD}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+- tapOn: "Login"
+- tapOn: "Email"
+- inputText: ${EMAIL}
+- tapOn: "Password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- tapOn: "Log In"
+- extendedWaitUntil:
+    notVisible: "Log In"
+    timeout: 15000
+# Session persistence: the token is restored from secure storage.
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+- assertNotVisible: "Login"

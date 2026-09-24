@@ -1,43 +1,49 @@
-import type { ApiResponse, Book, BookChapter } from '../types.js'
 import { getClient } from '../client.js'
+import type { Book, BookDetail, BookFileResponse, BooksResponse, ChaptersResponse, Id, ReadingProgress } from '../types.js'
+
+export interface BookQuery {
+  page?: number
+  limit?: number
+  q?: string
+  category?: Id
+  subcategory?: Id
+  author?: Id
+  free?: boolean
+  has_audio?: boolean
+  recommended?: boolean
+  top?: boolean
+  sort?: 'latest' | 'popular' | 'rating' | 'title'
+}
 
 export const books = {
-  // page=0-indexed; optional: email, id(author), type, cat, sub
-  fetchBooks: (params?: Record<string, unknown>) =>
-    getClient().post<any>('fetchbooks', params ?? {}),
+  /** Paginated list (1-based `page`). */
+  fetchBooks: (params: BookQuery = {}) => getClient().get<BooksResponse>('books', { params }),
 
-  fetchOtherBooks: (params?: Record<string, unknown>) =>
-    getClient().post<any>('fetchotherbooks', params ?? {}),
+  getBook: (id: Id | string) => getClient().get<{ status: 'ok'; book: BookDetail }>(`books/${id}`),
 
-  // Flutter: { type:'book', id }
-  getItem: (id: string | number) =>
-    getClient().post<any>('getitem', { type: 'book', id }),
+  /** @deprecated alias of getBook */
+  getItem: (id: Id | string) => getClient().get<{ status: 'ok'; book: BookDetail }>(`books/${id}`),
 
-  // Flutter: { book_id }
-  getAudioChapters: (bookId: string | number) =>
-    getClient().post<any>('getBookChapters', { book_id: bookId }),
+  /** Up to 12 books from the same author or category (not paginated). */
+  relatedBooks: (id: Id | string) => getClient().get<{ status: 'ok'; books: Book[] }>(`books/${id}/related`),
 
-  // Flutter: { book_id }
-  getChapters: (bookId: string | number) =>
-    getClient().post<any>('getBookChapters', { book_id: bookId }),
+  /**
+   * Signed, short-lived URL of the PDF or EPUB. Rejects with
+   * LOGIN_REQUIRED (401) or SUBSCRIPTION_REQUIRED (403) when the viewer has no access.
+   */
+  getFileUrl: (id: Id | string, format?: 'pdf' | 'epub') =>
+    getClient().get<BookFileResponse>(`books/${id}/file`, { params: format ? { format } : undefined }),
 
-  // Flutter: { bookid, email? }
-  relatedBooks: (bookId: string | number, email?: string) =>
-    getClient().post<any>('relatedbooks', { bookid: bookId, ...(email ? { email } : {}) }),
+  /** Audio chapters. Locked chapters come without `audio_url`. */
+  getChapters: (id: Id | string) => getClient().get<ChaptersResponse>(`books/${id}/chapters`),
 
-  // Flutter: { bookid, rate, email? }
-  rateBook: (bookId: string | number, rate: number, email?: string) =>
-    getClient().post<any>('ratebook', { bookid: bookId, rate: String(rate), ...(email ? { email } : {}) }),
+  /** @deprecated alias of getChapters */
+  getAudioChapters: (id: Id | string) => getClient().get<ChaptersResponse>(`books/${id}/chapters`),
 
-  // Flutter: { bookid }
-  updateTotalViews: (bookId: string | number) =>
-    getClient().post<any>('update_total_views', { bookid: bookId }),
+  updateTotalViews: (id: Id | string) => getClient().post<void>(`books/${id}/views`),
 
-  // Flutter: { email, bookid, amount }
-  purchaseBook: (email: string, bookId: string | number, amount: number) =>
-    getClient().post<any>('purchasebook', { email, bookid: bookId, amount }),
+  getProgress: (id: Id | string) => getClient().get<{ status: 'ok'; progress: ReadingProgress[] }>(`books/${id}/progress`),
 
-  // Flutter: { email, code, book_id }
-  redeemCoupon: (email: string, code: string, bookId: string | number) =>
-    getClient().post<any>('subscribeBookCoupon', { email, code, book_id: bookId }),
+  saveProgress: (id: Id | string, progress: { format: 'pdf' | 'epub' | 'audio'; location: string | null; progress: number }) =>
+    getClient().put<{ status: 'ok' }>(`books/${id}/progress`, progress),
 }

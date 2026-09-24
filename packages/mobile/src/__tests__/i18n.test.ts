@@ -1,4 +1,9 @@
-import { translate, resolveTranslationKey } from '@/i18n'
+import { translate, resolveTranslationKey, messages } from '@/i18n'
+
+function keysOf(obj: unknown, prefix = ''): string[] {
+  if (!obj || typeof obj !== 'object') return [prefix]
+  return Object.entries(obj as Record<string, unknown>).flatMap(([key, value]) => keysOf(value, prefix ? `${prefix}.${key}` : key))
+}
 
 describe('resolveTranslationKey', () => {
   it('resolves nested dotted keys', () => {
@@ -14,8 +19,7 @@ describe('translate', () => {
     expect(translate('en', 'nav.home')).toBe('Home')
   })
 
-  it('falls back to English when the Mon key is missing', () => {
-    // Contrived key that only exists in en fallback path — uses interpolation guard.
+  it('translates Mon keys', () => {
     expect(translate('mon', 'nav.home')).not.toBe('nav.home')
   })
 
@@ -24,7 +28,20 @@ describe('translate', () => {
   })
 
   it('interpolates params', () => {
-    // greeting has no params, but ensure interpolation leaves plain strings intact
-    expect(translate('en', 'common.by')).toBe('by')
+    expect(translate('en', 'subscribe.save', { percent: 17 })).toBe('Save 17%')
+  })
+})
+
+describe('locale files', () => {
+  it('English and Mon define the same key set', () => {
+    expect(keysOf(messages.mon).sort()).toEqual(keysOf(messages.en).sort())
+  })
+
+  it('no longer contain the coin economy', () => {
+    const all = keysOf(messages.en)
+    expect(all.some((key) => key.startsWith('purchases.'))).toBe(false)
+    // No key or copy mentions the old wallet currency.
+    expect(JSON.stringify(messages.en)).not.toMatch(/co[i]n/i)
+    expect(JSON.stringify(messages.mon)).not.toMatch(/co[i]n/i)
   })
 })

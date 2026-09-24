@@ -1,16 +1,24 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import BookCarousel from '@/components/shared/BookCarousel.vue'
 import ScrollCarousel from '@/components/shared/ScrollCarousel.vue'
 import type { Book } from '@loikmon/api'
+import { createTestI18n, makeBook } from './helpers'
 
 const sampleBooks: Book[] = [
-  { id: 1, title: 'Book One', authorname: 'Author A', price: 0, is_free: true } as Book,
-  { id: 2, title: 'Book Two', authorname: 'Author B', price: 100, is_free: false } as Book,
-  { id: 3, title: 'Book Three', authorname: 'Author C', price: 50, is_free: false } as Book,
+  makeBook({ id: 1, title: 'Book One', authorname: 'Author A', is_free: true }),
+  makeBook({ id: 2, title: 'Book Two', authorname: 'Author B', is_free: false }),
+  makeBook({ id: 3, title: 'Book Three', authorname: 'Author C', is_free: false }),
 ]
 
+let plugins: unknown[] = []
+
 describe('BookCarousel.vue', () => {
+  beforeEach(() => {
+    plugins = [createPinia(), createTestI18n()]
+  })
+
   it('renders nothing when books array is empty', () => {
     const wrapper = mount(BookCarousel, {
       props: {
@@ -28,6 +36,7 @@ describe('BookCarousel.vue', () => {
         title: 'More Books by This Author',
       },
       global: {
+        plugins: plugins as any,
         stubs: {
           RouterLink: {
             template: '<a><slot /></a>',
@@ -40,6 +49,10 @@ describe('BookCarousel.vue', () => {
     expect(wrapper.text()).toContain('Book One')
     expect(wrapper.text()).toContain('Book Two')
     expect(wrapper.text()).toContain('Book Three')
+    // Free / Premium badges replace the old coin prices.
+    expect(wrapper.text()).toContain('Free')
+    expect(wrapper.text()).toContain('Premium')
+    expect(wrapper.text()).not.toContain('🪙')
   })
 
   it('renders custom item slot if provided', () => {
@@ -52,6 +65,7 @@ describe('BookCarousel.vue', () => {
         item: '<template #item="{ book }"><div class="custom-item">{{ book.title }} - Custom</div></template>',
       },
       global: {
+        plugins: plugins as any,
         stubs: {
           RouterLink: true,
         },

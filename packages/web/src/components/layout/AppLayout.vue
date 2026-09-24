@@ -1,28 +1,31 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, useTemplateRef, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
+import AppFooter from './AppFooter.vue'
 import AppSidebar from './AppSidebar.vue'
 import AppTopBar from './AppTopBar.vue'
 import AudioPlayer from '@/components/media/AudioPlayer.vue'
-import { useAuthStore } from '@/stores/auth'
+import PaywallDialog from '@/components/shared/PaywallDialog.vue'
 import { useUiStore } from '@/stores/ui'
-import { usePurchasesStore } from '@/stores/purchases'
+import { usePaywallStore } from '@/stores/paywall'
 
-const authStore = useAuthStore()
 const uiStore = useUiStore()
-const purchasesStore = usePurchasesStore()
+const paywall = usePaywallStore()
 const route = useRoute()
-const mainEl = useTemplateRef<HTMLElement>('main')
+const scrollEl = useTemplateRef<HTMLElement>('scroller')
+
+// Browse/discovery pages get the site footer; immersive views (reader, detail
+// pages, search) stay focused on their own content.
+const showFooter = computed(() => route.matched.some((record) => record.meta?.footer))
 
 async function scrollMainToTop() {
   await nextTick()
-  mainEl.value?.scrollTo({ top: 0, left: 0 })
+  scrollEl.value?.scrollTo({ top: 0, left: 0 })
 }
 
-onMounted(async () => {
+onMounted(() => {
+  // The session itself is restored once in main.ts (auth.me()).
   window.addEventListener('loikmon:scroll-main-top', scrollMainToTop)
-  await authStore.restore()
-  if (authStore.isLoggedIn) purchasesStore.fetchAll()
 })
 
 onUnmounted(() => {
@@ -31,7 +34,10 @@ onUnmounted(() => {
 
 watch(
   () => route.fullPath,
-  scrollMainToTop,
+  () => {
+    paywall.close()
+    void scrollMainToTop()
+  },
 )
 </script>
 
@@ -61,19 +67,29 @@ watch(
     <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
       <AppTopBar />
 
-      <main ref="main" id="main-content" class="flex flex-col flex-1 overflow-y-auto" tabindex="-1">
-        <RouterView v-slot="{ Component, route: viewRoute }">
-          <Transition name="page" mode="out-in">
-            <div :key="viewRoute.fullPath" class="h-full min-h-full">
-              <component :is="Component" />
-            </div>
-          </Transition>
-        </RouterView>
-      </main>
+      <!-- Scroll container: holds <main> and the site footer so the footer is a
+           real `contentinfo` landmark (a <footer> inside <main> is not) and
+           still scrolls with the page instead of floating over it. -->
+      <div ref="scroller" class="flex flex-col flex-1 overflow-y-auto">
+        <main id="main-content" class="flex flex-col flex-1" tabindex="-1">
+          <RouterView v-slot="{ Component, route: viewRoute }">
+            <Transition name="page" mode="out-in">
+              <div :key="viewRoute.fullPath" class="h-full min-h-full">
+                <component :is="Component" />
+              </div>
+            </Transition>
+          </RouterView>
+        </main>
+
+        <AppFooter v-if="showFooter" />
+      </div>
     </div>
 
     <!-- Global audio player -->
     <AudioPlayer />
+
+    <!-- Global paywall (locked audio, list actions) -->
+    <PaywallDialog />
   </div>
 </template>
 

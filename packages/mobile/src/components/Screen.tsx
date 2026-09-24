@@ -1,6 +1,6 @@
 import { View } from 'react-native'
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context'
-import { useTheme } from '@/context/ThemeContext'
+import { useThemeColors } from '@/theme/colors'
 
 /**
  * Screen wrapper providing a themed background + safe-area padding.
@@ -12,13 +12,15 @@ import { useTheme } from '@/context/ThemeContext'
 export function Screen({
   children,
   edges = ['top'],
+  testID,
 }: {
   children: React.ReactNode
   edges?: Edge[]
+  testID?: string
 }) {
-  const { isDark } = useTheme()
+  const colors = useThemeColors()
   return (
-    <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: isDark ? '#0f172a' : '#f8fafc' }}>
+    <SafeAreaView testID={testID} edges={edges} style={{ flex: 1, backgroundColor: colors.background }}>
       <View className="flex-1">{children}</View>
     </SafeAreaView>
   )

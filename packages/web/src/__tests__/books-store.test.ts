@@ -3,153 +3,98 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { apiError, makeBook, makeBookList, response } from './helpers'
 
 const mockFetchBooks  = vi.fn()
-const mockGetItem     = vi.fn()
-const mockGetChapters = vi.fn()
+const mockGetBook     = vi.fn()
 const mockRelated     = vi.fn()
-const mockRateBook    = vi.fn()
 
-vi.mock('@loikmon/api', () => ({
-  books: {
-    fetchBooks:   (...a: unknown[]) => mockFetchBooks(...a),
-    getItem:      (...a: unknown[]) => mockGetItem(...a),
-    getChapters:  (...a: unknown[]) => mockGetChapters(...a),
-    relatedBooks: (...a: unknown[]) => mockRelated(...a),
-    rateBook:     (...a: unknown[]) => mockRateBook(...a),
-  },
-}))
+vi.mock('@loikmon/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@loikmon/api')>()
+  return {
+    ...actual,
+    books: {
+      ...actual.books,
+      fetchBooks:   (...a: unknown[]) => mockFetchBooks(...a),
+      getBook:      (...a: unknown[]) => mockGetBook(...a),
+      relatedBooks: (...a: unknown[]) => mockRelated(...a),
+    },
+  }
+})
 
 import { useBooksStore } from '../stores/books'
 
-const BOOK_LIST = [
-  { id: 1, title: 'Mon Book A', thumbnail: '/thumb1.jpg' },
-  { id: 2, title: 'Mon Book B', thumbnail: '/thumb2.jpg' },
-]
-
 describe('books store', () => {
-
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
-  // ── initial state ──────────────────────────────────────────────────────────
-  it('list starts empty', () => {
+  it('starts empty', () => {
     const store = useBooksStore()
     expect(store.list).toEqual([])
-  })
-
-  it('detail starts null', () => {
-    const store = useBooksStore()
     expect(store.detail).toBeNull()
-  })
-
-  it('loading starts false', () => {
-    const store = useBooksStore()
     expect(store.loading).toBe(false)
   })
 
-  // ── fetchBooks() ───────────────────────────────────────────────────────────
   describe('fetchBooks()', () => {
-    it('populates list from books array in response', async () => {
-      mockFetchBooks.mockResolvedValueOnce({ data: { books: BOOK_LIST } })
+    it('passes server-side filters and stores the page', async () => {
+      mockFetchBooks.mockReturnValueOnce(response(makeBookList([makeBook({ id: 1 }), makeBook({ id: 2 })])))
       const store = useBooksStore()
-      await store.fetchBooks()
+      await store.fetchBooks({ page: 2, limit: 18, category: 5, sort: 'popular' })
+      expect(mockFetchBooks).toHaveBeenCalledWith({ page: 2, limit: 18, category: 5, sort: 'popular' })
       expect(store.list).toHaveLength(2)
-      expect(store.list[0].title).toBe('Mon Book A')
-    })
-
-    it('handles top-level array response', async () => {
-      mockFetchBooks.mockResolvedValueOnce({ data: BOOK_LIST })
-      const store = useBooksStore()
-      await store.fetchBooks()
-      expect(store.list).toHaveLength(2)
-    })
-
-    it('sets list to [] when response is empty', async () => {
-      mockFetchBooks.mockResolvedValueOnce({ data: { books: [] } })
-      const store = useBooksStore()
-      await store.fetchBooks()
-      expect(store.list).toEqual([])
-    })
-
-    it('loading is false after fetch', async () => {
-      mockFetchBooks.mockResolvedValueOnce({ data: { books: [] } })
-      const store = useBooksStore()
-      await store.fetchBooks()
+      expect(store.total).toBe(2)
+      expect(store.pagination?.total_pages).toBe(1)
       expect(store.loading).toBe(false)
     })
 
-    it('passes params to API', async () => {
-      mockFetchBooks.mockResolvedValueOnce({ data: { books: [] } })
+    it('ignores responses of superseded requests', async () => {
+      let resolveSlow: (v: unknown) => void = () => {}
+      mockFetchBooks
+        .mockReturnValueOnce(new Promise((r) => { resolveSlow = r }))
+        .mockReturnValueOnce(response(makeBookList([makeBook({ id: 2 })])))
       const store = useBooksStore()
-      await store.fetchBooks({ cat: 'poetry', offset: 10 })
-      expect(mockFetchBooks).toHaveBeenCalledWith({ cat: 'poetry', offset: 10 })
+      const slow = store.fetchBooks({ category: 1 })
+      await store.fetchBooks({ category: 2 })
+      resolveSlow({ data: makeBookList([makeBook({ id: 1 })]) })
+      await slow
+      expect(store.list.map((b) => b.id)).toEqual([2])
     })
   })
 
-  // ── fetchDetail() ──────────────────────────────────────────────────────────
   describe('fetchDetail()', () => {
-    it('sets detail from body.book', async () => {
-      const book = { id: 5, title: 'Detail Book' }
-      mockGetItem.mockResolvedValueOnce({ data: { book } })
+    it('stores the book with its access decision', async () => {
+      mockGetBook.mockReturnValueOnce(response({ status: 'ok', book: makeBook({ id: 5, access: { granted: false, reason: 'login_required' } }) }))
       const store = useBooksStore()
       await store.fetchDetail(5)
-      expect(store.detail!.title).toBe('Detail Book')
+      expect(mockGetBook).toHaveBeenCalledWith(5)
+      expect(store.detail?.access.reason).toBe('login_required')
     })
 
-    it('sets detail from body.data.book (nested)', async () => {
-      const book = { id: 6, title: 'Nested Book' }
-      mockGetItem.mockResolvedValueOnce({ data: { data: { book } } })
-      const store = useBooksStore()
-      await store.fetchDetail(6)
-      expect(store.detail!.title).toBe('Nested Book')
-    })
-
-    it('sets detail to null when book not found', async () => {
-      mockGetItem.mockResolvedValueOnce({ data: {} })
+    it('sets detail to null and records the error code on failure', async () => {
+      mockGetBook.mockRejectedValueOnce(apiError(404, 'NOT_FOUND'))
       const store = useBooksStore()
       await store.fetchDetail(999)
       expect(store.detail).toBeNull()
+      expect(store.detailError).toBe('NOT_FOUND')
     })
   })
 
-  // ── fetchChapters() ────────────────────────────────────────────────────────
-  describe('fetchChapters()', () => {
-    it('populates chapters', async () => {
-      const chapters = [{ id: 1, title: 'Chapter 1' }, { id: 2, title: 'Chapter 2' }]
-      mockGetChapters.mockResolvedValueOnce({ data: { chapters } })
-      const store = useBooksStore()
-      await store.fetchChapters(1)
-      expect(store.chapters).toHaveLength(2)
-    })
-
-    it('handles empty chapters', async () => {
-      mockGetChapters.mockResolvedValueOnce({ data: { chapters: [] } })
-      const store = useBooksStore()
-      await store.fetchChapters(1)
-      expect(store.chapters).toEqual([])
-    })
-  })
-
-  // ── fetchRelated() ────────────────────────────────────────────────────────
   describe('fetchRelated()', () => {
-    it('populates related books', async () => {
-      mockRelated.mockResolvedValueOnce({ data: { books: BOOK_LIST } })
+    it('populates related books without the current one', async () => {
+      mockRelated.mockReturnValueOnce(response(makeBookList([makeBook({ id: 1 }), makeBook({ id: 3 })])))
       const store = useBooksStore()
       await store.fetchRelated(1)
-      expect(store.related).toHaveLength(2)
+      expect(store.related.map((b) => b.id)).toEqual([3])
     })
   })
 
-  // ── rateBook() ────────────────────────────────────────────────────────────
-  describe('rateBook()', () => {
-    it('calls API with bookId and rating', async () => {
-      mockRateBook.mockResolvedValueOnce({ data: { status: 'ok' } })
-      const store = useBooksStore()
-      await store.rateBook(5, 4)
-      expect(mockRateBook).toHaveBeenCalledWith(5, 4)
-    })
+  it('setInLibrary() updates the detail flag', async () => {
+    mockGetBook.mockReturnValueOnce(response({ status: 'ok', book: makeBook({ in_library: false }) }))
+    const store = useBooksStore()
+    await store.fetchDetail(7)
+    store.setInLibrary(true)
+    expect(store.detail?.in_library).toBe(true)
   })
 })

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useCategoriesStore } from '@/stores/categories'
 import { getCategoryIcon } from '@/composables/categoryIcons'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import ResponsiveImg from '@/components/shared/ResponsiveImg.vue'
 
 const { t } = useI18n()
 const store = useCategoriesStore()
@@ -12,18 +13,20 @@ onMounted(() => store.fetchCategories())
 
 <template>
   <div class="page-wrapper">
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Categories</h1>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">{{ t('categories.title') }}</h1>
     <LoadingSpinner v-if="store.loading" />
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
       <RouterLink v-for="cat in store.list" :key="cat.id"
         :to="`/categories/${cat.id}`"
         class="card p-5 flex flex-col items-center gap-3 text-center hover:border-brand-400 transition-colors">
-        <div class="w-12 h-12 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-2xl">
-          {{ getCategoryIcon(cat.id) }}
+        <div class="w-12 h-12 rounded-xl bg-brand-50 dark:bg-brand-900/20 flex items-center justify-center text-2xl overflow-hidden">
+          <ResponsiveImg :image="cat.thumbnail_image" :fallback="cat.thumbnail" :alt="cat.name" fill sizes="48px">
+            <template #empty><span>{{ getCategoryIcon(cat.id) }}</span></template>
+          </ResponsiveImg>
         </div>
         <div>
           <p class="font-semibold text-sm text-gray-900 dark:text-white">{{ cat.name }}</p>
-          <p v-if="cat.books_count" class="text-xs text-gray-400 mt-0.5">{{ cat.books_count }} books</p>
+          <p v-if="cat.books_count" class="text-xs text-gray-400 mt-0.5">{{ t('categories.booksCount', { count: cat.books_count }) }}</p>
         </div>
       </RouterLink>
     </div>

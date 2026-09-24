@@ -1,11 +1,9 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import { type TextStyle } from 'react-native'
 import { useI18n } from '@/context/I18nContext'
 import type { Locale } from '@/i18n'
 import { storage } from '@/services/storage'
-
-const BODY_FONT_KEY = 'ui-body-font'
-const HEADER_FONT_KEY = 'ui-header-font'
+import { PREF_KEYS } from '@/lib/preferences'
 
 export interface FontOption {
   id: string
@@ -16,9 +14,6 @@ export interface FontOption {
 export const FONT_OPTIONS: FontOption[] = [
   { id: 'system', label: 'System Default' },
   { id: 'serif', label: 'Serif' },
-  { id: 'Padauk', label: 'Padauk', family: 'Padauk' },
-  { id: 'Noto Sans Myanmar', label: 'Noto Sans Myanmar', family: 'Noto Sans Myanmar' },
-  { id: 'Noto Serif Myanmar', label: 'Noto Serif Myanmar', family: 'Noto Serif Myanmar' },
   { id: 'Mon3Anonta1', label: 'Mon3 Anonta1', family: 'Mon3Anonta1' },
   { id: 'MUA_Office_adobe', label: 'MUA Office', family: 'MUA_Office_adobe' },
   { id: 'Pyidaungsu', label: 'Pyidaungsu', family: 'Pyidaungsu' },
@@ -30,17 +25,22 @@ export const FONT_OPTIONS: FontOption[] = [
   { id: 'Style5', label: 'Style 5', family: 'Style5' },
 ]
 
+// Only fonts that ship in assets/fonts (see lib/fonts). Padauk and the Noto
+// Myanmar faces used to be listed here but were never bundled, so choosing them
+// — or falling back to them — rendered Mon text in an unrecognised family.
 export const MON_SAFE_FONT_IDS = new Set<string>([
-  'Padauk',
-  'Noto Sans Myanmar',
-  'Noto Serif Myanmar',
   'Mon3Anonta1',
   'MUA_Office_adobe',
   'Pyidaungsu',
   'PyidaungsuNumbers',
 ])
 
-export const MON_LOCALE_FALLBACK_FONT_ID = 'Padauk'
+export const MON_LOCALE_FALLBACK_FONT_ID = 'Pyidaungsu'
+export const DEFAULT_FONT_ID = 'Pyidaungsu'
+
+function validFontId(id: string | null | undefined): string {
+  return id && FONT_OPTIONS.some((font) => font.id === id) ? id : DEFAULT_FONT_ID
+}
 
 export function getFontFamily(id: string): string | undefined {
   if (id === 'system') return undefined
@@ -66,25 +66,29 @@ interface TypographyContextValue {
 
 const TypographyContext = createContext<TypographyContextValue | undefined>(undefined)
 
-export function TypographyProvider({ children }: { children: React.ReactNode }) {
-  const { locale } = useI18n()
-  const [bodyFont, setBodyFontState] = useState('Pyidaungsu')
-  const [headerFont, setHeaderFontState] = useState('Pyidaungsu')
+/** Font families start-up must load before the first frame, for the given saved choices. */
+export function requiredFontFamilies(
+  saved: { bodyFont?: string | null; headerFont?: string | null },
+  locale: Locale,
+): string[] {
+  return [saved.bodyFont, saved.headerFont]
+    .map((id) => getFontFamily(resolveFontIdForLocale(validFontId(id), locale)))
+    .filter((family): family is string => !!family)
+}
 
-  useEffect(() => {
-    ;(async () => {
-      const [savedBody, savedHeader] = await Promise.all([
-        storage.get(BODY_FONT_KEY),
-        storage.get(HEADER_FONT_KEY),
-      ])
-      if (savedBody && FONT_OPTIONS.some((font) => font.id === savedBody)) {
-        setBodyFontState(savedBody)
-      }
-      if (savedHeader && FONT_OPTIONS.some((font) => font.id === savedHeader)) {
-        setHeaderFontState(savedHeader)
-      }
-    })()
-  }, [])
+export function TypographyProvider({
+  children,
+  initialBodyFont,
+  initialHeaderFont,
+}: {
+  children: React.ReactNode
+  /** Saved choices, read before the first frame (see lib/preferences). */
+  initialBodyFont?: string | null
+  initialHeaderFont?: string | null
+}) {
+  const { locale } = useI18n()
+  const [bodyFont, setBodyFontState] = useState(() => validFontId(initialBodyFont))
+  const [headerFont, setHeaderFontState] = useState(() => validFontId(initialHeaderFont))
 
   const resolvedBodyFontId = resolveFontIdForLocale(bodyFont, locale)
   const resolvedHeaderFontId = resolveFontIdForLocale(headerFont, locale)
@@ -102,13 +106,13 @@ export function TypographyProvider({ children }: { children: React.ReactNode }) 
   const setBodyFont = useCallback((id: string) => {
     if (!FONT_OPTIONS.some((font) => font.id === id)) return
     setBodyFontState(id)
-    void storage.set(BODY_FONT_KEY, id)
+    void storage.set(PREF_KEYS.bodyFont, id)
   }, [])
 
   const setHeaderFont = useCallback((id: string) => {
     if (!FONT_OPTIONS.some((font) => font.id === id)) return
     setHeaderFontState(id)
-    void storage.set(HEADER_FONT_KEY, id)
+    void storage.set(PREF_KEYS.headerFont, id)
   }, [])
 
   const value = useMemo<TypographyContextValue>(

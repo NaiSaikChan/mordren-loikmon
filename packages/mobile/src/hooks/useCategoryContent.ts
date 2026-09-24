@@ -1,68 +1,71 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { books as booksApi, articles as articlesApi } from '@loikmon/api'
-import type { Book, Article } from '@loikmon/api'
-import { parseBooks, parseArticles } from '@/lib/normalize'
-import { matchesCategory, deduplicateById } from '@/lib/categoryFilter'
+import { useCallback, useMemo, useState } from 'react'
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { categories as catApi, errorMessage } from '@loikmon/api'
+import { applyCategoryPage, categoryHasMore, emptyCategoryState, type CategoryPageState } from '@/lib/pagination'
+import { firstPageOnly } from './usePaginatedList'
 
-/** Loads 3 pages of books + articles for a category, filtering client-side. */
-export function useCategoryContent(categoryId: string) {
-  const [books, setBooks] = useState<Book[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(false)
+const PAGE_SIZE = 20
 
-  const load = useCallback(async (id: string) => {
-    setLoading(true)
-    setBooks([])
-    setArticles([])
+type CategoryPage = Parameters<typeof applyCategoryPage>[2]
 
-    const seenBooks = new Set<string>()
-    const seenArticles = new Set<string>()
-    const accBooks: Book[] = []
-    const accArticles: Article[] = []
+export const categoryContentKey = (categoryId: string) => ['category', categoryId, 'content'] as const
 
+function mergePages(data: InfiniteData<CategoryPage, number> | undefined): CategoryPageState {
+  if (!data) return emptyCategoryState
+  return data.pages.reduce((state, page, index) => applyCategoryPage(state, data.pageParams[index] ?? 1, page), emptyCategoryState)
+}
+
+/**
+ * Books and articles of a category, filtered server-side (`categories.getCategory`).
+ * Pages are fetched with `useInfiniteQuery`, so repeated `loadMore` calls
+ * while a page is loading join that request instead of fetching it twice.
+ */
+export function useCategoryContent(categoryId: string | undefined) {
+  const queryClient = useQueryClient()
+  const id = categoryId ?? ''
+  const queryKey = useMemo(() => categoryContentKey(id), [id])
+  const [refreshing, setRefreshing] = useState(false)
+
+  const query = useInfiniteQuery<CategoryPage, Error, InfiniteData<CategoryPage, number>, readonly unknown[], number>({
+    queryKey,
+    queryFn: async ({ pageParam }): Promise<CategoryPage> => (await catApi.getCategory(id, { page: pageParam, limit: PAGE_SIZE })).data,
+    initialPageParam: 1,
+    getNextPageParam: (_last, pages, lastPageParam) => {
+      const merged = pages.reduce((state, page, index) => applyCategoryPage(state, index + 1, page), emptyCategoryState)
+      return categoryHasMore(merged) ? lastPageParam + 1 : undefined
+    },
+    enabled: id !== '',
+  })
+
+  const state = useMemo(() => mergePages(query.data), [query.data])
+  const { refetch, fetchNextPage, hasNextPage, isFetching } = query
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
     try {
-      await Promise.all(
-        [0, 1, 2].map((p) =>
-          Promise.all([
-            booksApi.fetchBooks({ category: id, page: String(p) })
-              .then((res) => {
-                const parsed = parseBooks(res.data)
-                for (const b of parsed) {
-                  const key = String(b.id)
-                  if (matchesCategory(b as any, id) && !seenBooks.has(key)) {
-                    seenBooks.add(key)
-                    accBooks.push(b)
-                  }
-                }
-              })
-              .catch(() => {}),
-            articlesApi.fetchArticles({ category: id, page: String(p), limit: '50' })
-              .then((res) => {
-                const parsed = parseArticles(res.data)
-                for (const a of parsed) {
-                  const key = String(a.id)
-                  if (matchesCategory(a as any, id) && !seenArticles.has(key)) {
-                    seenArticles.add(key)
-                    accArticles.push(a)
-                  }
-                }
-              })
-              .catch(() => {}),
-          ])
-        )
-      )
+      queryClient.setQueryData<InfiniteData<CategoryPage, number>>(queryKey, firstPageOnly)
+      await refetch()
     } finally {
-      setBooks([...accBooks])
-      setArticles([...accArticles])
-      setLoading(false)
+      setRefreshing(false)
     }
-  }, [])
+  }, [queryClient, queryKey, refetch])
 
-  useEffect(() => {
-    if (categoryId) void load(categoryId)
-  }, [categoryId, load])
+  const loadMore = useCallback(async () => {
+    if (!hasNextPage || isFetching) return
+    await fetchNextPage({ cancelRefetch: false })
+  }, [hasNextPage, isFetching, fetchNextPage])
 
-  const refresh = useCallback(() => load(categoryId), [categoryId, load])
-
-  return { books, articles, loading, refresh }
+  return {
+    category: state.category,
+    books: state.books,
+    articles: state.articles,
+    booksTotal: state.booksTotal,
+    articlesTotal: state.articlesTotal,
+    hasMore: categoryHasMore(state),
+    loading: query.isLoading || refreshing,
+    loadingMore: query.isFetchingNextPage,
+    error: query.error ? errorMessage(query.error, 'Failed to load category') : null,
+    refresh,
+    loadMore,
+  }
 }

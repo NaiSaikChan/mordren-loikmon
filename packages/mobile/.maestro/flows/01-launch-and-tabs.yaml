@@ -1,0 +1,20 @@
+appId: org.loikmon.mobile
+name: Cold launch reaches Home and every tab renders
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+- tapOn: "Books"
+- assertVisible: "Books"
+- tapOn: "Articles"
+- assertVisible: "Articles"
+- tapOn: "Categories"
+- assertVisible: "Categories"
+- tapOn: "Library"
+- assertVisible: "Library"
+- tapOn: "Search"
+- assertVisible: "Search"
+- tapOn: "Home"

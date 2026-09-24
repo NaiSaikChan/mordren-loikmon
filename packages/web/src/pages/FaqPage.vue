@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 import { misc } from '@loikmon/api'
+import type { FaqItem } from '@loikmon/api'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 
 const { t } = useI18n()
-const faqs = ref<any[]>([])
+const faqs = ref<FaqItem[]>([])
 const loading = ref(false)
 const openId = ref<string | null>(null)
 
@@ -13,7 +15,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const res = await misc.fetchFaqs()
-    faqs.value = (res.data as any).faqs ?? []
+    faqs.value = res.data.faqs ?? []
     if (faqs.value.length) openId.value = String(faqs.value[0].id)
   } catch { faqs.value = [] }
   finally { loading.value = false }
@@ -23,8 +25,12 @@ function toggle(id: string) {
   openId.value = openId.value === id ? null : id
 }
 
-function isOpen(id: string) {
+function isOpen(id: string | number) {
   return openId.value === String(id)
+}
+
+function answerHtml(faq: FaqItem) {
+  return DOMPurify.sanitize(faq.answer ?? '')
 }
 </script>
 
@@ -59,7 +65,7 @@ function isOpen(id: string) {
               {{ index + 1 }}
             </span>
             <span class="min-w-0 text-base font-semibold leading-7 text-gray-900 dark:text-white sm:text-lg">
-              {{ faq.question ?? faq.name }}
+              {{ faq.question }}
             </span>
           </span>
 
@@ -77,7 +83,7 @@ function isOpen(id: string) {
         >
           <div
             class="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-1 dark:prose-invert"
-            v-html="faq.answer ?? faq.content"
+            v-html="answerHtml(faq)"
           />
         </div>
       </div>

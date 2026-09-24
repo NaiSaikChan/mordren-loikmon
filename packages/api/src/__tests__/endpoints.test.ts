@@ -1,186 +1,125 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import axios from 'axios'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// ── Mock axios so no real HTTP is made ────────────
-vi.mock('axios', async (importOriginal) => {
-  const real = await importOriginal<typeof axios>()
-  const mockInstance = {
-    get: vi.fn().mockResolvedValue({ data: { data: {} } }),
-    post: vi.fn().mockResolvedValue({ data: { data: {} } }),
-    interceptors: {
-      request: { use: vi.fn() },
-      response: { use: vi.fn() },
-    },
-    defaults: { baseURL: '/api', timeout: 15000, headers: {} },
-  }
-  return {
-    ...real,
-    default: {
-      ...real,
-      create: vi.fn(() => mockInstance),
-    },
-    create: vi.fn(() => mockInstance),
+const http = { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }
+vi.mock('../client.js', () => ({ getClient: () => http }))
+
+import { articles } from '../endpoints/articles.js'
+import { auth } from '../endpoints/auth.js'
+import { authors } from '../endpoints/authors.js'
+import { books } from '../endpoints/books.js'
+import { categories } from '../endpoints/categories.js'
+import { library } from '../endpoints/library.js'
+import { media } from '../endpoints/media.js'
+import { misc } from '../endpoints/misc.js'
+import { reviews } from '../endpoints/reviews.js'
+import { search } from '../endpoints/search.js'
+import { formatPlanPrice, isLocked, storeSkus, subscriptions } from '../endpoints/subscriptions.js'
+import type { Plan } from '../types.js'
+
+beforeEach(() => {
+  for (const fn of Object.values(http)) {
+    fn.mockReset()
+    fn.mockResolvedValue({ data: { status: 'ok' } })
   }
 })
 
-describe('@loikmon/api — Endpoint modules (mocked Axios)', () => {
+describe('auth', () => {
+  it('uses the v1 auth routes and never sends the email as identity', async () => {
+    await auth.login({ email: 'a@b.c', password: 'secret123' })
+    expect(http.post).toHaveBeenCalledWith('auth/login', { email: 'a@b.c', password: 'secret123' })
+    await auth.register({ email: 'a@b.c', password: 'secret123', firstname: 'Nai' })
+    expect(http.post).toHaveBeenCalledWith('auth/register', { email: 'a@b.c', password: 'secret123', firstname: 'Nai' })
+    await auth.me()
+    expect(http.get).toHaveBeenCalledWith('auth/me')
+    await auth.updateProfile({ phone: '099' })
+    expect(http.patch).toHaveBeenCalledWith('auth/me', { phone: '099' })
+    await auth.forgotPassword('a@b.c')
+    expect(http.post).toHaveBeenCalledWith('auth/password/forgot', { email: 'a@b.c' })
+    await auth.confirmPasswordReset('tok', 'new-password')
+    expect(http.post).toHaveBeenCalledWith('auth/password/reset', { token: 'tok', new_password: 'new-password' })
+    await auth.deleteAccount('pw')
+    expect(http.delete).toHaveBeenCalledWith('auth/me', { data: { password: 'pw' } })
+    await auth.logout()
+    expect(http.post).toHaveBeenCalledWith('auth/logout')
+  })
+})
 
-  describe('URL path constants', () => {
-    // Validate all API paths are correctly formed strings
-    const PATHS = {
-      // auth
-      loginapp: 'loginapp',
-      createaccount: 'createaccount',
-      resetpassword: 'resetpassword',
-      resendVerificationMail: 'resendVerificationMail',
-      updateUserProfile: 'updateUserProfile',
-      deletemyaccount: 'deletemyaccount',
-      // books
-      fetchbooks: 'fetchbooks',
-      fetchotherbooks: 'fetchotherbooks',
-      getitem: 'getitem',
-      getBookChapters: 'getBookChapters',
-      relatedbooks: 'relatedbooks',
-      ratebook: 'ratebook',
-      purchasebook: 'purchasebook',
-      // articles
-      fetcharticles: 'fetcharticles',
-      purchasearticle: 'purchasearticle',
-      // authors
-      fetchauthors: 'fetchauthors',
-      getauthor: 'getauthor',
-      follow_unfollow_author: 'follow_unfollow_author',
-      // categories
-      fetchcategories: 'fetchcategories',
-      fetch_app_categories: 'fetch_app_categories',
-      // media
-      fetch_media: 'fetch_media',
-      getTrendingMedia: 'getTrendingMedia',
-      likeunlikemedia: 'likeunlikemedia',
-      // reviews
-      submitreview: 'submitreview',
-      loadreviews: 'loadreviews',
-      // purchases
-      fetchcoins: 'fetchcoins',
-      getusercoins: 'getusercoins',
-      loadbanks: 'loadbanks',
-      // misc
-      initapp: 'initapp',
-      search: 'search',
-      fetchfaqs: 'fetchfaqs',
-      fetch_inbox: 'fetch_inbox',
-    }
-
-    it('all path names are non-empty strings without leading slashes', () => {
-      Object.entries(PATHS).forEach(([name, path]) => {
-        expect(typeof path).toBe('string')
-        expect(path.length).toBeGreaterThan(0)
-        expect(path.startsWith('/')).toBe(false)
-      })
-    })
-
-    it('has 30+ distinct endpoint paths', () => {
-      const unique = new Set(Object.values(PATHS))
-      expect(unique.size).toBeGreaterThanOrEqual(30)
-    })
+describe('catalogue', () => {
+  it('lists and fetches books, files, chapters and progress', async () => {
+    await books.fetchBooks({ page: 2, category: 5, sort: 'popular' })
+    expect(http.get).toHaveBeenCalledWith('books', { params: { page: 2, category: 5, sort: 'popular' } })
+    await books.getBook(7)
+    expect(http.get).toHaveBeenCalledWith('books/7')
+    await books.getFileUrl(7, 'epub')
+    expect(http.get).toHaveBeenCalledWith('books/7/file', { params: { format: 'epub' } })
+    await books.getChapters(7)
+    expect(http.get).toHaveBeenCalledWith('books/7/chapters')
+    await books.updateTotalViews(7)
+    expect(http.post).toHaveBeenCalledWith('books/7/views')
+    await books.saveProgress(7, { format: 'pdf', location: '12', progress: 30 })
+    expect(http.put).toHaveBeenCalledWith('books/7/progress', { format: 'pdf', location: '12', progress: 30 })
   })
 
-  describe('Endpoint group coverage', () => {
-    const endpointGroups = ['auth', 'books', 'articles', 'authors', 'categories', 'media', 'reviews', 'purchases', 'misc']
+  it('covers articles, authors, categories, search, library, reviews and misc', async () => {
+    await articles.fetchArticles({ category: 3 })
+    expect(http.get).toHaveBeenCalledWith('articles', { params: { category: 3 } })
+    await articles.getArticle(9)
+    expect(http.get).toHaveBeenCalledWith('articles/9')
+    await authors.followUnfollow(4, false)
+    expect(http.put).toHaveBeenCalledWith('authors/4/follow')
+    await authors.followUnfollow(4, true)
+    expect(http.delete).toHaveBeenCalledWith('authors/4/follow')
+    await categories.fetchCategories('article')
+    expect(http.get).toHaveBeenCalledWith('categories', { params: { type: 'article' } })
+    await search.search('ဇာတ်', { type: 'book' })
+    expect(http.get).toHaveBeenCalledWith('search', { params: { q: 'ဇာတ်', type: 'book', page: 1, limit: 20 } })
+    await library.add('book', 7)
+    expect(http.put).toHaveBeenCalledWith('library/book/7')
+    await reviews.submitReview({ item_type: 'article', item_id: 9, rating: 5, content: 'ကောန်' })
+    expect(http.post).toHaveBeenCalledWith('reviews', { item_type: 'article', item_id: 9, rating: 5, content: 'ကောန်' })
+    await reviews.loadReviews('book', 7)
+    expect(http.get).toHaveBeenCalledWith('reviews', { params: { item_type: 'book', item_id: 7, page: 1, limit: 20 } })
+    await misc.home()
+    expect(http.get).toHaveBeenCalledWith('home')
+    await media.fetchAudioBooks()
+    expect(http.get).toHaveBeenCalledWith('books', { params: { has_audio: true, page: 1, limit: 20, sort: 'latest' } })
+  })
+})
 
-    it('has exactly 9 endpoint groups', () => {
-      expect(endpointGroups).toHaveLength(9)
-    })
-
-    it('all group names are lowercase strings', () => {
-      endpointGroups.forEach(g => {
-        expect(g).toBe(g.toLowerCase())
-      })
-    })
+describe('subscriptions', () => {
+  it('verifies store purchases with the proof expected by the backend', async () => {
+    await subscriptions.verifyApplePurchase('eyJ.jws.sig')
+    expect(http.post).toHaveBeenCalledWith('subscriptions/verify', { platform: 'ios', transaction_jws: 'eyJ.jws.sig' })
+    await subscriptions.verifyGooglePurchase('loikmon_premium', 'play-token')
+    expect(http.post).toHaveBeenCalledWith('subscriptions/verify', { platform: 'android', product_id: 'loikmon_premium', purchase_token: 'play-token' })
+    await subscriptions.restore([{ platform: 'ios', transaction_jws: 'a.b.c' }])
+    expect(http.post).toHaveBeenCalledWith('subscriptions/restore', { purchases: [{ platform: 'ios', transaction_jws: 'a.b.c' }] })
+    await subscriptions.getStatus()
+    expect(http.get).toHaveBeenCalledWith('subscriptions/me')
   })
 
-  describe('payload shape validation', () => {
-    it('LoginPayload has email + password', () => {
-      const payload = { email: 'a@b.com', password: 'abc123' }
-      expect(payload).toHaveProperty('email')
-      expect(payload).toHaveProperty('password')
-    })
-
-    it('RegisterPayload has password_confirmation', () => {
-      const payload = {
-        name: 'Test', email: 'test@test.com',
-        password: '12345678', password_confirmation: '12345678'
-      }
-      expect(payload.password).toBe(payload.password_confirmation)
-    })
-
-    it('review submit payload requires comment', () => {
-      const payload = { book_id: 1, rating: 4, comment: 'Great book!' }
-      expect(payload.comment.length).toBeGreaterThan(0)
-    })
-
-    it('purchase payload includes item_id', () => {
-      const payload = { book_id: 5, payment_method: 'coins', amount: 500 }
-      expect(payload.book_id).toBe(5)
-    })
-
-    it('search query is trimmed before sending', () => {
-      const raw = '  mon poetry  '
-      const trimmed = raw.trim()
-      expect(trimmed).toBe('mon poetry')
-    })
-
-    it('getChapters sends { book_id } not { bookid }', async () => {
-      const { books } = await import('../endpoints/books.js')
-      await books.getChapters(72)
-      const { default: axios } = await import('axios')
-      const mockInstance = (axios.create as vi.Mock)()
-      expect(mockInstance.post).toHaveBeenCalledWith('getBookChapters', { book_id: 72 })
-    })
-
-    it('getArticle loads a single article via the generic item endpoint', async () => {
-      const { articles } = await import('../endpoints/articles.js')
-      await articles.getArticle(290)
-      const { default: axios } = await import('axios')
-      const mockInstance = (axios.create as vi.Mock)()
-      expect(mockInstance.post).toHaveBeenCalledWith('getitem', { type: 'article', id: 290 })
-    })
-
-    it('fetchCategories sends the book category payload by default', async () => {
-      const { categories } = await import('../endpoints/categories.js')
-      await categories.fetchCategories('book', 0)
-      const { default: axios } = await import('axios')
-      const mockInstance = (axios.create as vi.Mock)()
-      expect(mockInstance.post).toHaveBeenCalledWith('fetchcategories', { type: 'book', page: 0 })
-    })
-
-    it('fetchCategories sends the article category payload when requested', async () => {
-      const { categories } = await import('../endpoints/categories.js')
-      await categories.fetchCategories('article', 0)
-      const { default: axios } = await import('axios')
-      const mockInstance = (axios.create as vi.Mock)()
-      expect(mockInstance.post).toHaveBeenCalledWith('fetchcategories', { type: 'article', page: 0 })
-    })
+  const plan = (code: string, apple: string, cents: number): Plan => ({
+    code,
+    name: code,
+    description: null,
+    price_cents: cents,
+    price: (cents / 100).toFixed(2),
+    currency: 'USD',
+    period_months: 1,
+    monthly_price_cents: cents,
+    savings_percent: 0,
+    apple_product_id: apple,
+    google_product_id: 'loikmon_premium',
+    google_base_plan_id: code,
   })
 
-  describe('response envelope unwrapping', () => {
-    it('{ data: { data: T } } — outer .data is axios, inner .data is API', () => {
-      const axiosResponse = { data: { data: { books: [{ id: 1, title: 'Test' }] } } }
-      const books = axiosResponse.data.data.books
-      expect(books).toHaveLength(1)
-      expect(books[0].title).toBe('Test')
-    })
-
-    it('handles empty data gracefully with fallback', () => {
-      const axiosResponse = { data: { data: null as { books?: unknown[] } | null } }
-      const books = axiosResponse.data.data?.books ?? []
-      expect(books).toEqual([])
-    })
-
-    it('handles missing data key with fallback', () => {
-      const axiosResponse = { data: {} } as any
-      const books = axiosResponse.data?.data?.books ?? []
-      expect(books).toEqual([])
-    })
+  it('derives store SKUs, lock state and fallback prices', () => {
+    const plans = [plan('monthly', 'org.loikmon.mobile.premium.monthly', 400), plan('yearly', 'org.loikmon.mobile.premium.yearly', 4500)]
+    expect(storeSkus(plans, 'ios')).toEqual(['org.loikmon.mobile.premium.monthly', 'org.loikmon.mobile.premium.yearly'])
+    expect(storeSkus(plans, 'android')).toEqual(['loikmon_premium'])
+    expect(isLocked({ is_free: false }, null)).toBe(true)
+    expect(isLocked({ is_free: true }, null)).toBe(false)
+    expect(isLocked({ is_free: false }, { active: true, source: 'subscription', expires_at: null, subscription: null })).toBe(false)
+    expect(formatPlanPrice(plans[1]!)).toBe('$45.00')
   })
 })

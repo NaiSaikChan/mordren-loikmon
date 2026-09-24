@@ -1,70 +1,145 @@
-import { ScrollView, View, Text, Pressable, Image } from 'react-native'
+import { memo, useCallback } from 'react'
+import { ScrollView, View, Text, Pressable, RefreshControl } from 'react-native'
+import { Image } from 'expo-image'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useReducedMotion } from 'react-native-reanimated'
+import type { Book } from '@loikmon/api'
 import { Screen } from '@/components/Screen'
 import { SectionHeader } from '@/components/SectionHeader'
-import { BookCard } from '@/components/BookCard'
+import { BookCard, CARD_MAX_FONT_SCALE } from '@/components/BookCard'
 import { ArticleCard } from '@/components/ArticleCard'
 import { AuthorCard } from '@/components/AuthorCard'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
-import { useBooks } from '@/hooks/useBooks'
-import { useArticles } from '@/hooks/useArticles'
-import { useAuthors } from '@/hooks/useAuthors'
+import { ListSkeleton, Skeleton } from '@/components/Skeleton'
+import { useHome } from '@/hooks/useHome'
 import { useI18n } from '@/context/I18nContext'
 import { useAuth } from '@/context/AuthContext'
 import { useTypography } from '@/context/TypographyContext'
-import { useAudio } from '@/context/AudioContext'
-import { useBookAudioChapters } from '@/hooks/useBookAudioChapters'
-import type { AudioTrack } from '@/lib/audio'
+import { pickImage } from '@/lib/url'
+import { useThemeColors } from '@/theme/colors'
 
-function AudioBookCard({ track }: { track: AudioTrack }) {
-  const { play, current, isPlaying, toggle } = useAudio()
-  const { bodyTextStyle, headerTextStyle } = useTypography()
-  const titleStyle = bodyTextStyle
-  const bodyStyle = bodyTextStyle
-  const headerPreviewStyle = headerTextStyle
-  const isCurrent = current && current.url === track.url
+const AUDIO_CARD_WIDTH = 144
+const AUDIO_CARD_STYLE = { width: AUDIO_CARD_WIDTH, marginRight: 12 } as const
+const CAROUSEL_CONTENT = { paddingLeft: 16, paddingRight: 4, alignItems: 'stretch' } as const
+const SCROLL_CONTENT = { paddingBottom: 12 } as const
+
+const goSettings = () => router.push('/settings')
+const goLogin = () => router.push('/(auth)/login')
+const goSearch = () => router.push('/search')
+const goSubscribe = () => router.push('/subscribe')
+const goBooks = () => router.push('/books')
+const goAudio = () => router.push('/audio')
+const goArticles = () => router.push('/articles')
+const goAuthors = () => router.push('/authors')
+
+const AudioBookCard = memo(function AudioBookCard({ book }: { book: Book }) {
+  const { bodyTextStyle } = useTypography()
+  const colors = useThemeColors()
+  const reduceMotion = useReducedMotion()
+  const cover = pickImage(book, AUDIO_CARD_WIDTH)
+  const id = book.id
+  const onPress = useCallback(
+    () => router.push({ pathname: '/audiobook/[id]', params: { id: String(id) } }),
+    [id],
+  )
 
   return (
     <Pressable
-      onPress={() => {
-        if (isCurrent) {
-          void toggle()
-        } else {
-          void play(track)
-        }
-      }}
-      className="mr-3 w-36"
+      onPress={onPress}
+      style={AUDIO_CARD_STYLE}
+      className="active:opacity-80"
+      accessibilityRole="button"
+      accessibilityLabel={[book.title, book.authorname].filter(Boolean).join(', ')}
     >
-      <View className="aspect-[3/4] overflow-hidden rounded-xl bg-surface-200 dark:bg-surface-800">
-        {track.cover ? (
-          <Image source={{ uri: track.cover }} className="h-full w-full" resizeMode="cover" />
+      <View className="aspect-[3/4] overflow-hidden rounded-control bg-surface-200 dark:bg-surface-800">
+        {cover ? (
+          <Image
+            source={cover}
+            style={{ width: '100%', height: '100%' }}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={String(id)}
+            transition={reduceMotion ? 0 : 150}
+            accessible={false}
+          />
         ) : (
           <View className="h-full w-full items-center justify-center">
-            <Text className="text-4xl" style={headerPreviewStyle}>🎧</Text>
+            <Text className="text-4xl">🎧</Text>
           </View>
         )}
         <View className="absolute inset-0 items-center justify-center bg-black/20">
-          <Ionicons
-            name={isCurrent && isPlaying ? 'pause' : 'play'}
-            size={32}
-            color="#ffffff"
-          />
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-audio-500/90">
+            <Ionicons name="headset" size={24} color={colors.onImage} />
+          </View>
         </View>
       </View>
       <Text
         numberOfLines={1}
+        maxFontSizeMultiplier={CARD_MAX_FONT_SCALE}
         className="mt-2 text-xs font-medium text-surface-900 dark:text-surface-50"
-        style={titleStyle}
+        style={bodyTextStyle}
       >
-        {track.title}
+        {book.title}
       </Text>
-      {track.artist ? (
-        <Text numberOfLines={1} className="text-[10px] text-surface-400" style={bodyStyle}>
-          {track.artist}
+      {book.authorname ? (
+        <Text
+          numberOfLines={1}
+          maxFontSizeMultiplier={CARD_MAX_FONT_SCALE}
+          className="text-2xs text-surface-500 dark:text-surface-400"
+          style={bodyTextStyle}
+        >
+          {book.authorname}
         </Text>
       ) : null}
     </Pressable>
+  )
+})
+
+/** Subscription status chip: "Premium" when active, otherwise a link to the paywall. */
+function PremiumChip() {
+  const { t } = useI18n()
+  const { entitlement } = useAuth()
+  const { bodyTextStyle } = useTypography()
+  const colors = useThemeColors()
+  const active = Boolean(entitlement?.active)
+  const label = active ? t('home.premiumActive') : t('home.goPremium')
+
+  return (
+    <Pressable
+      onPress={goSubscribe}
+      className={`min-h-touch flex-row items-center rounded-full px-3 active:opacity-70 ${
+        active ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-brand-50 dark:bg-brand-900/30'
+      }`}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Ionicons name={active ? 'star' : 'diamond-outline'} size={15} color={active ? colors.premium : colors.brand} />
+      <Text
+        className={`ml-1 text-sm ${active ? 'text-amber-700 dark:text-amber-300' : 'text-brand-600 dark:text-brand-300'}`}
+        style={bodyTextStyle}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  )
+}
+
+function HomeSkeleton() {
+  return (
+    <View>
+      <View className="mt-5 px-4">
+        <Skeleton height={20} width={160} />
+      </View>
+      <View className="mt-3 flex-row px-4">
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={{ width: 132, marginRight: 12 }}>
+            <Skeleton height={176} />
+            <Skeleton height={12} width="80%" style={{ marginTop: 10 }} />
+          </View>
+        ))}
+      </View>
+      <ListSkeleton rows={3} />
+    </View>
   )
 }
 
@@ -72,135 +147,121 @@ export default function HomeScreen() {
   const { t } = useI18n()
   const { user, isLoggedIn } = useAuth()
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const titleStyle = bodyTextStyle
-  const bodyStyle = bodyTextStyle
-  const headerPreviewStyle = headerTextStyle
-  const books = useBooks()
-  const articles = useArticles()
-  const authors = useAuthors()
-  const { tracks: featuredAudioTracks } = useBookAudioChapters(undefined, t('home.audiobooks'))
+  const colors = useThemeColors()
+  const home = useHome()
+  const { refresh } = home
+  const onRefresh = useCallback(() => void refresh(), [refresh])
 
   return (
     <Screen>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 12 }}
+        contentContainerStyle={SCROLL_CONTENT}
         nestedScrollEnabled
+        refreshControl={
+          <RefreshControl
+            refreshing={home.refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.brand}
+            colors={[colors.brandSolid]}
+          />
+        }
       >
         {/* Header */}
-        <View className="flex-row items-center justify-between px-4 pb-1">
-          <View>
-            <Text className="text-xl text-surface-500 dark:text-surface-400 pt-safe" style={headerPreviewStyle}>
+        <View className="flex-row items-center justify-between px-4 pb-1 pt-3">
+          <View className="flex-1 pr-2">
+            <Text className="text-xl text-surface-500 dark:text-surface-400" style={headerTextStyle}>
               {t('home.greeting')}
             </Text>
-            <Text className="text-2xl text-surface-900 dark:text-surface-50" style={titleStyle}>
+            <Text
+              numberOfLines={1}
+              className="text-2xl text-surface-900 dark:text-surface-50"
+              style={bodyTextStyle}
+              accessibilityRole="header"
+            >
               {isLoggedIn ? (user?.name ?? 'Loikmon') : 'Loikmon'}
             </Text>
           </View>
-          <View className="flex-row items-center gap-3 pt-safe">
+          <View className="flex-row items-center gap-1">
             {isLoggedIn ? (
-              <Pressable
-                onPress={() => router.push('/purchases')}
-                className="flex-row items-center rounded-full bg-brand-50 dark:bg-brand-900/30 px-3 py-1.5"
-              >
-                <Ionicons name="server-outline" size={16} color="#2563eb" />
-                <Text className="ml-1 text-sm text-brand-600 dark:text-brand-300" style={bodyStyle}>
-                  {Number(user?.coins ?? 0)}
-                </Text>
-              </Pressable>
+              <PremiumChip />
             ) : (
               <Pressable
-                onPress={() => router.push('/(auth)/login')}
-                className="items-center justify-center rounded-full bg-brand-600 px-5 py-2"
+                onPress={goLogin}
+                className="min-h-touch items-center justify-center rounded-full bg-brand-600 px-5 active:opacity-80"
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.login')}
               >
-                <Text
-                  className="text-sm font-normal text-white pt-1"
-                  style={bodyStyle}
-                >
+                <Text className="text-sm font-normal text-white" style={bodyTextStyle}>
                   {t('auth.login')}
                 </Text>
               </Pressable>
             )}
-            <Pressable onPress={() => router.push('/settings')} hitSlop={8}>
-              <Ionicons name="settings-outline" size={24} color="#94a3b8" />
+            <Pressable
+              onPress={goSettings}
+              className="min-h-touch min-w-touch items-center justify-center rounded-full active:opacity-60"
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.settings')}
+            >
+              <Ionicons name="settings-outline" size={24} color={colors.mutedText} />
             </Pressable>
           </View>
         </View>
 
         {/* Search */}
         <Pressable
-          onPress={() => router.push('/search')}
-          className="mx-4 mt-3 flex-row items-center rounded-xl bg-white dark:bg-surface-800 px-3 py-2.5"
+          onPress={goSearch}
+          className="mx-4 mt-3 min-h-[48px] flex-row items-center rounded-control bg-white px-3 active:opacity-80 dark:bg-surface-800"
+          accessibilityRole="button"
+          accessibilityLabel={t('search.placeholder')}
         >
-          <Ionicons name="search" size={18} color="#94a3b8" />
-          <Text
-            numberOfLines={1}
-            className="ml-2 flex-1 text-base text-surface-400"
-            style={bodyStyle}
-          >
+          <Ionicons name="search" size={18} color={colors.placeholder} />
+          <Text numberOfLines={1} className="ml-2 flex-1 text-base text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
             {t('search.placeholder')}
           </Text>
         </Pressable>
 
-        {/* Latest books */}
-        <SectionHeader
-          title={t('home.latestBooks')}
-          actionLabel={t('home.seeAll')}
-          onAction={() => router.push('/books')}
-        />
-        {books.loading ? (
-          <LoadingSpinner />
+        {home.loading ? (
+          <HomeSkeleton />
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 16, paddingRight: 4, alignItems: 'flex-start' }}
-          >
-            {books.items.slice(0, 12).map((item) => (
-              <BookCard key={String(item.id)} book={item} />
-            ))}
-          </ScrollView>
+          <>
+            {/* Latest books */}
+            <SectionHeader title={t('home.latestBooks')} actionLabel={t('home.seeAll')} onAction={goBooks} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={CAROUSEL_CONTENT}>
+              {home.latestBooks.map((item) => (
+                <BookCard key={String(item.id)} book={item} />
+              ))}
+            </ScrollView>
+
+            {/* Audiobooks */}
+            {home.audioBooks.length > 0 ? (
+              <>
+                <SectionHeader title={t('home.audiobooks')} actionLabel={t('home.seeAll')} onAction={goAudio} />
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={CAROUSEL_CONTENT}>
+                  {home.audioBooks.slice(0, 10).map((book) => (
+                    <AudioBookCard key={String(book.id)} book={book} />
+                  ))}
+                </ScrollView>
+              </>
+            ) : null}
+
+            {/* Latest articles */}
+            <SectionHeader title={t('home.latestArticles')} actionLabel={t('home.seeAll')} onAction={goArticles} />
+            <View className="px-4">
+              {home.articles.slice(0, 4).map((article) => (
+                <ArticleCard key={String(article.id)} article={article} />
+              ))}
+            </View>
+
+            {/* Popular authors */}
+            <SectionHeader title={t('home.popularAuthors')} actionLabel={t('home.seeAll')} onAction={goAuthors} />
+            <View className="px-4">
+              {home.authors.slice(0, 4).map((author) => (
+                <AuthorCard key={String(author.id)} author={author} />
+              ))}
+            </View>
+          </>
         )}
-
-        {/* Featured audiobooks */}
-        {featuredAudioTracks.length > 0 ? (
-          <SectionHeader title={t('home.audiobooks')}/>
-        ) : null}
-        {featuredAudioTracks.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 16, paddingRight: 4, alignItems: 'flex-start' }}
-          >
-            {featuredAudioTracks.slice(0, 10).map((track) => (
-              <AudioBookCard key={String(track.id)} track={track} />
-            ))}
-          </ScrollView>
-        ) : null}
-
-        {/* Latest articles */}
-        <SectionHeader
-          title={t('home.latestArticles')}
-          actionLabel={t('home.seeAll')}
-          onAction={() => router.push('/articles')}
-        />
-        <View className="px-4">
-          {articles.items.slice(0, 4).map((article) => (
-            <ArticleCard key={String(article.id)} article={article} />
-          ))}
-        </View>
-
-        {/* Popular authors */}
-        <SectionHeader
-          title={t('home.popularAuthors')}
-          actionLabel={t('home.seeAll')}
-          onAction={() => router.push('/authors')}
-        />
-        <View className="px-4">
-          {authors.items.slice(0, 4).map((author) => (
-            <AuthorCard key={String(author.id)} author={author} />
-          ))}
-        </View>
       </ScrollView>
     </Screen>
   )

@@ -1,63 +1,53 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
-import { articles as articlesApi } from '@loikmon/api'
-import type { Article } from '@loikmon/api'
+import { articles as articlesApi, errorCode } from '@loikmon/api'
+import type { Article, ArticleDetail, ArticleQuery, Pagination } from '@loikmon/api'
 
 export const useArticlesStore = defineStore('articles', () => {
-  const list    = ref<Article[]>([])
-  const detail  = shallowRef<Article | null>(null)   // ← was undefined, must be null
-  const loading = ref(false)
-  const total   = shallowRef(0)
+  const list        = ref<Article[]>([])
+  const pagination  = shallowRef<Pagination | null>(null)
+  const total       = shallowRef(0)
+  const detail      = shallowRef<ArticleDetail | null>(null)
+  const loading     = ref(false)
+  const detailError = ref<string | null>(null)
 
-  async function fetchArticles(params?: Record<string, unknown>, append = false): Promise<number> {
+  /** Server-side filtered, 1-based page of articles (without bodies). */
+  async function fetchArticles(params: ArticleQuery = {}, append = false) {
     loading.value = true
     try {
-      const res   = await articlesApi.fetchArticles(params)
-      const body  = res.data as any
-      const items: Article[] = body.articles ?? body.data?.articles ?? (Array.isArray(body) ? body : [])
-      const t = body.total ?? body.data?.total ?? body.count ?? body.data?.count
-      if (t != null) total.value = Number(t)
-      list.value  = append ? [...list.value, ...items] : items
-      return items.length
+      const { data } = await articlesApi.fetchArticles(params)
+      const items = data.articles ?? []
+      list.value = append ? [...list.value, ...items] : items
+      total.value = Number(data.total ?? data.pagination?.total ?? list.value.length)
+      pagination.value = data.pagination ?? null
+      return data
     } finally {
       loading.value = false
     }
   }
 
+  /**
+   * Always asks the server: list items carry no body, and only the detail
+   * endpoint knows whether the viewer may read `content` / `audio_url`.
+   */
   async function fetchDetail(id: string | number) {
     loading.value = true
+    detailError.value = null
     try {
-      // 1. Check list cache first — avoids an extra API round-trip
-      const cached = list.value.find(a => String(a.id) === String(id))
-      if (cached) {
-        detail.value = cached
-        return
-      }
-
-      // 2. Call the generic article detail endpoint
-      try {
-        const res  = await articlesApi.getArticle(id)
-        const body = res.data as any
-        const found = body.article ?? body.data?.article ?? null
-        if (found && found.id) {
-          detail.value = found
-          return
-        }
-      } catch { /* fallthrough to bulk fetch */ }
-
-      // 3. Last resort: fetch all articles and find by id
-      const res  = await articlesApi.fetchArticles()
-      const body = res.data as any
-      list.value  = body.articles ?? []
-      detail.value = list.value.find(a => String(a.id) === String(id)) ?? null
+      const { data } = await articlesApi.getArticle(id)
+      detail.value = data.article ?? null
+    } catch (err) {
+      detail.value = null
+      detailError.value = errorCode(err)
     } finally {
       loading.value = false
     }
+    return detail.value
   }
 
-  function setDetail(article: Article) {
-    detail.value = article
+  function setInLibrary(inLibrary: boolean) {
+    if (detail.value) detail.value = { ...detail.value, in_library: inLibrary }
   }
 
-  return { list, detail, loading, total, fetchArticles, fetchDetail, setDetail }
+  return { list, pagination, total, detail, loading, detailError, fetchArticles, fetchDetail, setInLibrary }
 })

@@ -1,14 +1,21 @@
 import { getClient } from '../client.js'
+import type { Article, Book, Category, Id } from '../types.js'
+
+type CategoryDetailResponse = {
+  status: 'ok'
+  category: Category
+  books: Book[]
+  articles: Article[]
+  books_total: number
+  articles_total: number
+}
 
 export const categories = {
-  fetchCategories: (type: 'book' | 'article' = 'book', page = 0) =>
-    getClient().post<any>('fetchcategories', { type, page }),
+  /** Categories usable for `type` ('book' | 'article'); omit to get all. */
+  fetchCategories: (type?: 'book' | 'article') =>
+    getClient().get<{ status: 'ok'; categories: Category[] }>('categories', { params: type ? { type } : undefined }),
 
-  // Flutter: { author, type:'book', page:0 }
-  fetchAuthorCategories: (authorId: string | number, type = 'book', page = 0) =>
-    getClient().post<any>('fetchauthorcategories', { author: authorId, type, page }),
-
-  // Books filtered by category: cat + optional subcategory, page
-  fetchBooksByCategory: (category: string | number, subcategory?: string | number, page = 0) =>
-    getClient().post<any>('fetchbooks', { category, ...(subcategory ? { subcategory } : {}), page: String(page) }),
+  /** Category with its books and articles (paginated together). */
+  getCategory: (id: Id | string, params: { page?: number; limit?: number } = {}) =>
+    getClient().get<CategoryDetailResponse>(`categories/${id}`, { params }),
 }

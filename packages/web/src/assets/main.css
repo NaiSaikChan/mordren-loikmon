@@ -20,9 +20,29 @@
   --color-brand-900: oklch(0.22 0.13 270);
   --color-brand-950: oklch(0.14 0.09 270);
 
+  /* Audio accent — the audiobook identity, distinct from the indigo brand ramp.
+     Used for listening surfaces only (player, audio badges, progress). */
+  --color-audio-50:  oklch(0.97 0.02 85);
+  --color-audio-100: oklch(0.94 0.04 85);
+  --color-audio-200: oklch(0.89 0.07 85);
+  --color-audio-300: oklch(0.83 0.10 85);
+  --color-audio-400: oklch(0.77 0.12 85);
+  --color-audio-500: oklch(0.70 0.13 85);
+  --color-audio-600: oklch(0.61 0.12 85);
+  --color-audio-700: oklch(0.50 0.10 85);
+  --color-audio-800: oklch(0.39 0.08 85);
+  --color-audio-900: oklch(0.29 0.06 85);
+  --color-audio-950: oklch(0.19 0.04 85);
+
   /* Surface/background neutrals */
   --color-surface-50:  oklch(0.985 0 0);
   --color-surface-100: oklch(0.97 0 0);
+  --color-surface-200: oklch(0.92 0 0);
+  --color-surface-300: oklch(0.87 0 0);
+  --color-surface-400: oklch(0.71 0.002 264);
+  --color-surface-500: oklch(0.56 0.004 264);
+  --color-surface-600: oklch(0.44 0.004 264);
+  --color-surface-700: oklch(0.31 0.004 264);
   --color-surface-800: oklch(0.18 0.004 264);
   --color-surface-900: oklch(0.13 0.004 264);
   --color-surface-950: oklch(0.09 0.004 264);
@@ -222,6 +242,18 @@
     @apply transition-colors text-sm;
   }
 
+  /*
+   * Required-field feedback: only flag an empty/invalid required field once the
+   * user has actually interacted with it (or tried to submit), never on load.
+   * Border width changes alongside colour so the state isn't colour-only.
+   */
+  .input:user-invalid {
+    @apply border-2 border-red-500 dark:border-red-500;
+  }
+  .input:required:user-valid {
+    @apply border-green-600 dark:border-green-500;
+  }
+
   /* Badges */
   .badge {
     @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
@@ -260,6 +292,15 @@
   .nav-link.active {
     @apply bg-brand-50 text-brand-700;
     @apply dark:bg-brand-900/30 dark:text-brand-300;
+  }
+
+  /* Footer link — quieter than a body link, still clearly interactive. */
+  .footer-link {
+    @apply inline-block text-sm text-gray-500 no-underline;
+    @apply hover:text-brand-600 hover:underline;
+    @apply dark:text-gray-400 dark:hover:text-brand-300;
+    @apply transition-colors;
+    line-height: 1.75;   /* override global 2.0 for a compact link list */
   }
 
   /* Layout helpers */
@@ -384,6 +425,20 @@
   }
 }
 
+/* ── Site footer bottom inset ─────────────────────────────────────── */
+/* The global audio player is fixed to the bottom of the viewport. While a
+   track is loaded, AudioPlayer puts `.audio-player-open` on <html> so the
+   footer can clear the mini bar and keep its legal row visible.
+   Unscoped on purpose: Vue's scoped-style compiler rewrites a
+   `:global(html…) .child` selector into `html…` alone.                      */
+.app-footer-inner {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+
+html.audio-player-open .app-footer-inner {
+  padding-bottom: calc(4.5rem + max(env(safe-area-inset-bottom), 0px));
+}
+
 /* ── Heading font scale (unlayered — wins over Tailwind text-size utilities) ── */
 /* Defaults match Tailwind text-2xl / text-xl / text-lg / text-base / text-sm  */
 /* --ui-header-scale is set by the ui store font settings (default: 1)          */
@@ -392,3 +447,65 @@ h2           { font-size: calc(1.25rem  * var(--ui-header-scale, 1)); }
 h3           { font-size: calc(1.125rem * var(--ui-header-scale, 1)); }
 h4           { font-size: calc(1rem     * var(--ui-header-scale, 1)); }
 h5, h6       { font-size: calc(0.875rem * var(--ui-header-scale, 1)); }
+
+/* ── CMS print support ────────────────────────────────────────────── */
+/* `printSection(id)` tags one element with [data-print-root] and adds
+   .cms-printing to <body>. Visibility (not display) is used so the print
+   root's ancestors stay in the layout while everything else disappears —
+   the browser's print dialog then produces just that fragment, and its
+   "Save as PDF" option is what "export as PDF" means here.               */
+@media print {
+  .cms-printing {
+    visibility: hidden;
+  }
+
+  .cms-printing [data-print-root],
+  .cms-printing [data-print-root] * {
+    visibility: visible;
+  }
+
+  .cms-printing [data-print-root] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .cms-printing [data-print-root] :is(button, select, input[type="checkbox"]) {
+    display: none !important;
+  }
+
+  .cms-printing [data-print-root] * {
+    color: black !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
+/* ── Player: chapter cover cross-fade ────────────────
+   Direction-aware swap between chapter covers. Transform/opacity only, so the
+   whole animation stays on the compositor. */
+@keyframes cover-in {
+  from { opacity: 0; transform: scale(1.06); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cover-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.92); }
+}
+
+@keyframes track-in {
+  from { opacity: 0; transform: translateX(var(--dx, 0)); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.cover-enter { animation: cover-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.cover-exit  { animation: cover-out 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.track-enter { animation: track-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Listeners who ask for less motion get the swap, not the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .cover-enter, .cover-exit, .track-enter { animation-duration: 1ms; }
+}

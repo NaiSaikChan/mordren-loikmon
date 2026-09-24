@@ -17,6 +17,11 @@ packages/web/src/**/*.js.map
 .env
 .env.local
 .env.*.local
+.env.production
+.env.staging
+
+# Server-side backups created by docker-compose.prod.yml
+backups/
 
 # Logs
 *.log
@@ -39,6 +44,6 @@ Thumbs.db
 android/
 ios/
 
-# Agents Skills
+# Agents Skills (workflows under .github/workflows stay tracked)
 .agents
-.github
+.github/prompts

@@ -1,32 +1,28 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import { media as mediaApi, misc } from '@loikmon/api'
+import { ref, shallowRef } from 'vue'
+import { media as mediaApi } from '@loikmon/api'
+import type { Book, Pagination } from '@loikmon/api'
 
+const PAGE_SIZE = 24
+
+/** Audiobooks: books that have audio chapters. */
 export const useMediaStore = defineStore('media', () => {
-  const leagues = ref<any[]>([])
-  const books = ref<any[]>([])
+  const books = ref<Book[]>([])
+  const pagination = shallowRef<Pagination | null>(null)
   const loading = ref(false)
-  const page = ref(0)
 
-  async function fetchLeagues() {
+  async function fetchAudioBooks(nextPage = false) {
+    const page = nextPage ? (pagination.value?.page ?? 0) + 1 : 1
     loading.value = true
     try {
-      const res = await misc.fetchLeagues()
-      leagues.value = (res.data as any).leagues ?? []
-    } finally { loading.value = false }
+      const { data } = await mediaApi.fetchAudioBooks(page, PAGE_SIZE)
+      const items = data.books ?? []
+      books.value = nextPage ? [...books.value, ...items] : items
+      pagination.value = data.pagination ?? null
+    } finally {
+      loading.value = false
+    }
   }
 
-  async function fetchMediaBooks(email?: string, nextPage = false) {
-    loading.value = true
-    if (nextPage) page.value++
-    else { page.value = 0; books.value = [] }
-    try {
-      const res = await mediaApi.fetchMediaBooks(page.value, email)
-      const body = res.data as any
-      const newBooks = body.books ?? []
-      books.value = nextPage ? [...books.value, ...newBooks] : newBooks
-    } finally { loading.value = false }
-  }
-
-  return { leagues, books, loading, page, fetchLeagues, fetchMediaBooks }
+  return { books, pagination, loading, fetchAudioBooks }
 })

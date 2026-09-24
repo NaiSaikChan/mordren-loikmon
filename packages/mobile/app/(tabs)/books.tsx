@@ -1,8 +1,8 @@
+import { View, Text } from 'react-native'
 import { Screen } from '@/components/Screen'
 import { BookGrid } from '@/components/BookGrid'
 import { useBooks } from '@/hooks/useBooks'
 import { useI18n } from '@/context/I18nContext'
-import { View, Text } from 'react-native'
 import { useTypography } from '@/context/TypographyContext'
 
 export default function BooksScreen() {
@@ -12,10 +12,12 @@ export default function BooksScreen() {
 
   return (
     <Screen>
-      <View className="px-4 pb-1 pt-2">
+      <View className="px-4 pb-1 pt-3">
         <Text
-          className="text-2xl text-surface-900 dark:text-surface-50 pt-2" style={headerTextStyle}
-          allowFontScaling={false}
+          className="text-2xl text-surface-900 dark:text-surface-50"
+          style={headerTextStyle}
+          accessibilityRole="header"
+          maxFontSizeMultiplier={1.6}
         >
           {t('nav.books')}
         </Text>

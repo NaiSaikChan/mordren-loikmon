@@ -3,97 +3,66 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { makeArticle, makeBook, response } from './helpers'
 
 const mockSearch = vi.fn()
 
-vi.mock('@loikmon/api', () => ({
-  search: {
-    search: (...a: unknown[]) => mockSearch(...a),
-  },
-}))
+vi.mock('@loikmon/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@loikmon/api')>()
+  return { ...actual, search: { search: (...a: unknown[]) => mockSearch(...a) } }
+})
 
 import { useSearchStore } from '../stores/search'
 
-describe('search store', () => {
+const results = (overrides = {}) => ({
+  status: 'ok', query: 'mon', books: [], articles: [], authors: [], totals: { books: 0, articles: 0, authors: 0 }, ...overrides,
+})
 
+describe('search store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
   })
 
-  it('results start null', () => {
+  it('starts empty', () => {
     const store = useSearchStore()
     expect(store.results).toBeNull()
-  })
-
-  it('query starts empty', () => {
-    const store = useSearchStore()
     expect(store.query).toBe('')
   })
 
-  // ── search() ───────────────────────────────────────────────────────────────
-  describe('search()', () => {
-    it('populates results with books + articles', async () => {
-      const books    = [{ id: 1, title: 'Mon Poetry' }]
-      const articles = [{ id: 10, title: 'Mon News' }]
-      mockSearch
-        .mockResolvedValueOnce({ data: { search: books } })     // type=0 books
-        .mockResolvedValueOnce({ data: { search: articles } })  // type=1 articles
-      const store = useSearchStore()
-      await store.search('mon')
-      expect(store.results!.books).toHaveLength(1)
-      expect(store.results!.articles).toHaveLength(1)
-      expect(store.results!.books[0].title).toBe('Mon Poetry')
-    })
-
-    it('fires two parallel calls: type=0 + type=1', async () => {
-      mockSearch.mockResolvedValue({ data: { search: [] } })
-      const store = useSearchStore()
-      await store.search('test')
-      expect(mockSearch).toHaveBeenCalledTimes(2)
-      expect(mockSearch).toHaveBeenCalledWith('test', 0, 0)
-      expect(mockSearch).toHaveBeenCalledWith('test', 1, 0)
-    })
-
-    it('does NOT call API for blank/whitespace query', async () => {
-      const store = useSearchStore()
-      await store.search('   ')
-      expect(mockSearch).not.toHaveBeenCalled()
-      expect(store.results).toBeNull()
-    })
-
-    it('sets query to trimmed value', async () => {
-      mockSearch.mockResolvedValue({ data: { search: [] } })
-      const store = useSearchStore()
-      await store.search('mon poetry')
-      expect(store.query).toBe('mon poetry')
-    })
-
-    it('loading is false after search', async () => {
-      mockSearch.mockResolvedValue({ data: { search: [] } })
-      const store = useSearchStore()
-      await store.search('q')
-      expect(store.loading).toBe(false)
-    })
-
-    it('handles missing search key gracefully', async () => {
-      mockSearch.mockResolvedValue({ data: {} })
-      const store = useSearchStore()
-      await store.search('q')
-      expect(store.results!.books).toEqual([])
-      expect(store.results!.articles).toEqual([])
-    })
+  it('makes one request for books, articles and authors', async () => {
+    mockSearch.mockReturnValueOnce(response(results({ books: [makeBook({ title: 'Mon Poetry' })], articles: [makeArticle()], authors: [] })))
+    const store = useSearchStore()
+    await store.search('  mon  ')
+    expect(mockSearch).toHaveBeenCalledTimes(1)
+    expect(mockSearch).toHaveBeenCalledWith('mon', { type: 'all', limit: 20 })
+    expect(store.query).toBe('mon')
+    expect(store.results!.books[0].title).toBe('Mon Poetry')
+    expect(store.results!.articles).toHaveLength(1)
+    expect(store.loading).toBe(false)
   })
 
-  // ── clear() ────────────────────────────────────────────────────────────────
-  describe('clear()', () => {
-    it('resets results and query', async () => {
-      mockSearch.mockResolvedValue({ data: { search: [] } })
-      const store = useSearchStore()
-      await store.search('mon')
-      store.clear()
-      expect(store.results).toBeNull()
-      expect(store.query).toBe('')
-    })
+  it('does NOT call the API for a blank query', async () => {
+    const store = useSearchStore()
+    await store.search('   ')
+    expect(mockSearch).not.toHaveBeenCalled()
+    expect(store.results).toBeNull()
+  })
+
+  it('handles missing arrays gracefully', async () => {
+    mockSearch.mockReturnValueOnce(response({ status: 'ok' }))
+    const store = useSearchStore()
+    await store.search('q')
+    expect(store.results!.books).toEqual([])
+    expect(store.results!.authors).toEqual([])
+  })
+
+  it('clear() resets results and query', async () => {
+    mockSearch.mockReturnValueOnce(response(results()))
+    const store = useSearchStore()
+    await store.search('mon')
+    store.clear()
+    expect(store.results).toBeNull()
+    expect(store.query).toBe('')
   })
 })

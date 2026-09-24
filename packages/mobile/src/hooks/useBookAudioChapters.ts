@@ -1,70 +1,73 @@
-import { useCallback, useEffect, useState } from 'react'
-import { books as booksApi } from '@loikmon/api'
-import type { BookAudioChapter } from '@loikmon/api'
-import { chaptersToTracks, type AudioTrack } from '@/lib/audio'
+import { useCallback, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { books as booksApi, errorMessage } from '@loikmon/api'
+import type { AccessInfo, BookChapter } from '@loikmon/api'
+import { useAuth } from '@/context/AuthContext'
+import { chaptersToTracks, type AudioTrack, type TrackSource } from '@/lib/audio'
+import { queryKeys } from '@/lib/queryClient'
 
 interface UseBookAudioChaptersResult {
-  chapters: BookAudioChapter[]
+  /** All chapters, including locked ones (shown with a lock, never played). */
+  chapters: BookChapter[]
+  /** Playable tracks only (unlocked chapters with a signed audio URL). */
   tracks: AudioTrack[]
+  access: AccessInfo | null
+  lockedCount: number
   loading: boolean
   error: string | null
   hasAudio: boolean
-  refetch: () => void
+  refetch: () => Promise<void>
 }
 
+const EMPTY: BookChapter[] = []
+
 /**
- * Fetch the audiobook chapters for a book via `getBookChapters`.
- *
- * The endpoint returns a success response when audio chapters exist and an
- * empty/error response otherwise. We treat any non-empty chapter list as
- * "has audio" and expose pre-built AudioTracks for the media player.
+ * Audiobook chapters via `books.getChapters`. Locked chapters come without
+ * `audio_url`; preview chapters stay open. The cache key includes the viewer's
+ * entitlement, so subscribing (or signing in/out) fetches fresh locks and URLs.
  */
-export function useBookAudioChapters(
-  bookId: string | number | undefined,
-  bookTitle?: string,
-): UseBookAudioChaptersResult {
-  const [chapters, setChapters] = useState<BookAudioChapter[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export function useBookAudioChapters(bookId: string | number | undefined, book?: TrackSource): UseBookAudioChaptersResult {
+  const { user, entitlement } = useAuth()
+  const accessKey = `${user?.id ?? ''}:${entitlement?.active ? 1 : 0}`
+  const enabled = bookId != null && String(bookId) !== ''
 
-  const load = useCallback(async () => {
-    if (!bookId) {
-      setChapters([])
-      setError(null)
-      return
-    }
+  const query = useQuery({
+    queryKey: queryKeys.bookChapters(enabled ? bookId : '', accessKey),
+    queryFn: async () => {
+      const { data } = await booksApi.getChapters(bookId as string | number)
+      return { chapters: data.chapters ?? [], access: data.access ?? null }
+    },
+    enabled,
+  })
 
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await booksApi.getAudioChapters(bookId)
-      const payload = res.data as Record<string, unknown>
-      const data = payload.data as unknown
-      const list: BookAudioChapter[] =
-        Array.isArray(data) ? data :
-        (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).chapters))
-          ? (data as Record<string, unknown>).chapters as BookAudioChapter[] :
-        Array.isArray(payload.chapters) ? payload.chapters as BookAudioChapter[] :
-        []
-      setChapters(list)
-    } catch (err) {
-      setChapters([])
-      setError(err instanceof Error ? err.message : 'Failed to load audiobook chapters')
-    } finally {
-      setLoading(false)
-    }
-  }, [bookId])
+  const chapters = (enabled && query.data?.chapters) || EMPTY
+  const access = enabled ? (query.data?.access ?? null) : null
+  const error = enabled && query.error ? errorMessage(query.error, 'Failed to load audiobook chapters') : null
 
-  useEffect(() => {
-    load()
-  }, [load])
+  const { refetch: refetchQuery } = query
+  const refetch = useCallback(async () => {
+    if (!enabled) return
+    await refetchQuery()
+  }, [enabled, refetchQuery])
 
-  const tracks = chaptersToTracks(chapters, bookTitle).map((track, _index, all) => ({
-    ...track,
-    sourceBookId: track.sourceBookId ?? bookId,
-    queueLength: all.length,
-  }))
-  const hasAudio = tracks.length > 0
+  const title = book?.title
+  const author = book?.authorname
+  const cover = book?.thumbnail ?? book?.cover_url ?? book?.coverphoto
+  const coverImage = book?.cover_image ?? book?.thumbnail_image ?? null
+  const tracks = useMemo(
+    () => chaptersToTracks(chapters, { id: bookId, title, authorname: author, thumbnail: cover, cover_image: coverImage }),
+    [chapters, bookId, title, author, cover, coverImage],
+  )
+  const lockedCount = useMemo(() => chapters.filter((c) => c.locked).length, [chapters])
 
-  return { chapters, tracks, loading, error, hasAudio, refetch: load }
+  return {
+    chapters,
+    tracks,
+    access,
+    lockedCount,
+    loading: enabled && query.isFetching && !query.data,
+    error,
+    hasAudio: chapters.length > 0,
+    refetch,
+  }
 }

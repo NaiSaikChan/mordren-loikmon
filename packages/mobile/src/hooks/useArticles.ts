@@ -1,104 +1,61 @@
-import { useCallback, useEffect, useState } from 'react'
-import { articles as articlesApi } from '@loikmon/api'
-import type { Article } from '@loikmon/api'
-import { parseArticles, parseArticleDetail } from '@/lib/normalize'
+import { useCallback, useEffect, useRef } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { articles as articlesApi, errorMessage } from '@loikmon/api'
+import type { Article, ArticleDetail, ArticleQuery } from '@loikmon/api'
+import { useAccessKey } from '@/context/AuthContext'
+import { queryKeys } from '@/lib/queryClient'
 import { stableKey } from '@/lib/stableKey'
+import { DETAIL_STALE_TIME, keepSameItem } from './useBooks'
+import { usePaginatedList } from './usePaginatedList'
 
-export function useArticles(params?: Record<string, unknown>) {
-  const [items, setItems] = useState<Article[]>([])
-  const [page, setPage] = useState(0)
-  const [loading, setLoading] = useState(false)
-  const [refreshing, setRefreshing] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
+export function useArticles(params: Omit<ArticleQuery, 'page'> = {}) {
   const key = stableKey(params)
-
-  const load = useCallback(
-    async (nextPage: number, replace: boolean) => {
-      setError(null)
-      try {
-        const res = await articlesApi.fetchArticles({ ...(params ?? {}), page: String(nextPage) })
-        const parsed = parseArticles(res.data)
-        setItems((prev) => (replace ? parsed : [...prev, ...parsed]))
-        setHasMore(parsed.length > 0)
-        setPage(nextPage)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load articles')
-      }
+  const fetchPage = useCallback(
+    async (page: number) => {
+      const { data } = await articlesApi.fetchArticles({ limit: 20, ...params, page })
+      return { items: data.articles, pagination: data.pagination }
     },
+    // `key` is the serialised `params`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [key],
   )
-
-  useEffect(() => {
-    setLoading(true)
-    load(0, true).finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
-
-  const loadMore = useCallback(() => {
-    if (loading || refreshing || !hasMore) return
-    load(page + 1, false)
-  }, [loading, refreshing, hasMore, page, load])
-
-  const refresh = useCallback(() => {
-    setRefreshing(true)
-    load(0, true).finally(() => setRefreshing(false))
-  }, [load])
-
-  return { items, loading, refreshing, hasMore, error, loadMore, refresh }
+  return usePaginatedList<Article>(`articles:${key}`, fetchPage)
 }
 
-export function useArticleDetail(id: string | number | string[] | undefined) {
-  const [article, setArticle] = useState<Article | null>(null)
-  const [description, setDescription] = useState<string | null>(null)
-  const [content, setContent] = useState<string | null>(null)
-  const [author, setAuthor] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+/**
+ * Article with body/audio when the viewer has access (`locked: false`),
+ * otherwise metadata + excerpt only. Cached per session/entitlement, so it
+ * re-fetches when the entitlement changes but not on back navigation.
+ */
+export function useArticleDetail(id: string | number | undefined) {
+  const accessKey = useAccessKey()
+  const articleId = id == null ? '' : String(id).trim()
+  const hasId = articleId !== ''
+  const viewedId = useRef<string | null>(null)
+
+  const query = useQuery({
+    queryKey: queryKeys.article(articleId, accessKey),
+    queryFn: async () => (await articlesApi.getArticle(articleId)).data.article,
+    enabled: hasId,
+    staleTime: DETAIL_STALE_TIME,
+    placeholderData: keepSameItem<ArticleDetail>(articleId),
+  })
 
   useEffect(() => {
-    const articleId = Array.isArray(id) ? id[0] : id
-    let active = true
-    ;(async () => {
-      setLoading(true)
-      setError(null)
-      setArticle(null)
-      if (articleId == null || String(articleId).trim() === '') {
-        if (active) {
-          setError('Missing article id')
-          setLoading(false)
-        }
-        return
-      }
-      try {
-        const res = await articlesApi.updateArticleTotalViews(articleId)
-        if (!active) return
-        const parsed = parseArticleDetail(res.data)
-        if (parsed) {
-          setArticle(parsed)
-        } else {
-          const listRes = await articlesApi.fetchArticles()
-          if (!active) return
-          const fallback = parseArticles(listRes.data).find(
-            (item) => String(item.id) === String(articleId),
-          )
-          if (!fallback) {
-            throw new Error('Article not found')
-          }
-          setArticle(fallback)
-        }
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Failed to load article')
-      } finally {
-        if (active) setLoading(false)
-      }
-    })()
-    return () => {
-      active = false
-    }
-  }, [id])
+    if (!hasId || viewedId.current === articleId) return
+    viewedId.current = articleId
+    articlesApi.updateArticleTotalViews(articleId).catch(() => undefined)
+  }, [articleId, hasId])
 
-  return { article, loading, error }
+  const { refetch } = query
+  const reload = useCallback(() => {
+    void refetch()
+  }, [refetch])
+
+  return {
+    article: query.data ?? null,
+    loading: hasId && query.isPending,
+    error: !hasId ? 'Missing article id' : query.error ? errorMessage(query.error, 'Failed to load article') : null,
+    reload,
+  }
 }

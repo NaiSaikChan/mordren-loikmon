@@ -1,55 +1,74 @@
-version: '3.8'
+# Local development stack (no Traefik, no TLS).
+#
+# Infrastructure only, then run the apps with npm (hot reload):
+#   docker compose up -d mysql minio
+#   npm run dev:backend        # http://localhost:4001  (packages/backend/.env.example)
+#   npm run dev:web            # http://localhost:5173  (proxies /api → :4001)
+#
+# Everything in containers:
+#   docker compose up -d --build   # web on http://localhost:8080
+#
+# Production lives in docker-compose.prod.yml (see DEPLOYMENT.md).
+
+name: loikmon-dev
 
 services:
-  server:
-    build:
-      context: .
-      dockerfile: packages/server/Dockerfile
-    container_name: loikmon-server
-    restart: unless-stopped
+  mysql:
+    image: mysql:8.4
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci', '--default-time-zone=+00:00']
     environment:
-      - PORT=4000
-      - NODE_ENV=production
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=aar_traefik_traefik-proxy"
-      - "traefik.http.routers.loikmon-api.rule=Host(`api.loikmon.org`)"
-      - "traefik.http.routers.loikmon-api.entrypoints=websecure"
-      - "traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.loikmon-api.service=loikmon-api-svc"
-      - "traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4000"
-    networks:
-      - traefik-proxy
-      - internal
+      MYSQL_DATABASE: loikmon
+      MYSQL_USER: loikmon
+      MYSQL_PASSWORD: loikmon
+      MYSQL_ROOT_PASSWORD: root
+    ports: ['3306:3306']
+    volumes: [mysql-data:/var/lib/mysql]
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -proot --silent']
+      interval: 5s
+      retries: 20
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ['9000:9000', '9001:9001']
+    volumes: [minio-data:/data]
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 5s
+      retries: 20
+
+  backend:
+    build: { context: ., dockerfile: packages/backend/Dockerfile }
+    depends_on:
+      mysql: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    environment:
+      NODE_ENV: development
+      DB_HOST: mysql
+      DB_USER: loikmon
+      DB_PASSWORD: loikmon
+      DB_NAME: loikmon
+      AUTH_SECRET: local-docker-secret-local-docker-secret
+      PUBLIC_API_URL: http://localhost:4001
+      APP_WEB_URL: http://localhost:8080
+      CORS_ORIGINS: http://localhost:8080,http://localhost:5173
+      MINIO_ENDPOINT: minio
+      MINIO_PUBLIC_URL: http://localhost:9000
+      ADMIN_EMAILS: admin@loikmon.local
+    ports: ['4001:4001']
 
   web:
     build:
       context: .
       dockerfile: packages/web/Dockerfile
-      args:
-        VITE_BASE: /
-        VITE_API_BASE: /api
-    container_name: loikmon-web
-    restart: unless-stopped
-    healthcheck:
-      disable: true
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=aar_traefik_traefik-proxy"
-      - "traefik.http.routers.loikmon-app.rule=Host(`app.loikmon.org`)"
-      - "traefik.http.routers.loikmon-app.entrypoints=websecure"
-      - "traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.loikmon-app.service=loikmon-app-svc"
-      - "traefik.http.services.loikmon-app-svc.loadbalancer.server.port=80"
-    depends_on:
-      - server
-    networks:
-      - traefik-proxy
-      - internal
+      args: { VITE_BASE: /, VITE_API_BASE: /api/v1 }
+    depends_on: [backend]
+    ports: ['8080:80']
 
-networks:
-  traefik-proxy:
-    external: true
-    name: aar_traefik_traefik-proxy
-  internal:
-    driver: bridge
+volumes:
+  mysql-data:
+  minio-data:

@@ -1,33 +1,18 @@
 import { getClient } from '../client.js'
+import type { Id, ItemType, Review, ReviewsResponse } from '../types.js'
 
 export const reviews = {
-  // { id:0, itmid, type:'book'|'article', email? }  → { userreview, reviews:[] }
-  loadRecentReviews: (itmid: string|number, type: string, email?: string) =>
-    getClient().post<any>('loadrecentreviews', { id: 0, itmid, type, ...(email?{email}:{}) }),
+  /** Reviews for a book or article, plus the viewer's own review and the rating summary. */
+  loadReviews: (itemType: ItemType, itemId: Id | string, page = 1, limit = 20) =>
+    getClient().get<ReviewsResponse>('reviews', { params: { item_type: itemType, item_id: itemId, page, limit } }),
 
-  // { page:'0', type, itmid }
-  loadReviews: (itmid: string|number, type: string, page = 0) =>
-    getClient().post<any>('loadreviews', { page: String(page), type, itmid }),
-
-  // { content:base64, email, itmid, type, rating }  → { review:{} }
-  submitReview: (data: { itmid:string|number; type:string; content:string; rating:number; email?:string }) =>
-    getClient().post<any>('submitreview', {
-      content: btoa(unescape(encodeURIComponent(data.content))),
-      email: data.email ?? '',
-      itmid: data.itmid,
-      type: data.type,
-      rating: data.rating,
+  /** Creates the viewer's review, or updates it when one already exists. Plain text (no base64). */
+  submitReview: (data: { item_type: ItemType; item_id: Id; rating: number; content?: string | null }) =>
+    getClient().post<{ status: 'ok'; review: Pick<Review, 'id' | 'rating' | 'content' | 'username' | 'created_at'> }>('reviews', {
+      ...data,
+      item_id: Number(data.item_id),
+      content: data.content ?? null,
     }),
 
-  // { id, content:base64, rating }
-  editReview: (id: string|number, content: string, rating: number) =>
-    getClient().post<any>('editreview', {
-      id,
-      content: btoa(unescape(encodeURIComponent(content))),
-      rating,
-    }),
-
-  // { id }
-  deleteReview: (id: string|number) =>
-    getClient().post<any>('deletereview', { id }),
+  deleteReview: (id: Id | string) => getClient().delete<{ status: 'ok' }>(`reviews/${id}`),
 }

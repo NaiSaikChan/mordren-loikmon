@@ -2,10 +2,9 @@ import React, { createContext, useContext, useCallback, useEffect, useMemo, useS
 import { useColorScheme as useRNColorScheme } from 'react-native'
 import { colorScheme as nwColorScheme } from 'nativewind'
 import { storage } from '@/services/storage'
+import { PREF_KEYS, type ThemePref } from '@/lib/preferences'
 
-export type ThemePref = 'light' | 'dark' | 'system'
-
-const THEME_KEY = 'theme'
+export type { ThemePref }
 
 interface ThemeContextValue {
   /** User preference: light | dark | system. */
@@ -18,17 +17,17 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({
+  children,
+  initialPref,
+}: {
+  children: React.ReactNode
+  /** Saved preference, read before the first frame (see lib/preferences). */
+  initialPref?: ThemePref | null
+}) {
   const rawScheme = useRNColorScheme()
   const systemScheme: 'light' | 'dark' = rawScheme === 'dark' ? 'dark' : 'light'
-  const [pref, setPrefState] = useState<ThemePref>('system')
-
-  useEffect(() => {
-    ;(async () => {
-      const saved = (await storage.get(THEME_KEY)) as ThemePref | null
-      if (saved) setPrefState(saved)
-    })()
-  }, [])
+  const [pref, setPrefState] = useState<ThemePref>(initialPref ?? 'system')
 
   const scheme: 'light' | 'dark' = pref === 'system' ? systemScheme : pref
 
@@ -39,7 +38,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setPref = useCallback((next: ThemePref) => {
     setPrefState(next)
-    void storage.set(THEME_KEY, next)
+    void storage.set(PREF_KEYS.theme, next)
   }, [])
 
   const value = useMemo<ThemeContextValue>(

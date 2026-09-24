@@ -1,4 +1,5 @@
 import { View, Text } from 'react-native'
+import { useTypography } from '@/context/TypographyContext'
 
 export function EmptyState({
   icon = '📭',
@@ -9,14 +10,17 @@ export function EmptyState({
   title: string
   subtitle?: string
 }) {
+  const { bodyTextStyle, headerTextStyle } = useTypography()
   return (
-    <View className="flex-1 items-center justify-center px-8 py-16">
-      <Text className="text-5xl mb-3 pt-safe">{icon}</Text>
-      <Text className="text-base text-surface-800 dark:text-surface-100 text-center pt-3" style={{ fontSize: 16, lineHeight: 24 }}>
+    <View className="flex-1 items-center justify-center px-8 py-16" accessible accessibilityRole="text">
+      <Text className="mb-3 text-5xl" importantForAccessibility="no" accessibilityElementsHidden>
+        {icon}
+      </Text>
+      <Text className="text-center text-base text-surface-800 dark:text-surface-100" style={headerTextStyle}>
         {title}
       </Text>
       {subtitle ? (
-        <Text className="mt-1 text-sm text-surface-500 dark:text-surface-400 text-center pt-3" style={{ fontFamily: 'padauk', fontSize: 14, lineHeight: 20 }}>
+        <Text className="mt-1 text-center text-sm text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
           {subtitle}
         </Text>
       ) : null}

@@ -6,6 +6,7 @@ import {
   type StyleProp,
   type TextStyle,
 } from 'react-native'
+import { useThemeColors } from '@/theme/colors'
 
 export function PrimaryButton({
   label,
@@ -21,23 +22,32 @@ export function PrimaryButton({
   labelClassName?: string
   labelStyle?: StyleProp<TextStyle>
 }) {
-  const base = 'flex-row items-center justify-center rounded-xl px-6 py-3.5'
+  const colors = useThemeColors()
+  const disabled = Boolean(loading || props.disabled)
+  const base = 'min-h-[48px] flex-row items-center justify-center rounded-control px-6 py-3'
   const styles =
     variant === 'primary'
-      ? 'bg-brand-600 active:bg-brand-700'
+      ? 'bg-brand-600 active:bg-brand-700 active:opacity-90'
       : 'bg-surface-200 dark:bg-surface-800 active:opacity-80'
   const textStyle =
     variant === 'primary' ? 'text-white' : 'text-surface-900 dark:text-surface-50'
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
       {...props}
-      className={`${base} ${styles} ${loading ? 'opacity-70' : ''}`}
-      disabled={loading || !!props.disabled}
+      accessibilityState={{ ...props.accessibilityState, disabled, busy: Boolean(loading) }}
+      className={`${base} ${styles} ${disabled ? 'opacity-60' : ''}`}
+      disabled={disabled}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#ffffff' : '#2563eb'} />
+        <ActivityIndicator color={variant === 'primary' ? colors.onBrand : colors.brand} />
       ) : (
-        <Text className={`text-base ${textStyle} ${labelClassName ?? ''}`} style={labelStyle}>
+        <Text
+          className={`text-center text-base ${textStyle} ${labelClassName ?? ''}`}
+          style={labelStyle}
+          maxFontSizeMultiplier={1.6}
+        >
           {label}
         </Text>
       )}

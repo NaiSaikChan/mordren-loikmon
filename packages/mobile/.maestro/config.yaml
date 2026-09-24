@@ -1,0 +1,7 @@
+# Maestro E2E smoke suite. Run against a dev/preview build on a device or emulator:
+#   maestro test .maestro/
+# Login flows need credentials of a test account:
+#   maestro test -e EMAIL=qa@example.com -e PASSWORD=secret .maestro/
+# Flows assume the English locale.
+flows:
+  - "flows/*"

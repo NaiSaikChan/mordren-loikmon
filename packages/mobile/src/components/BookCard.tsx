@@ -1,125 +1,149 @@
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native'
-import { Link } from 'expo-router'
+import { memo, useCallback } from 'react'
+import { View, Text, Pressable, StyleSheet } from 'react-native'
+import { Image } from 'expo-image'
+import { router } from 'expo-router'
+import { useReducedMotion } from 'react-native-reanimated'
 import type { Book } from '@loikmon/api'
+import { useAuth } from '@/context/AuthContext'
+import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
-import { pickCover } from '@/lib/url'
+import { accessBadge } from '@/lib/access'
+import { pickImage } from '@/lib/url'
+import { radius } from '@/theme/colors'
 import { PriceBadge } from './PriceBadge'
 
 /** Poster aspect ratio (width / height) shared by every book cover. */
 export const BOOK_COVER_ASPECT_RATIO = 3 / 4
 
+/** Dense card text may grow with Dynamic Type, but only this far. */
+export const CARD_MAX_FONT_SCALE = 1.4
+
 /**
- * Fixed text metrics keep every card the same height so grid rows stay aligned
- * regardless of how many lines a Myanmar/Mon title wraps to.
+ * Text metrics sized for stacked Myanmar/Mon diacritics (~1.6–1.7× leading).
+ * Each line reserves its height (scaled with the user's font size) so grid
+ * rows stay aligned regardless of how many lines a title wraps to.
  */
 const TITLE_FONT_SIZE = 13
-const TITLE_LINE_HEIGHT = 21
+const TITLE_LINE_HEIGHT = 22
 const TITLE_LINES = 2
-const AUTHOR_FONT_SIZE = 11.5
-const AUTHOR_LINE_HEIGHT = 18
+const AUTHOR_FONT_SIZE = 12
+const AUTHOR_LINE_HEIGHT = 20
 const CATEGORY_FONT_SIZE = 11
-const CATEGORY_LINE_HEIGHT = 16
+const CATEGORY_LINE_HEIGHT = 18
+
+/** Price/access phrase for a combined screen-reader label. */
+export function useAccessLabel(item: { is_free?: boolean }): string {
+  const { t } = useI18n()
+  const { entitlement } = useAuth()
+  const kind = accessBadge(item, entitlement)
+  if (kind === 'free') return t('books.free')
+  if (kind === 'premium-locked') return `${t('books.premium')}, ${t('a11y.locked')}`
+  return t('books.premium')
+}
 
 /** Poster-style book card used across home, books, search and library. */
-export function BookCard({
+export const BookCard = memo(function BookCard({
   book,
   width = 132,
   variant = 'carousel',
+  imageWidth,
+  testID = 'book-card',
 }: {
   book: Book
   width?: number
   variant?: 'carousel' | 'grid'
+  /** Rendered cover width in points (grid cells); picks the image variant. */
+  imageWidth?: number
+  testID?: string
 }) {
   const { bodyTextStyle, headerTextStyle } = useTypography()
-  const cover = pickCover(book as unknown as Record<string, unknown>)
-  const author = (book.authorname as string) ?? (book.author as string) ?? ''
-  const category = (book.categoryname as string) ?? (book.cat as string) ?? ''
-
+  const reduceMotion = useReducedMotion()
+  const accessLabel = useAccessLabel(book)
   const isGrid = variant === 'grid'
+  const cover = pickImage(book, imageWidth ?? (isGrid ? 160 : width))
+  const author = book.authorname ?? ''
+  const category = book.categoryname ?? ''
+  const id = book.id
+
+  const onPress = useCallback(() => router.push(`/book/${id}`), [id])
 
   return (
     <View style={isGrid ? styles.gridCard : [styles.carouselCard, { width }]}>
-      <Link href={`/book/${book.id}`} asChild>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={author ? `${book.title}, ${author}` : String(book.title)}
-        >
-          <View
-            style={styles.cover}
-            className="w-full overflow-hidden rounded-xl bg-surface-200 dark:bg-surface-800"
-          >
-            {cover ? (
-              <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            ) : (
-              <View style={styles.coverFallback}>
-                <Text style={styles.coverFallbackIcon}>📚</Text>
-              </View>
-            )}
-          </View>
+      <Pressable
+        testID={testID}
+        onPress={onPress}
+        className="active:opacity-80"
+        style={styles.pressable}
+        accessibilityRole="button"
+        accessibilityLabel={[book.title, author, accessLabel].filter(Boolean).join(', ')}
+      >
+        <View style={styles.cover} className="w-full overflow-hidden bg-surface-200 dark:bg-surface-800">
+          {cover ? (
+            <Image
+              source={cover}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={String(id)}
+              transition={reduceMotion ? 0 : 150}
+              accessible={false}
+            />
+          ) : (
+            <View style={styles.coverFallback}>
+              <Text style={styles.coverFallbackIcon}>📚</Text>
+            </View>
+          )}
+        </View>
 
-          <View style={styles.titleBlock}>
-            <Text
-              numberOfLines={TITLE_LINES}
-              className="text-surface-900 dark:text-surface-50"
-              style={[
-                headerTextStyle,
-                {
-                  fontSize: TITLE_FONT_SIZE,
-                  lineHeight: TITLE_LINE_HEIGHT,
-                  letterSpacing: -0.2,
-                },
-              ]}
-              allowFontScaling={false}
-            >
-              {book.title}
-            </Text>
+        <View style={styles.titleBlock}>
+          <Text
+            numberOfLines={TITLE_LINES}
+            maxFontSizeMultiplier={CARD_MAX_FONT_SCALE}
+            className="text-surface-900 dark:text-surface-50"
+            style={[headerTextStyle, styles.title]}
+          >
+            {book.title}
+          </Text>
+          {category ? (
             <Text
               numberOfLines={1}
-              className="text-brand-500 pt-2"
-              style={{
-                fontFamily: headerTextStyle?.fontFamily,
-                fontSize: CATEGORY_FONT_SIZE,
-                lineHeight: CATEGORY_LINE_HEIGHT,
-                minHeight: CATEGORY_LINE_HEIGHT,
-                letterSpacing: 0.3,
-                textTransform: 'uppercase',
-              }}
+              maxFontSizeMultiplier={CARD_MAX_FONT_SCALE}
+              className="text-brand-600 dark:text-brand-400"
+              style={[{ fontFamily: headerTextStyle?.fontFamily }, styles.category]}
             >
               {category}
             </Text>
+          ) : null}
+          {author ? (
             <Text
               numberOfLines={1}
+              maxFontSizeMultiplier={CARD_MAX_FONT_SCALE}
               className="text-surface-500 dark:text-surface-400"
-              style={[
-                bodyTextStyle,
-                {
-                  fontSize: AUTHOR_FONT_SIZE,
-                  lineHeight: AUTHOR_LINE_HEIGHT,
-                  minHeight: AUTHOR_LINE_HEIGHT,
-                  letterSpacing: -0.1,
-                },
-              ]}
-              allowFontScaling={false}
+              style={[bodyTextStyle, styles.author]}
             >
               {author}
             </Text>
-          </View>
+          ) : null}
+        </View>
 
-          <View style={styles.badgeRow}>
-            <PriceBadge item={book as unknown as Record<string, unknown>} />
-          </View>
-        </Pressable>
-      </Link>
+        <View style={styles.badgeRow}>
+          <PriceBadge item={book} />
+        </View>
+      </Pressable>
     </View>
   )
-}
+})
 
 const styles = StyleSheet.create({
-  gridCard: { width: '100%' },
+  // Cards stretch to the tallest card in their row; the badge is pushed to the
+  // bottom so badges line up even when titles wrap to different line counts.
+  gridCard: { width: '100%', flex: 1 },
   carouselCard: { marginRight: 12 },
+  pressable: { flex: 1 },
   cover: {
     width: '100%',
     aspectRatio: BOOK_COVER_ASPECT_RATIO,
+    borderRadius: radius.control,
   },
   coverFallback: {
     position: 'absolute',
@@ -131,13 +155,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   coverFallbackIcon: { fontSize: 32 },
-  titleBlock: {
-    marginTop: 8,
-    minHeight: TITLE_LINE_HEIGHT * TITLE_LINES + CATEGORY_LINE_HEIGHT,
-    justifyContent: 'flex-start',
+  titleBlock: { marginTop: 8 },
+  title: {
+    fontSize: TITLE_FONT_SIZE,
+    lineHeight: TITLE_LINE_HEIGHT,
+    letterSpacing: -0.2,
+  },
+  category: {
+    marginTop: 2,
+    fontSize: CATEGORY_FONT_SIZE,
+    lineHeight: CATEGORY_LINE_HEIGHT,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  author: {
+    fontSize: AUTHOR_FONT_SIZE,
+    lineHeight: AUTHOR_LINE_HEIGHT,
+    letterSpacing: -0.1,
   },
   badgeRow: {
-    marginTop: 6,
+    marginTop: 'auto',
+    paddingTop: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

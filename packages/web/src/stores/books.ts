@@ -1,58 +1,64 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef } from 'vue'
-import { books as booksApi } from '@loikmon/api'
-import type { Book, BookChapter } from '@loikmon/api'
+import { books as booksApi, errorCode } from '@loikmon/api'
+import type { Book, BookDetail, BookQuery, Pagination } from '@loikmon/api'
 
 export const useBooksStore = defineStore('books', () => {
-  const list = ref<Book[]>([])
-  const detail = shallowRef<Book | null>(null)
-  const chapters = ref<BookChapter[]>([])
-  const related = ref<Book[]>([])
-  const loading = ref(false)
-  const total   = shallowRef(0)
+  const list       = ref<Book[]>([])
+  const pagination = shallowRef<Pagination | null>(null)
+  const total      = shallowRef(0)
+  const detail     = shallowRef<BookDetail | null>(null)
+  const related    = ref<Book[]>([])
+  const loading    = ref(false)
+  /** Error code of the last failed detail request (e.g. NOT_FOUND, NETWORK_ERROR). */
+  const detailError = ref<string | null>(null)
 
-  async function fetchBooks(params?: Record<string, unknown>): Promise<number> {
+  let listRequest = 0
+
+  /** Server-side filtered, 1-based page of books. Responses of superseded requests are ignored. */
+  async function fetchBooks(params: BookQuery = {}) {
+    const id = ++listRequest
     loading.value = true
     try {
-      const res = await booksApi.fetchBooks(params)
-      // API returns top-level array directly in many cases, or {books:[...]}
-      const body = res.data as any
-      const items: Book[] = body.books ?? (Array.isArray(body) ? body : [])
-      const t = body.total ?? body.data?.total ?? body.count ?? body.data?.count
-      if (t != null) total.value = Number(t)
-      list.value = items
-      return items.length
+      const { data } = await booksApi.fetchBooks(params)
+      if (id === listRequest) {
+        list.value = data.books ?? []
+        total.value = Number(data.total ?? data.pagination?.total ?? list.value.length)
+        pagination.value = data.pagination ?? null
+      }
+      return data
     } finally {
-      loading.value = false
+      if (id === listRequest) loading.value = false
     }
   }
 
   async function fetchDetail(id: string | number) {
     loading.value = true
+    detailError.value = null
     try {
-      const res = await booksApi.getItem(id)
-      const body = res.data as any
-      detail.value = body.book ?? body.data?.book ?? null
+      const { data } = await booksApi.getBook(id)
+      detail.value = data.book ?? null
+    } catch (err) {
+      detail.value = null
+      detailError.value = errorCode(err)
     } finally {
       loading.value = false
     }
-  }
-
-  async function fetchChapters(bookId: string | number) {
-    const res = await booksApi.getChapters(bookId)
-    const body = res.data as any
-    chapters.value = body.chapters ?? body.data?.chapters ?? []
+    return detail.value
   }
 
   async function fetchRelated(bookId: string | number) {
-    const res = await booksApi.relatedBooks(bookId)
-    const body = res.data as any
-    related.value = body.books ?? body.data?.books ?? []
+    try {
+      const { data } = await booksApi.relatedBooks(bookId)
+      related.value = (data.books ?? []).filter((b) => String(b.id) !== String(bookId))
+    } catch {
+      related.value = []
+    }
   }
 
-  async function rateBook(bookId: string | number, rating: number) {
-    await booksApi.rateBook(bookId, rating)
+  function setInLibrary(inLibrary: boolean) {
+    if (detail.value) detail.value = { ...detail.value, in_library: inLibrary }
   }
 
-  return { list, detail, chapters, related, loading, total, fetchBooks, fetchDetail, fetchChapters, fetchRelated, rateBook }
+  return { list, pagination, total, detail, related, loading, detailError, fetchBooks, fetchDetail, fetchRelated, setInLibrary }
 })

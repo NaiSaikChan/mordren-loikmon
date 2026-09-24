@@ -1,11 +1,14 @@
 import { computed, shallowRef } from 'vue'
-import { useArticlesStore } from '@/stores/articles'
-import type { Article } from '@loikmon/api'
+import { articles as articlesApi } from '@loikmon/api'
+import type { Article, ArticleQuery } from '@loikmon/api'
 
 export const PAGE_SIZES = [10, 20, 30, 50, 100]
 
-const API_PAGE_SIZE = 10
+/** The backend caps `limit` at 100; large pages keep the number of requests low. */
+export const API_PAGE_SIZE = 100
+/** Safety cap in case a server keeps reporting `has_more`. */
 const MAX_ARTICLE_PAGES = 100
+
 const articleListCache = new Map<number, Article[]>()
 const articleListCacheComplete = new Set<number>()
 const articleListBackgroundLoads = new Map<number, Promise<void>>()
@@ -17,9 +20,9 @@ export function clearArticleListCache() {
 }
 
 export function getArticleDateTimestamp(article: Article): number | null {
-  const raw = article.articledate ?? article.updated_at ?? article.created_at ?? article.date
+  const raw = article.articledate ?? article.published_at ?? article.updated_at ?? article.created_at ?? article.date
   if (!raw) return null
-  const timestamp = new Date(raw as string).getTime()
+  const timestamp = new Date(raw).getTime()
   return Number.isNaN(timestamp) ? null : timestamp
 }
 
@@ -34,15 +37,27 @@ export function compareArticlesByDate(a: Article, b: Article, order: 'asc' | 'de
   return order === 'asc' ? dateA - dateB : dateB - dateA
 }
 
-export function useArticlesList() {
-  const store = useArticlesStore()
+function fetchArticlesPage(categoryKey: number, page: number) {
+  const params: ArticleQuery = { page, limit: API_PAGE_SIZE, sort: 'latest' }
+  if (categoryKey > 0) params.category = categoryKey
+  return articlesApi.fetchArticles(params)
+}
 
-  const page        = shallowRef(1)              // 1-indexed for display; API uses 0-indexed
+/**
+ * All articles of a category, sorted by date and paginated locally.
+ *
+ * The first server page renders immediately; the remaining pages are loaded
+ * in the background (following `pagination.has_more`) and cached per category
+ * so revisiting a category does not refetch it.
+ */
+export function useArticlesList() {
+  const page        = shallowRef(1)
   const pageSize    = shallowRef(10)
   const sortOrder   = shallowRef<'asc' | 'desc'>('desc')
   const selectedCat = shallowRef(0)
   const allArticles = shallowRef<Article[]>(articleListCache.get(0) ?? [])
   const loadingAll  = shallowRef(false)
+  const error       = shallowRef(false)
   let loadId = 0
 
   const totalPages = computed(() =>
@@ -66,77 +81,68 @@ export function useArticlesList() {
     if (cachedArticles) {
       allArticles.value = cachedArticles
       if (!articleListCacheComplete.has(categoryKey)) {
-        void continueLoading(categoryKey, cachedArticles)
+        void continueLoading(categoryKey, cachedArticles, 2)
       }
       return
     }
 
     const currentLoadId = ++loadId
     loadingAll.value = true
+    error.value = false
 
     try {
-      const count = await store.fetchArticles({
-        page: 0,
-        limit: API_PAGE_SIZE,
-        type: 1,
-        query: '',
-        category: categoryKey,
-      })
+      const { data } = await fetchArticlesPage(categoryKey, 1)
       if (currentLoadId !== loadId) return
 
-      const firstPage = [...store.list]
+      const firstPage = data.articles ?? []
       articleListCache.set(categoryKey, firstPage)
       allArticles.value = firstPage
 
       // Render the first page immediately; complete the cache without blocking the UI.
       loadingAll.value = false
-      if (count > 0 && firstPage.length > 0) {
-        void continueLoading(categoryKey, firstPage)
+      if (data.pagination?.has_more && firstPage.length > 0) {
+        void continueLoading(categoryKey, firstPage, 2)
       } else {
         articleListCacheComplete.add(categoryKey)
+      }
+    } catch {
+      if (currentLoadId === loadId) {
+        error.value = true
+        allArticles.value = []
       }
     } finally {
       if (currentLoadId === loadId) loadingAll.value = false
     }
   }
 
-  function continueLoading(categoryKey: number, initialArticles: Article[]) {
+  function continueLoading(categoryKey: number, initialArticles: Article[], startPage: number) {
     const existingLoad = articleListBackgroundLoads.get(categoryKey)
     if (existingLoad) return existingLoad
 
     const load = (async () => {
-      const byId = new Map<string | number, Article>(
-        initialArticles.map(article => [article.id, article]),
-      )
+      const byId = new Map<number, Article>(initialArticles.map(article => [article.id, article]))
+      // Resume after the pages already cached.
+      let apiPage = Math.max(startPage, Math.floor(initialArticles.length / API_PAGE_SIZE) + 1)
 
       try {
-        for (let apiPage = 1; apiPage < MAX_ARTICLE_PAGES; apiPage += 1) {
+        for (; apiPage <= MAX_ARTICLE_PAGES; apiPage += 1) {
           // Yield between pages so scrolling and interactions remain responsive.
           await new Promise<void>(resolve => setTimeout(resolve, 0))
-          const count = await store.fetchArticles({
-            page: apiPage,
-            limit: API_PAGE_SIZE,
-            type: 1,
-            query: '',
-            category: categoryKey,
-          })
-          const batch = [...store.list]
-          if (count === 0 || batch.length === 0) break
+          const { data } = await fetchArticlesPage(categoryKey, apiPage)
+          const batch = data.articles ?? []
 
-          let added = 0
-          for (const article of batch) {
-            if (!byId.has(article.id)) {
-              byId.set(article.id, article)
-              added += 1
-            }
-          }
-          if (added === 0) break
-
+          for (const article of batch) byId.set(article.id, article)
           const nextArticles = Array.from(byId.values())
           articleListCache.set(categoryKey, nextArticles)
           if (selectedCat.value === categoryKey) allArticles.value = nextArticles
+
+          if (!data.pagination?.has_more || batch.length === 0) {
+            articleListCacheComplete.add(categoryKey)
+            break
+          }
         }
-        articleListCacheComplete.add(categoryKey)
+      } catch {
+        // Keep what was loaded; the next visit resumes from the cache.
       } finally {
         articleListBackgroundLoads.delete(categoryKey)
       }
@@ -158,7 +164,7 @@ export function useArticlesList() {
   function changeCategory(catId: number) {
     selectedCat.value = catId
     page.value = 1
-    fetchPage()
+    return fetchPage()
   }
 
   function toggleSort() {
@@ -174,7 +180,8 @@ export function useArticlesList() {
     selectedCat,
     isLastPage,
     totalPages,
-    loading: computed(() => store.loading || loadingAll.value),
+    error,
+    loading: computed(() => loadingAll.value),
     PAGE_SIZES,
     fetchPage,
     goToPage,

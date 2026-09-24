@@ -1,39 +1,50 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { reviews as reviewsApi } from '@loikmon/api'
-import { useAuthStore } from './auth'
+import type { ItemType, Review, ReviewsResponse } from '@loikmon/api'
 
 export const useReviewsStore = defineStore('reviews', () => {
-  const list = ref<any[]>([])
-  const userReview = ref<any>(null)
+  const list = ref<Review[]>([])
+  const userReview = shallowRef<Review | null>(null)
+  const summary = shallowRef<ReviewsResponse['summary']>({ average: 0, count: 0 })
   const loading = ref(false)
+  let current: { type: ItemType; id: number } | null = null
 
-  async function loadReviews(itmid: string | number, type: string, page = 0) {
+  async function loadReviews(itemType: ItemType, itemId: string | number, page = 1) {
+    current = { type: itemType, id: Number(itemId) }
     loading.value = true
     try {
-      const auth = useAuthStore()
-      const res = await reviewsApi.loadRecentReviews(itmid, type, auth.user?.email as string)
-      const body = res.data as any
-      list.value = body.reviews ?? []
-      userReview.value = body.userreview ?? null
-    } finally { loading.value = false }
+      const { data } = await reviewsApi.loadReviews(itemType, itemId, page)
+      list.value = data.reviews ?? []
+      userReview.value = data.user_review ?? null
+      summary.value = data.summary ?? { average: 0, count: list.value.length }
+    } catch {
+      list.value = []
+      userReview.value = null
+      summary.value = { average: 0, count: 0 }
+    } finally {
+      loading.value = false
+    }
   }
 
-  async function submitReview(itmid: string | number, type: string, content: string, rating: number) {
-    const auth = useAuthStore()
-    const res = await reviewsApi.submitReview({
-      itmid, type, content, rating,
-      email: auth.user?.email as string,
+  /** Creates or updates the viewer's review (plain text), then reloads the list. */
+  async function submitReview(itemType: ItemType, itemId: string | number, rating: number, content: string) {
+    const { data } = await reviewsApi.submitReview({
+      item_type: itemType,
+      item_id: Number(itemId),
+      rating,
+      content: content.trim() || null,
     })
-    const body = res.data as any
-    if (body.review) list.value = [body.review, ...list.value]
-    return body
+    await loadReviews(itemType, itemId)
+    return data.review
   }
 
   async function deleteReview(id: string | number) {
     await reviewsApi.deleteReview(id)
-    list.value = list.value.filter(r => String(r.id) !== String(id))
+    list.value = list.value.filter((r) => String(r.id) !== String(id))
+    if (userReview.value && String(userReview.value.id) === String(id)) userReview.value = null
+    if (current) await loadReviews(current.type, current.id)
   }
 
-  return { list, userReview, loading, loadReviews, submitReview, deleteReview }
+  return { list, userReview, summary, loading, loadReviews, submitReview, deleteReview }
 })

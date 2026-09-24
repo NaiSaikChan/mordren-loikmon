@@ -1,4 +1,4 @@
-const { getDefaultConfig } = require('expo/metro-config')
+const { getSentryExpoConfig } = require('@sentry/react-native/metro')
 const { withNativeWind } = require('nativewind/metro')
 const path = require('path')
 
@@ -9,7 +9,9 @@ const path = require('path')
 const projectRoot = __dirname
 const workspaceRoot = path.resolve(projectRoot, '../..')
 
-const config = getDefaultConfig(projectRoot)
+// Expo's default config plus Sentry debug IDs, so crash stack traces map back
+// to source for both embedded bundles and OTA updates.
+const config = getSentryExpoConfig(projectRoot)
 
 config.watchFolders = [workspaceRoot]
 config.resolver.nodeModulesPaths = [

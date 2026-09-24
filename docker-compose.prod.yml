@@ -1,26 +1,153 @@
-version: '3.8'
+# Loikmon production stack for a single Docker host (Hostinger VPS) behind the
+# existing Traefik instance (external network `aar_traefik_traefik-proxy`,
+# entrypoint `websecure`, certresolver `letsencrypt`).
+#
+#   cp .env.production.example .env.production   # fill in secrets
+#   docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+#
+# Public hostnames (DNS A records → VPS IP):
+#   APP_DOMAIN      web app (nginx; proxies /api to the backend)
+#   API_DOMAIN      backend API for the mobile apps + store webhooks
+#   STORAGE_DOMAIN  MinIO S3 endpoint: public covers + signed book/audio URLs
+#
+# MySQL and the MinIO console are never exposed publicly. See DEPLOYMENT.md.
+
+name: loikmon
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '5'
 
 services:
-  server:
+  mysql:
+    image: mysql:8.4
+    container_name: loikmon-mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+00:00
+      - --innodb-buffer-pool-size=${MYSQL_BUFFER_POOL:-512M}
+      - --max-connections=200
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-loikmon}
+      MYSQL_USER: ${DB_USER:-loikmon}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks: [internal]
+    logging: *logging
+
+  minio:
+    # MinIO no longer publishes community images on Docker Hub; quay.io keeps
+    # the last public release. The backend only uses the S3 API.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: loikmon-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
+      MINIO_API_CORS_ALLOW_ORIGIN: https://${APP_DOMAIN}${EXTRA_CORS_ORIGINS:-}
+      MINIO_SERVER_URL: https://${STORAGE_DOMAIN}
+    volumes:
+      - minio-data:/data
+    # Console only on the VPS loopback: ssh -L 9001:127.0.0.1:9001 user@vps → http://localhost:9001
+    ports:
+      - '127.0.0.1:9001:9001'
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=aar_traefik_traefik-proxy
+      - traefik.http.routers.loikmon-storage.rule=Host(`${STORAGE_DOMAIN}`)
+      - traefik.http.routers.loikmon-storage.entrypoints=websecure
+      - traefik.http.routers.loikmon-storage.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-storage.service=loikmon-storage-svc
+      - traefik.http.services.loikmon-storage-svc.loadbalancer.server.port=9000
+    networks: [internal, traefik-proxy]
+    logging: *logging
+
+  backend:
     build:
       context: .
-      dockerfile: packages/server/Dockerfile
-    container_name: loikmon-server
+      dockerfile: packages/backend/Dockerfile
+    image: loikmon-backend:${IMAGE_TAG:-latest}
+    container_name: loikmon-backend
     restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
-      - PORT=4000
-      - NODE_ENV=production
+      NODE_ENV: production
+      PORT: 4001
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PUBLIC_API_URL: https://${API_DOMAIN}
+      APP_WEB_URL: https://${APP_DOMAIN}
+      CORS_ORIGINS: https://${APP_DOMAIN}${EXTRA_CORS_ORIGINS:-}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-loikmon}
+      DB_USER: ${DB_USER:-loikmon}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_MIGRATE_ON_BOOT: 'true'
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      AUTH_REQUIRE_EMAIL_VERIFICATION: ${AUTH_REQUIRE_EMAIL_VERIFICATION:-false}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-Loikmon <no-reply@loikmon.org>}
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: 'false'
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_PUBLIC_URL: https://${STORAGE_DOMAIN}
+      MINIO_BUCKET_PUBLIC: ${MINIO_BUCKET_PUBLIC:-loikmon-public}
+      MINIO_BUCKET_PRIVATE: ${MINIO_BUCKET_PRIVATE:-loikmon-private}
+      SIGNED_URL_TTL_SECONDS: ${SIGNED_URL_TTL_SECONDS:-3600}
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID:-}
+      APPLE_APP_APPLE_ID: ${APPLE_APP_APPLE_ID:-}
+      APPLE_ALLOW_SANDBOX: ${APPLE_ALLOW_SANDBOX:-true}
+      APPLE_ISSUER_ID: ${APPLE_ISSUER_ID:-}
+      APPLE_KEY_ID: ${APPLE_KEY_ID:-}
+      APPLE_PRIVATE_KEY: ${APPLE_PRIVATE_KEY:-}
+      GOOGLE_PLAY_PACKAGE_NAME: ${GOOGLE_PLAY_PACKAGE_NAME:-}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${GOOGLE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_PUBSUB_AUDIENCE: ${GOOGLE_PUBSUB_AUDIENCE:-}
+      GOOGLE_PUBSUB_SERVICE_ACCOUNT: ${GOOGLE_PUBSUB_SERVICE_ACCOUNT:-}
+      GOOGLE_PUBSUB_VERIFICATION_TOKEN: ${GOOGLE_PUBSUB_VERIFICATION_TOKEN:-}
+      LEGACY_API_BASE: ${LEGACY_API_BASE:-}
+      JOBS_ENABLED: 'true'
+      JOBS_RECONCILE_INTERVAL_MINUTES: ${JOBS_RECONCILE_INTERVAL_MINUTES:-60}
     labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=aar_traefik_traefik-proxy"
-      - "traefik.http.routers.loikmon-api.rule=Host(`api.loikmon.org`)"
-      - "traefik.http.routers.loikmon-api.entrypoints=websecure"
-      - "traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.loikmon-api.service=loikmon-api-svc"
-      - "traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4000"
-    networks:
-      - traefik-proxy
-      - internal
+      - traefik.enable=true
+      - traefik.docker.network=aar_traefik_traefik-proxy
+      - traefik.http.routers.loikmon-api.rule=Host(`${API_DOMAIN}`)
+      - traefik.http.routers.loikmon-api.entrypoints=websecure
+      - traefik.http.routers.loikmon-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-api.service=loikmon-api-svc
+      - traefik.http.services.loikmon-api-svc.loadbalancer.server.port=4001
+    networks: [internal, traefik-proxy]
+    logging: *logging
 
   web:
     build:
@@ -28,24 +155,55 @@ services:
       dockerfile: packages/web/Dockerfile
       args:
         VITE_BASE: /
-        VITE_API_BASE: /api
+        VITE_API_BASE: /api/v1
+        VITE_APP_STORE_URL: ${APP_STORE_URL:-}
+        VITE_PLAY_STORE_URL: ${PLAY_STORE_URL:-}
+    image: loikmon-web:${IMAGE_TAG:-latest}
     container_name: loikmon-web
     restart: unless-stopped
-    healthcheck:
-      disable: true
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=aar_traefik_traefik-proxy"
-      - "traefik.http.routers.loikmon-app.rule=Host(`app.loikmon.org`)"
-      - "traefik.http.routers.loikmon-app.entrypoints=websecure"
-      - "traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.loikmon-app.service=loikmon-app-svc"
-      - "traefik.http.services.loikmon-app-svc.loadbalancer.server.port=80"
     depends_on:
-      - server
-    networks:
-      - traefik-proxy
-      - internal
+      backend:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=aar_traefik_traefik-proxy
+      - traefik.http.routers.loikmon-app.rule=Host(`${APP_DOMAIN}`)
+      - traefik.http.routers.loikmon-app.entrypoints=websecure
+      - traefik.http.routers.loikmon-app.tls.certresolver=letsencrypt
+      - traefik.http.routers.loikmon-app.service=loikmon-app-svc
+      - traefik.http.services.loikmon-app-svc.loadbalancer.server.port=80
+    networks: [internal, traefik-proxy]
+    logging: *logging
+
+  # Nightly compressed MySQL dumps into ./backups (kept ${BACKUP_RETENTION_DAYS} days).
+  db-backup:
+    image: mysql:8.4
+    container_name: loikmon-db-backup
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_PWD: ${MYSQL_ROOT_PASSWORD}
+      DB_NAME: ${DB_NAME:-loikmon}
+      RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        while true; do
+          file="/backups/$${DB_NAME}-$$(date -u +%Y%m%d-%H%M%S).sql.gz"
+          if mysqldump -h mysql -uroot --single-transaction --routines --triggers --set-gtid-purged=OFF "$$DB_NAME" | gzip > "$$file.tmp"; then
+            mv "$$file.tmp" "$$file" && echo "backup ok: $$file"
+          else
+            rm -f "$$file.tmp" && echo "backup FAILED" >&2
+          fi
+          find /backups -name '*.sql.gz' -mtime +$$RETENTION_DAYS -delete
+          sleep 86400
+        done
+    volumes:
+      - ./backups/mysql:/backups
+    networks: [internal]
+    logging: *logging
 
 networks:
   traefik-proxy:
@@ -53,3 +211,7 @@ networks:
     name: aar_traefik_traefik-proxy
   internal:
     driver: bridge
+
+volumes:
+  mysql-data:
+  minio-data:
