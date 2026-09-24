@@ -1,0 +1,1 @@
+import{i as e}from"./client-Cjbri9NQ.js";var t={home:()=>e().get(`home`),fetchCollections:(t=1,n=20)=>e().get(`collections`,{params:{page:t,limit:n}}),fetchSingleCollection:t=>e().get(`collections/${t}`),fetchFaqs:()=>e().get(`faqs`),fetchInbox:()=>e().get(`notifications`)};export{t};

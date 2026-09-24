@@ -1,0 +1,1 @@
+import{i as e}from"./client-Cjbri9NQ.js";var t={fetchCategories:t=>e().get(`categories`,{params:t?{type:t}:void 0}),getCategory:(t,n={})=>e().get(`categories/${t}`,{params:n})};export{t};

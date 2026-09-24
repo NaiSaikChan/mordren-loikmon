@@ -1,0 +1,1 @@
+import{i as e}from"./client-Cjbri9NQ.js";var t={fetchArticles:(t={})=>e().get(`articles`,{params:t}),getArticle:t=>e().get(`articles/${t}`),updateArticleTotalViews:t=>e().post(`articles/${t}/views`)};export{t};
