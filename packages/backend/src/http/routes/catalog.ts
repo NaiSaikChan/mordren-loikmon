@@ -75,11 +75,12 @@ export function catalogRouter(ctx: AppContext) {
     const entitlement = await getEntitlement(ctx, req)
     const [sliders, latest, popular, recommended, audio, articles, authors] = await Promise.all([
       catalog.listSliders({ isAuthenticated: Boolean(req.user), isSubscribed: entitlement?.active === true, placement: 'home' }),
-      catalog.listBooks({ page: 1, limit: 12, sort: 'latest' }),
-      catalog.listBooks({ page: 1, limit: 12, sort: 'popular' }),
-      catalog.listBooks({ page: 1, limit: 12, recommended: true, sort: 'latest' }),
-      catalog.listBooks({ page: 1, limit: 12, hasAudio: true, sort: 'latest' }),
-      catalog.listArticles({ page: 1, limit: 10 }),
+      // Latest Books is the public home section and must exclude premium content.
+      catalog.listBooks({ page: 1, limit: 12, sort: 'latest', free: true }),
+      catalog.listBooks({ page: 1, limit: 12, sort: 'popular', free: true  }),
+      catalog.listBooks({ page: 1, limit: 12, recommended: true, sort: 'latest', free: true }),
+      catalog.listBooks({ page: 1, limit: 12, hasAudio: true, sort: 'latest', free: true }),
+      catalog.listArticles({ page: 1, limit: 10, free: true }),
       catalog.listAuthors({ page: 1, limit: 12 }),
     ])
     const books = (rows: typeof latest.rows) => rows.map((b) => serializeBook(b, ctx.storage))

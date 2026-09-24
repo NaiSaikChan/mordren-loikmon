@@ -12,7 +12,8 @@ export function useArticles(params: Omit<ArticleQuery, 'page'> = {}) {
   const key = stableKey(params)
   const fetchPage = useCallback(
     async (page: number) => {
-      const { data } = await articlesApi.fetchArticles({ limit: 20, ...params, page })
+      // Filter to show only free articles (premium content disabled)
+      const { data } = await articlesApi.fetchArticles({ limit: 20, ...params, free: true, page })
       return { items: data.articles, pagination: data.pagination }
     },
     // `key` is the serialised `params`.

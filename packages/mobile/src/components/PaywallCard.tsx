@@ -48,6 +48,7 @@ export function PaywallCard({
           <PrimaryButton
             label={isLogin ? t('auth.signIn') : t('subscribe.subscribe')}
             onPress={() => router.push(isLogin ? '/(auth)/login' : '/subscribe')}
+            disabled={!isLogin}
             labelStyle={headerTextStyle}
           />
         </View>

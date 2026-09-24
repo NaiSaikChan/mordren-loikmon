@@ -103,11 +103,13 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
       </View>
 
       {/* Subscription */}
-      <Pressable
+      {/* <Pressable
         onPress={() => router.push('/subscribe')}
+        disabled
         className="mt-4 min-h-touch flex-row items-center justify-between rounded-control bg-white px-3 py-3 active:opacity-70 dark:bg-surface-800"
         accessibilityRole="button"
         accessibilityLabel={`${t('settings.subscription')}, ${entitlement?.active ? t('subscribe.statusActive') : t('home.goPremium')}`}
+        accessibilityState={{ disabled: true }}
       >
         <View className="flex-row items-center gap-2">
           <Ionicons name={entitlement?.active ? 'star' : 'diamond-outline'} size={16} color={entitlement?.active ? colors.premium : colors.brand} />
@@ -121,7 +123,7 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
           </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.mutedText} />
         </View>
-      </Pressable>
+      </Pressable> */}
 
       {/* Change password */}
       <Pressable

@@ -107,11 +107,13 @@ function PremiumChip() {
   return (
     <Pressable
       onPress={goSubscribe}
+      disabled
       className={`min-h-touch flex-row items-center rounded-full px-3 active:opacity-70 ${
         active ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-brand-50 dark:bg-brand-900/30'
       }`}
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={{ disabled: true }}
     >
       <Ionicons name={active ? 'star' : 'diamond-outline'} size={15} color={active ? colors.premium : colors.brand} />
       <Text
@@ -183,9 +185,7 @@ export default function HomeScreen() {
             </Text>
           </View>
           <View className="flex-row items-center gap-1">
-            {isLoggedIn ? (
-              <PremiumChip />
-            ) : (
+            {!isLoggedIn && (
               <Pressable
                 onPress={goLogin}
                 className="min-h-touch items-center justify-center rounded-full bg-brand-600 px-5 active:opacity-80"

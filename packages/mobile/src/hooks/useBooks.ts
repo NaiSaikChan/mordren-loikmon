@@ -15,7 +15,8 @@ export function useBooks(params: Omit<BookQuery, 'page'> = {}) {
   const key = stableKey(params)
   const fetchPage = useCallback(
     async (page: number) => {
-      const { data } = await booksApi.fetchBooks({ limit: 20, ...params, page })
+      // Filter to show only free books (premium content disabled)
+      const { data } = await booksApi.fetchBooks({ limit: 20, ...params, free: true, page })
       return { items: data.books, pagination: data.pagination }
     },
     // `key` is the serialised `params`.

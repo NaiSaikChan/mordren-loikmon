@@ -30,7 +30,7 @@ export function useHome() {
 
   const data = query.data
   return {
-    latestBooks: data?.latest_books ?? EMPTY,
+    latestBooks: data?.latest_books.filter((book) => book.is_free) ?? EMPTY,
     popularBooks: data?.popular_books ?? EMPTY,
     recommendedBooks: data?.recommended_books ?? EMPTY,
     audioBooks: data?.audio_books ?? EMPTY,

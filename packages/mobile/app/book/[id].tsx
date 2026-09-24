@@ -155,7 +155,13 @@ export default function BookDetailScreen() {
   const actionButtons = (
     <View style={styles.actions}>
       {formats.map((format) => (
-        <PrimaryButton key={format} label={readLabel(format)} onPress={() => openReader(format)} labelStyle={headerTextStyle} />
+        <PrimaryButton
+          key={format}
+          label={readLabel(format)}
+          onPress={() => openReader(format)}
+          disabled={action === 'subscribe'}
+          labelStyle={headerTextStyle}
+        />
       ))}
       {book.has_audio ? (
         <PrimaryButton label={`🎧 ${t('books.listen')}`} variant={formats.length ? 'ghost' : 'primary'} onPress={openAudiobook} labelStyle={headerTextStyle} />

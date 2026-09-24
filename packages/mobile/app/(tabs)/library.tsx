@@ -39,9 +39,11 @@ function PremiumPrompt() {
   return (
     <Pressable
       onPress={goSubscribe}
+      disabled
       className="mt-3 flex-row items-center rounded-card bg-brand-600 p-4 active:opacity-90"
       accessibilityRole="button"
       accessibilityLabel={`${t('library.premiumTitle')}. ${t('library.premiumHint')}`}
+      accessibilityState={{ disabled: true }}
     >
       <View className="h-10 w-10 items-center justify-center rounded-control bg-white/20">
         <Ionicons name="diamond-outline" size={20} color={colors.onBrand} />

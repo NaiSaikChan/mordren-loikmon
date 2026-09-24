@@ -324,6 +324,7 @@ interface ChapterRowProps {
   index: number
   active: boolean
   playing: boolean
+  disabled?: boolean
   onSelect: (chapter: BookChapter) => void
   colors: Palette
   textStyle: TextStyle | undefined
@@ -335,6 +336,7 @@ const ChapterRow = memo(function ChapterRow({
   index,
   active,
   playing,
+  disabled = false,
   onSelect,
   colors,
   textStyle,
@@ -347,6 +349,7 @@ const ChapterRow = memo(function ChapterRow({
   return (
     <Pressable
       onPress={() => onSelect(chapter)}
+      disabled={disabled}
       className={`mx-6 mb-2 min-h-11 flex-row items-center gap-3 rounded-2xl border px-3 py-3 ${
         active
           ? 'border-audio-500/50 bg-audio-500/15 dark:border-audio-400/40 dark:bg-audio-400/15'
@@ -355,7 +358,7 @@ const ChapterRow = memo(function ChapterRow({
       accessibilityRole="button"
       accessibilityLabel={`${index + 1}. ${title}${length ? `, ${length}` : ''}`}
       accessibilityHint={status}
-      accessibilityState={{ selected: active }}
+      accessibilityState={{ selected: active, disabled }}
     >
       <View
         className={`h-8 w-8 items-center justify-center rounded-xl ${
@@ -511,13 +514,14 @@ export default function AudiobookScreen() {
         index={index}
         active={activeChapterId === String(item.id)}
         playing={isPlaying && activeChapterId === String(item.id)}
+        disabled={item.locked && accessAction(access, isLoggedIn) === 'subscribe'}
         onSelect={onSelectChapter}
         colors={colors}
         textStyle={bodyTextStyle}
         labels={rowLabels}
       />
     ),
-    [activeChapterId, isPlaying, onSelectChapter, colors, bodyTextStyle, rowLabels],
+    [activeChapterId, isPlaying, onSelectChapter, access, isLoggedIn, colors, bodyTextStyle, rowLabels],
   )
 
   const onSelectSpeed = useCallback(
@@ -724,9 +728,11 @@ export default function AudiobookScreen() {
       {lockedCount > 0 ? (
         <Pressable
           onPress={() => router.push(accessAction(access, isLoggedIn) === 'login' ? '/(auth)/login' : '/subscribe')}
+          disabled={accessAction(access, isLoggedIn) === 'subscribe'}
           className="mx-6 mt-4 min-h-11 flex-row items-center gap-2 rounded-2xl bg-black/5 px-4 py-3 dark:bg-white/10"
           accessibilityRole="button"
           accessibilityLabel={t('audio.lockedHint', { count: lockedCount })}
+          accessibilityState={{ disabled: accessAction(access, isLoggedIn) === 'subscribe' }}
         >
           <Ionicons name="lock-closed" size={16} color={colors.accent} />
           <Text className="flex-1 text-xs font-semibold text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
