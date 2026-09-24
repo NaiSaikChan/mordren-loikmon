@@ -32,6 +32,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "maraohnonpon@hotmail.com",
+        "ascAppId": "6815781800",
+        "appleTeamId": "86SZC8RRQ7"
+      }
+    }
   }
 }

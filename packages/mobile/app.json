@@ -14,7 +14,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "org.loikmon.mobile",
+      "bundleIdentifier": "com.loikmon.mobile",
       "infoPlist": {
         "UIBackgroundModes": [
           "audio"
@@ -58,7 +58,7 @@
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "backgroundColor": "#e0d0d0"
       },
-      "package": "org.loikmon.mobile",
+      "package": "com.loikmon.mobile",
       "permissions": [
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
