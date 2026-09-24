@@ -83,16 +83,17 @@ function RootNavigator() {
           headerStyle: { backgroundColor: isDark ? colors.background : colors.surface },
           headerTintColor: colors.text,
           headerTitleStyle: { fontFamily: headerFontFamily },
+          headerBackTitleStyle: { fontFamily: headerFontFamily },
           contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: tabsBackTitle }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="reader" options={{ title: '' }} />
-        <Stack.Screen name="subscribe" options={{ title: t('subscribe.title') }} />
+        {/* <Stack.Screen name="subscribe" options={{ title: t('subscribe.title') }} /> */}
         <Stack.Screen name="audio" options={{ title: '' }} />
         <Stack.Screen name="audiobook/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="category/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="category/[id]" options={{ headerShown: false, title: t('nav.categories') }} />
       </Stack>
     </>
   )

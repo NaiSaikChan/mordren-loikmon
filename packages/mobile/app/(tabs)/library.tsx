@@ -133,7 +133,7 @@ export default function LibraryScreen() {
         renderItem={renderItem}
         renderSectionHeader={renderSectionHeader}
         stickySectionHeadersEnabled={false}
-        ListHeaderComponent={header}
+        // ListHeaderComponent={header}
         ListEmptyComponent={<EmptyState icon="🔖" title={t('library.empty')} subtitle={t('library.emptyHint')} />}
         contentContainerStyle={CONTENT}
         initialNumToRender={6}

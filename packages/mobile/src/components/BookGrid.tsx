@@ -41,11 +41,12 @@ export function BookGrid({
 
   const renderItem = useCallback<ListRenderItem<Book>>(
     ({ item }) => (
-      <View className="flex-1 p-2">
+      // Fixed 1/columns width so a lone item in the last row doesn't stretch full-width.
+      <View className="p-2" style={{ width: `${100 / columns}%` }}>
         <BookCard book={item} variant="grid" imageWidth={cellWidth} />
       </View>
     ),
-    [cellWidth],
+    [cellWidth, columns],
   )
 
   if (loading && books.length === 0) {

@@ -12,7 +12,7 @@ import {
   type SectionListRenderItem,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useLocalSearchParams, router } from 'expo-router'
+import { useLocalSearchParams, router, Stack } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useReducedMotion } from 'react-native-reanimated'
 import type { Article, Book } from '@loikmon/api'
@@ -150,6 +150,8 @@ export default function CategoryDetailScreen() {
 
   return (
     <Screen>
+      {/* Native back button on pushed screens (book/article) shows this as its label. */}
+      <Stack.Screen options={{ title: category?.name ?? t('nav.categories') }} />
       {/* Back button */}
       <View className="px-4 pt-1">
         <Pressable

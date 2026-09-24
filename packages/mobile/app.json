@@ -118,7 +118,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://api.loikmon.org/api/v1"
+      "apiBaseUrl": "https://api.loikmon.org/api/v1",
+      "router": {},
+      "eas": {
+        "projectId": "5a2b412f-72e4-4ce7-9c43-c65897bce962"
+      }
     },
     "runtimeVersion": {
       "policy": "appVersion"
