@@ -150,51 +150,102 @@ for (const type of ['contextmenu', 'selectstart', 'copy', 'cut', 'paste', 'drags
 
 // --- byte stream from the native side ---------------------------------------
 
-const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-const LOOKUP = new Uint8Array(256)
-for (let i = 0; i < ALPHABET.length; i++) LOOKUP[ALPHABET.charCodeAt(i)] = i
-
-/** Decode one aligned base64 chunk (native sends 3-byte-aligned slices). */
-function decodeChunk(b64) {
-  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '')
-  const out = new Uint8Array((clean.length >> 2) * 3)
-  let o = 0
-  for (let i = 0; i < clean.length; i += 4) {
-    const n =
-      (LOOKUP[clean.charCodeAt(i)] << 18) |
-      (LOOKUP[clean.charCodeAt(i + 1)] << 12) |
-      (LOOKUP[clean.charCodeAt(i + 2)] << 6) |
-      LOOKUP[clean.charCodeAt(i + 3)]
-    out[o++] = (n >> 16) & 0xff
-    out[o++] = (n >> 8) & 0xff
-    out[o++] = n & 0xff
-  }
-  return out
-}
-
+/**
+ * Native slices the file on 3-byte boundaries so each base64 chunk is
+ * self-contained; only the last one carries `=` padding.
+ *
+ * `__pdfBegin(size)` preallocates the final buffer and every chunk is decoded
+ * straight into it, so the document is held once — not as a list of parts plus
+ * a merged copy. Without `__pdfBegin` (older native code) chunks are collected
+ * and merged at the end.
+ */
+let buffer = null
 let parts = []
 let received = 0
+let startPage = 1
+
+function resetStream() {
+  buffer = null
+  parts = []
+  received = 0
+}
+
+window.__pdfBegin = (byteLength, page) => {
+  resetStream()
+  startPage = Number(page) > 1 ? Math.floor(Number(page)) : 1
+  if (byteLength > 0) {
+    try {
+      buffer = new Uint8Array(byteLength)
+    } catch {
+      buffer = null // allocation failed: fall back to parts
+    }
+  }
+}
 
 window.__pdfChunk = (b64) => {
-  const bytes = decodeChunk(b64)
-  parts.push(bytes)
-  received += bytes.length
+  const binary = atob(b64)
+  const length = binary.length
+  if (buffer && received + length <= buffer.length) {
+    for (let i = 0; i < length; i++) buffer[received + i] = binary.charCodeAt(i)
+  } else {
+    const bytes = new Uint8Array(length)
+    for (let i = 0; i < length; i++) bytes[i] = binary.charCodeAt(i)
+    parts.push(bytes)
+  }
+  received += length
 }
 
 window.__pdfFail = (message) => showError(message)
 
 window.__pdfDone = (byteLength) => {
-  const data = new Uint8Array(received)
-  let offset = 0
-  for (const part of parts) {
-    data.set(part, offset)
-    offset += part.length
+  if (byteLength > 0 && byteLength !== received) {
+    console.warn('[pdf] expected ' + byteLength + ' bytes, assembled ' + received)
   }
-  parts = []
-  received = 0
-  // The final chunk is padded up to a 3-byte boundary; trim to the real size.
-  openDocument(byteLength > 0 && byteLength < data.length ? data.subarray(0, byteLength) : data)
+  let data
+  if (buffer && !parts.length) {
+    data = received === buffer.length ? buffer : buffer.subarray(0, received)
+  } else {
+    // Fallback path: merge, freeing each part as soon as it is copied.
+    data = new Uint8Array(received)
+    let offset = 0
+    if (buffer) {
+      data.set(buffer.subarray(0, Math.min(buffer.length, received)), 0)
+      offset = Math.min(buffer.length, received)
+    }
+    for (let i = 0; i < parts.length; i++) {
+      data.set(parts[i], offset)
+      offset += parts[i].length
+      parts[i] = null
+    }
+  }
+  resetStream()
+  openDocument(data)
 }
+
+/** Scroll so `page` is at the top. Exposed for native (restore / "go to page"). */
+window.__pdfGoToPage = (page) => {
+  if (!pdfDoc) {
+    startPage = Number(page) > 1 ? Math.floor(Number(page)) : 1
+    return
+  }
+  scrollToPage(page)
+  updateHud()
+}
+
+// Messages posted from native via `webView.postMessage` also work.
+function onNativeMessage(event) {
+  let message = event && event.data
+  if (typeof message === 'string') {
+    try {
+      message = JSON.parse(message)
+    } catch {
+      return
+    }
+  }
+  if (message && message.type === 'goToPage') window.__pdfGoToPage(message.page)
+}
+window.addEventListener('message', onNativeMessage)
+document.addEventListener('message', onNativeMessage)
 
 // --- rendering ---------------------------------------------------------------
 
@@ -223,6 +274,12 @@ function outputScale() {
 }
 
 async function openDocument(data) {
+  if (observer) observer.disconnect()
+  if (pdfDoc) {
+    const previous = pdfDoc
+    pdfDoc = null
+    previous.destroy().catch(() => undefined)
+  }
   try {
     pdfDoc = await pdfjsLib.getDocument({
       data,
@@ -254,8 +311,32 @@ async function openDocument(data) {
     observer.observe(holder)
   }
 
+  // Restore the reading position before the first page report, so the
+  // stored position is never overwritten with page 1.
+  if (startPage > 1) scrollToPage(startPage)
   updateHud()
   post({ type: 'loaded', pages: pdfDoc.numPages })
+}
+
+let userTouched = false
+window.addEventListener('touchstart', () => { userTouched = true }, { passive: true, capture: true })
+
+function scrollToPage(page) {
+  if (!pdfDoc) return
+  const n = Math.min(Math.max(1, Math.floor(Number(page)) || 1), pdfDoc.numPages)
+  const holder = pagesEl.children[n - 1]
+  if (!holder) return
+  const jump = () => window.scrollTo(0, Math.max(0, holder.offsetTop - 8))
+  jump()
+  // Pages above may resize once rendered (mixed page sizes): re-align once,
+  // unless the reader has started scrolling in the meantime.
+  userTouched = false
+  setTimeout(() => {
+    if (!userTouched) {
+      jump()
+      updateHud()
+    }
+  }, 450)
 }
 
 function onVisibility(entries) {
@@ -265,14 +346,36 @@ function onVisibility(entries) {
   }
 }
 
-/** Drop a far-away page's pixels so long books stay within the WebView's memory. */
+/**
+ * Drop a far-away page's pixels and pdf.js's per-page resources (operator
+ * lists, decoded images) so long books stay within the WebView's memory.
+ */
 function releasePage(holder) {
+  const task = holder._renderTask
+  if (task) {
+    holder._renderTask = null
+    try {
+      task.cancel()
+    } catch {
+      /* already finished */
+    }
+  }
   const canvas = holder.querySelector('canvas')
-  if (!canvas) return
-  canvas.width = 0
-  canvas.height = 0
-  canvas.remove()
+  if (canvas) {
+    canvas.width = 0
+    canvas.height = 0
+    canvas.remove()
+  }
   holder.dataset.rendered = ''
+  if (pdfDoc) {
+    const doc = pdfDoc
+    doc
+      .getPage(Number(holder.dataset.page))
+      .then((page) => {
+        if (doc === pdfDoc && !holder._renderTask) page.cleanup()
+      })
+      .catch(() => undefined)
+  }
 }
 
 async function renderPage(holder) {
@@ -293,13 +396,16 @@ async function renderPage(holder) {
     canvas.style.width = '100%'
     if (!canvas.isConnected) holder.appendChild(canvas)
 
-    await page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport }).promise
+    const task = page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport })
+    holder._renderTask = task
+    await task.promise
     holder.dataset.rendered = String(scale)
   } catch (err) {
     if (!err || err.name !== 'RenderingCancelledException') {
       console.warn('[pdf] page render failed', err)
     }
   } finally {
+    holder._renderTask = null
     holder.dataset.busy = ''
   }
 }

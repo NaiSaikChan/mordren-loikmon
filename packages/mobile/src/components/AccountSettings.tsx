@@ -9,6 +9,7 @@ import { useAuth, type StoreName } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
 import { useSubscription } from '@/context/SubscriptionContext'
 import { STORE_MANAGE_URLS } from '@/lib/iap'
+import { useThemeColors } from '@/theme/colors'
 
 type Panel = 'none' | 'password' | 'delete'
 
@@ -17,6 +18,7 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
   const { t } = useI18n()
   const { user, entitlement, logout, changePassword, deleteAccount } = useAuth()
   const { status } = useSubscription()
+  const colors = useThemeColors()
   const [panel, setPanel] = useState<Panel>('none')
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -85,7 +87,7 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
   }
 
   return (
-    <View className="rounded-2xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900/40">
+    <View className="rounded-card border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900/40">
       <View className="flex-row items-center justify-between">
         <View className="flex-1 pr-4">
           <Text className="text-base font-semibold text-surface-900 dark:text-surface-50" style={textStyle}>
@@ -96,17 +98,19 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
           </Text>
         </View>
         <View className="h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-900/30">
-          <Ionicons name="checkmark-done" size={16} color="#059669" />
+          <Ionicons name="checkmark-done" size={16} color={colors.success} />
         </View>
       </View>
 
       {/* Subscription */}
       <Pressable
         onPress={() => router.push('/subscribe')}
-        className="mt-4 flex-row items-center justify-between rounded-xl bg-white px-3 py-3 dark:bg-surface-800"
+        className="mt-4 min-h-touch flex-row items-center justify-between rounded-control bg-white px-3 py-3 active:opacity-70 dark:bg-surface-800"
+        accessibilityRole="button"
+        accessibilityLabel={`${t('settings.subscription')}, ${entitlement?.active ? t('subscribe.statusActive') : t('home.goPremium')}`}
       >
         <View className="flex-row items-center gap-2">
-          <Ionicons name={entitlement?.active ? 'star' : 'diamond-outline'} size={16} color={entitlement?.active ? '#d97706' : '#4f46e5'} />
+          <Ionicons name={entitlement?.active ? 'star' : 'diamond-outline'} size={16} color={entitlement?.active ? colors.premium : colors.brand} />
           <Text className="text-sm font-semibold text-surface-900 dark:text-surface-50" style={textStyle}>
             {t('settings.subscription')}
           </Text>
@@ -115,34 +119,41 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
           <Text className="text-xs text-surface-500 dark:text-surface-400" style={textStyle}>
             {entitlement?.active ? t('subscribe.statusActive') : t('home.goPremium')}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color="#94a3b8" />
+          <Ionicons name="chevron-forward" size={16} color={colors.mutedText} />
         </View>
       </Pressable>
 
       {/* Change password */}
       <Pressable
         onPress={() => togglePanel('password')}
-        className="mt-2 flex-row items-center justify-between rounded-xl bg-white px-3 py-3 dark:bg-surface-800"
+        className="mt-2 min-h-touch flex-row items-center justify-between rounded-control bg-white px-3 py-3 active:opacity-70 dark:bg-surface-800"
+        accessibilityRole="button"
+        accessibilityLabel={t('settings.changePassword')}
+        accessibilityState={{ expanded: panel === 'password' }}
       >
         <View className="flex-row items-center gap-2">
-          <Ionicons name="key-outline" size={16} color="#4f46e5" />
+          <Ionicons name="key-outline" size={16} color={colors.brand} />
           <Text className="text-sm font-semibold text-surface-900 dark:text-surface-50" style={textStyle}>
             {t('settings.changePassword')}
           </Text>
         </View>
-        <Ionicons name={panel === 'password' ? 'chevron-up' : 'chevron-down'} size={16} color="#94a3b8" />
+        <Ionicons name={panel === 'password' ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
       </Pressable>
       {panel === 'password' ? (
         <View className="mt-3">
-          <FormField label={t('auth.currentPassword')} value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry autoComplete="password" />
-          <FormField label={t('auth.newPassword')} value={newPassword} onChangeText={setNewPassword} secureTextEntry autoComplete="new-password" />
-          <FormField label={t('auth.passwordConfirmation')} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoComplete="new-password" />
+          <FormField label={t('auth.currentPassword')} value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry autoComplete="current-password" textContentType="password" />
+          <FormField label={t('auth.newPassword')} value={newPassword} onChangeText={setNewPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" />
+          <FormField label={t('auth.passwordConfirmation')} value={confirmPassword} onChangeText={setConfirmPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" />
           <PrimaryButton label={t('common.save')} loading={busy} onPress={onChangePassword} labelStyle={textStyle} />
         </View>
       ) : null}
 
       {message && panel !== 'none' ? (
-        <Text className={`mt-3 text-sm ${message.ok ? 'text-emerald-600' : 'text-red-500'}`} style={textStyle}>
+        <Text
+          className={`mt-3 text-sm ${message.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
+          style={textStyle}
+          accessibilityLiveRegion="polite"
+        >
           {message.text}
         </Text>
       ) : null}
@@ -152,17 +163,25 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
           void logout()
           router.replace('/(tabs)')
         }}
-        className="mt-4 flex-row items-center justify-center rounded-xl border border-red-200 bg-red-50 py-2.5 dark:border-red-900/30 dark:bg-red-900/20"
+        className="mt-4 min-h-touch flex-row items-center justify-center rounded-control border border-red-200 bg-red-50 py-2.5 active:opacity-70 dark:border-red-900/30 dark:bg-red-900/20"
+        accessibilityRole="button"
+        accessibilityLabel={t('nav.logout')}
       >
-        <Ionicons name="log-out-outline" size={17} color="#ef4444" />
-        <Text className="ml-2 font-semibold text-red-500" style={textStyle}>
+        <Ionicons name="log-out-outline" size={17} color={colors.danger} />
+        <Text className="ml-2 text-sm font-semibold text-red-600 dark:text-red-400" style={textStyle}>
           {t('nav.logout')}
         </Text>
       </Pressable>
 
       {/* Delete account (required by the App Store for apps with account creation) */}
-      <Pressable onPress={() => togglePanel('delete')} className="mt-3 flex-row items-center justify-center py-2">
-        <Ionicons name="trash-outline" size={15} color="#94a3b8" />
+      <Pressable
+        onPress={() => togglePanel('delete')}
+        className="mt-3 min-h-touch flex-row items-center justify-center py-2 active:opacity-60"
+        accessibilityRole="button"
+        accessibilityLabel={t('settings.deleteAccount')}
+        accessibilityState={{ expanded: panel === 'delete' }}
+      >
+        <Ionicons name="trash-outline" size={15} color={colors.mutedText} />
         <Text className="ml-1.5 text-sm text-surface-500 dark:text-surface-400" style={textStyle}>
           {t('settings.deleteAccount')}
         </Text>
@@ -172,13 +191,16 @@ export function AccountSettings({ textStyle }: { textStyle?: StyleProp<TextStyle
           <Text className="mb-3 text-sm text-surface-600 dark:text-surface-300" style={textStyle}>
             {t('settings.deleteAccountHint')}
           </Text>
-          <FormField label={t('auth.password')} value={deletePassword} onChangeText={setDeletePassword} secureTextEntry autoComplete="password" />
+          <FormField label={t('auth.password')} value={deletePassword} onChangeText={setDeletePassword} secureTextEntry autoComplete="current-password" textContentType="password" />
           <Pressable
             onPress={onDelete}
             disabled={!deletePassword || busy}
-            className={`flex-row items-center justify-center rounded-xl bg-red-600 py-3 ${!deletePassword || busy ? 'opacity-50' : ''}`}
+            className={`min-h-[48px] flex-row items-center justify-center rounded-control bg-red-600 py-3 active:opacity-80 ${!deletePassword || busy ? 'opacity-50' : ''}`}
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.deleteAccount')}
+            accessibilityState={{ disabled: !deletePassword || busy, busy }}
           >
-            <Text className="font-semibold text-white" style={textStyle}>
+            <Text className="text-base font-semibold text-white" style={textStyle}>
               {t('settings.deleteAccount')}
             </Text>
           </Pressable>

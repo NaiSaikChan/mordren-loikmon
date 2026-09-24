@@ -1,0 +1,17 @@
+appId: org.loikmon.mobile
+name: Dark theme applies on the first frame after relaunch
+tags: [smoke]
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+- tapOn: "Settings"
+- tapOn: "Dark"
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible: "Home"
+    timeout: 10000
+- takeScreenshot: theme-after-relaunch

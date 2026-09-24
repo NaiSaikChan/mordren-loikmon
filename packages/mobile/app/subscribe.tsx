@@ -3,7 +3,7 @@ import { Linking, Platform, Pressable, RefreshControl, ScrollView, Text, View } 
 import { Stack, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Screen } from '@/components/Screen'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { Skeleton } from '@/components/Skeleton'
 import { PrimaryButton } from '@/components/PrimaryButton'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
@@ -11,6 +11,8 @@ import { useSubscription } from '@/context/SubscriptionContext'
 import { useTypography } from '@/context/TypographyContext'
 import type { PlanOffer } from '@/lib/iap'
 import { PRIVACY_URL, TERMS_URL, describeSubscription, formatDate } from '@/lib/subscriptionStatus'
+import { useThemeColors } from '@/theme/colors'
+import { brand } from '@/theme/palette'
 
 type T = ReturnType<typeof useI18n>['t']
 
@@ -22,13 +24,18 @@ function periodLabel(months: number, t: T): string {
 
 function Banner({ tone, text }: { tone: 'error' | 'info' | 'warning'; text: string }) {
   const { bodyTextStyle } = useTypography()
+  const colors = useThemeColors()
   const styles = {
-    error: { box: 'border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-900/20', text: 'text-red-700 dark:text-red-300', icon: 'alert-circle' as const, color: '#dc2626' },
-    warning: { box: 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/20', text: 'text-amber-800 dark:text-amber-200', icon: 'warning' as const, color: '#d97706' },
-    info: { box: 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/20', text: 'text-emerald-800 dark:text-emerald-200', icon: 'checkmark-circle' as const, color: '#059669' },
+    error: { box: 'border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-900/20', text: 'text-red-700 dark:text-red-300', icon: 'alert-circle' as const, color: colors.danger },
+    warning: { box: 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/20', text: 'text-amber-800 dark:text-amber-200', icon: 'warning' as const, color: colors.premium },
+    info: { box: 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-900/20', text: 'text-emerald-800 dark:text-emerald-200', icon: 'checkmark-circle' as const, color: colors.success },
   }[tone]
   return (
-    <View className={`mt-3 flex-row items-start gap-2 rounded-2xl border p-3 ${styles.box}`}>
+    <View
+      className={`mt-3 flex-row items-start gap-2 rounded-card border p-3 ${styles.box}`}
+      accessibilityRole={tone === 'error' ? 'alert' : undefined}
+      accessibilityLiveRegion="polite"
+    >
       <Ionicons name={styles.icon} size={18} color={styles.color} />
       <Text className={`flex-1 text-sm ${styles.text}`} style={bodyTextStyle}>
         {text}
@@ -65,7 +72,7 @@ function PlanCard({
     >
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1">
-          <Text className="text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+          <Text className="text-lg text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
             {plan.name}
           </Text>
           {plan.description ? (
@@ -77,14 +84,14 @@ function PlanCard({
         <View className="items-end gap-1">
           {offer.bestValue ? (
             <View className="rounded-full bg-brand-600 px-2.5 py-1">
-              <Text className="text-[11px] font-semibold text-white" style={bodyTextStyle}>
+              <Text className="text-2xs font-semibold text-white" style={bodyTextStyle}>
                 {t('subscribe.bestValue')}
               </Text>
             </View>
           ) : null}
           {plan.savings_percent > 0 ? (
             <View className="rounded-full bg-emerald-100 px-2.5 py-1 dark:bg-emerald-900/40">
-              <Text className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-300" style={bodyTextStyle}>
+              <Text className="text-2xs font-semibold text-emerald-700 dark:text-emerald-300" style={bodyTextStyle}>
                 {t('subscribe.save', { percent: plan.savings_percent })}
               </Text>
             </View>
@@ -117,6 +124,7 @@ export default function SubscribeScreen() {
   const { t } = useI18n()
   const { isLoggedIn } = useAuth()
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const colors = useThemeColors()
   const subscription = useSubscription()
   const {
     plans,
@@ -205,15 +213,22 @@ export default function SubscribeScreen() {
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading && plans.length > 0}
+            onRefresh={() => void refresh()}
+            tintColor={colors.brand}
+            colors={[colors.brandSolid]}
+          />
+        }
       >
         {/* Hero */}
         <View className="rounded-3xl bg-brand-600 px-5 py-5">
           <View className="flex-row items-center gap-3">
             <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20">
-              <Ionicons name="diamond-outline" size={22} color="#ffffff" />
+              <Ionicons name="diamond-outline" size={22} color={colors.onBrand} />
             </View>
-            <Text className="flex-1 text-xl text-white" style={headerTextStyle}>
+            <Text className="flex-1 text-xl text-white" style={headerTextStyle} accessibilityRole="header">
               {t('subscribe.title')}
             </Text>
           </View>
@@ -222,7 +237,7 @@ export default function SubscribeScreen() {
           </Text>
           {[t('subscribe.benefitBooks'), t('subscribe.benefitArticles'), t('subscribe.benefitAudio')].map((benefit) => (
             <View key={benefit} className="mt-2 flex-row items-center gap-2">
-              <Ionicons name="checkmark-circle" size={16} color="#bfdbfe" />
+              <Ionicons name="checkmark-circle" size={16} color={brand[200]} />
               <Text className="flex-1 text-sm text-white" style={bodyTextStyle}>
                 {benefit}
               </Text>
@@ -232,14 +247,14 @@ export default function SubscribeScreen() {
 
         {/* Current status */}
         {statusText ? (
-          <View className="mt-4 rounded-2xl border border-surface-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-800">
+          <View className="mt-4 rounded-card border border-surface-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-800">
             <View className="flex-row items-center gap-2">
               <Ionicons
                 name={entitlement?.active ? 'star' : state.kind === 'billing_issue' ? 'warning' : 'information-circle-outline'}
                 size={18}
-                color={entitlement?.active ? '#d97706' : state.kind === 'billing_issue' ? '#dc2626' : '#64748b'}
+                color={entitlement?.active ? colors.premium : state.kind === 'billing_issue' ? colors.danger : colors.mutedText}
               />
-              <Text className="text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+              <Text className="text-base text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
                 {entitlement?.active ? t('subscribe.statusActive') : t('settings.subscription')}
               </Text>
             </View>
@@ -278,7 +293,12 @@ export default function SubscribeScreen() {
 
         {/* Plans */}
         {plans.length === 0 ? (
-          loading ? <LoadingSpinner /> : null
+          loading ? (
+            <View className="mt-3 gap-3">
+              <Skeleton height={176} radius={24} />
+              <Skeleton height={176} radius={24} />
+            </View>
+          ) : null
         ) : (
           plans.map((offer) => {
             const button = buttonFor(offer)
@@ -299,13 +319,25 @@ export default function SubscribeScreen() {
         {/* Restore / manage */}
         {storePlatform ? (
           <View className="mt-5 flex-row flex-wrap justify-center gap-x-6 gap-y-2">
-            <Pressable onPress={() => void restore()} disabled={restoring || purchasing !== null} hitSlop={8}>
+            <Pressable
+              onPress={() => void restore()}
+              disabled={restoring || purchasing !== null}
+              className="min-h-touch justify-center px-2 active:opacity-60"
+              accessibilityRole="button"
+              accessibilityLabel={t('subscribe.restore')}
+              accessibilityState={{ disabled: restoring || purchasing !== null, busy: restoring }}
+            >
               <Text className={`text-sm font-semibold text-brand-600 dark:text-brand-400 ${restoring ? 'opacity-50' : ''}`} style={bodyTextStyle}>
                 {restoring ? `${t('subscribe.restore')}…` : t('subscribe.restore')}
               </Text>
             </Pressable>
             {isLoggedIn && manageUrl ? (
-              <Pressable onPress={() => void openManageSubscription()} hitSlop={8}>
+              <Pressable
+                onPress={() => void openManageSubscription()}
+                className="min-h-touch justify-center px-2 active:opacity-60"
+                accessibilityRole="button"
+                accessibilityLabel={t('subscribe.manage')}
+              >
                 <Text className="text-sm font-semibold text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
                   {t('subscribe.manage')}
                 </Text>
@@ -315,16 +347,26 @@ export default function SubscribeScreen() {
         ) : null}
 
         {/* Store-required disclosure */}
-        <Text className="mt-6 text-xs leading-5 text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
+        <Text className="mt-6 text-xs text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
           {disclosure}
         </Text>
-        <View className="mt-3 flex-row justify-center gap-6">
-          <Pressable onPress={() => void Linking.openURL(TERMS_URL)} hitSlop={8}>
+        <View className="mt-2 flex-row justify-center gap-4">
+          <Pressable
+            onPress={() => void Linking.openURL(TERMS_URL)}
+            className="min-h-touch justify-center px-2 active:opacity-60"
+            accessibilityRole="link"
+            accessibilityLabel={t('subscribe.terms')}
+          >
             <Text className="text-xs font-semibold text-brand-600 underline dark:text-brand-400" style={bodyTextStyle}>
               {t('subscribe.terms')}
             </Text>
           </Pressable>
-          <Pressable onPress={() => void Linking.openURL(PRIVACY_URL)} hitSlop={8}>
+          <Pressable
+            onPress={() => void Linking.openURL(PRIVACY_URL)}
+            className="min-h-touch justify-center px-2 active:opacity-60"
+            accessibilityRole="link"
+            accessibilityLabel={t('subscribe.privacy')}
+          >
             <Text className="text-xs font-semibold text-brand-600 underline dark:text-brand-400" style={bodyTextStyle}>
               {t('subscribe.privacy')}
             </Text>

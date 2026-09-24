@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { authors as authorsApi, errorMessage } from '@loikmon/api'
 import type { Article, Author, Book } from '@loikmon/api'
-import { useAuth } from '@/context/AuthContext'
+import { useAccessKey } from '@/context/AuthContext'
+import { queryKeys } from '@/lib/queryClient'
+import { DETAIL_STALE_TIME, keepSameItem } from './useBooks'
 import { usePaginatedList } from './usePaginatedList'
 
 /** Paginated authors list, optionally filtered by a search query. */
@@ -16,57 +19,68 @@ export function useAuthors(query = '') {
   return usePaginatedList<Author>(`authors:${query}`, fetchPage)
 }
 
+interface AuthorDetailData {
+  author: Author
+  books: Book[]
+  articles: Article[]
+}
+
+const EMPTY_BOOKS: Book[] = []
+const EMPTY_ARTICLES: Article[] = []
+
 /** Author profile with their books and articles, plus follow/unfollow. */
 export function useAuthorDetail(id: string | number | undefined) {
-  const { user } = useAuth()
-  const [author, setAuthor] = useState<Author | null>(null)
-  const [books, setBooks] = useState<Book[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
-  const [loading, setLoading] = useState(true)
-  const [following, setFollowing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // `is_following` depends on the signed-in user.
+  const accessKey = useAccessKey()
+  const queryClient = useQueryClient()
+  const authorId = id == null ? '' : String(id).trim()
+  const hasId = authorId !== ''
+  const queryKey = queryKeys.author(authorId, accessKey)
 
-  useEffect(() => {
-    let active = true
-    ;(async () => {
-      if (id == null || String(id).trim() === '') {
-        setError('Missing author id')
-        setLoading(false)
-        return
-      }
-      setLoading(true)
-      setError(null)
-      try {
-        const { data } = await authorsApi.getAuthor(id)
-        if (!active) return
-        setAuthor(data.author)
-        setBooks(data.books)
-        setArticles(data.articles)
-      } catch (err) {
-        if (active) setError(errorMessage(err, 'Failed to load author'))
-      } finally {
-        if (active) setLoading(false)
-      }
-    })()
-    return () => {
-      active = false
-    }
-    // `is_following` depends on the signed-in user.
-  }, [id, user?.id])
+  const query = useQuery({
+    queryKey,
+    queryFn: async (): Promise<AuthorDetailData> => {
+      const { data } = await authorsApi.getAuthor(authorId)
+      return { author: data.author, books: data.books, articles: data.articles }
+    },
+    enabled: hasId,
+    staleTime: DETAIL_STALE_TIME,
+    placeholderData: keepSameItem<AuthorDetailData>(authorId),
+  })
 
+  const author = query.data?.author ?? null
+
+  const follow = useMutation({
+    mutationFn: async (target: Author) =>
+      (target.is_following ? await authorsApi.unfollow(target.id) : await authorsApi.follow(target.id)).data,
+    onSuccess: (data) => {
+      queryClient.setQueryData<AuthorDetailData>(queryKey, (prev) =>
+        prev ? { ...prev, author: { ...prev.author, is_following: data.is_following, followers_count: data.followers_count } } : prev,
+      )
+    },
+  })
+
+  const { mutateAsync } = follow
   const toggleFollow = useCallback(async () => {
     if (!author) return
-    setFollowing(true)
-    try {
-      const { data } = author.is_following ? await authorsApi.unfollow(author.id) : await authorsApi.follow(author.id)
-      setAuthor((prev) => (prev ? { ...prev, is_following: data.is_following, followers_count: data.followers_count } : prev))
-    } catch (err) {
-      setError(errorMessage(err, 'Failed to update follow status'))
-      throw err
-    } finally {
-      setFollowing(false)
-    }
-  }, [author])
+    await mutateAsync(author)
+  }, [author, mutateAsync])
 
-  return { author, books, articles, loading, error, following, toggleFollow }
+  const error = !hasId
+    ? 'Missing author id'
+    : follow.error
+      ? errorMessage(follow.error, 'Failed to update follow status')
+      : query.error
+        ? errorMessage(query.error, 'Failed to load author')
+        : null
+
+  return {
+    author,
+    books: query.data?.books ?? EMPTY_BOOKS,
+    articles: query.data?.articles ?? EMPTY_ARTICLES,
+    loading: hasId && query.isPending,
+    error,
+    following: follow.isPending,
+    toggleFollow,
+  }
 }

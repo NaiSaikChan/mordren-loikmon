@@ -1,44 +1,45 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { errorMessage, search as searchApi } from '@loikmon/api'
 import type { Article, Author, Book } from '@loikmon/api'
 
-/** Full-text search across books, articles and authors (`GET /search`). */
+const NO_BOOKS: Book[] = []
+const NO_ARTICLES: Article[] = []
+const NO_AUTHORS: Author[] = []
+
+export const searchKey = (q: string) => ['search', q] as const
+
+/**
+ * Full-text search across books, articles and authors (`GET /search`).
+ * Results are cached per query, and a slow response for an older query can
+ * never overwrite a newer one (each query has its own cache entry).
+ */
 export function useSearch() {
-  const [books, setBooks] = useState<Book[]>([])
-  const [articles, setArticles] = useState<Article[]>([])
-  const [authors, setAuthors] = useState<Author[]>([])
-  const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [searched, setSearched] = useState(false)
-  const latest = useRef(0)
+  const trimmed = query.trim()
+  const enabled = trimmed !== ''
+
+  const result = useQuery({
+    queryKey: searchKey(trimmed),
+    queryFn: async () => (await searchApi.search(trimmed, { type: 'all', page: 1, limit: 20 })).data,
+    enabled,
+    // Keep the previous results on screen while the next query loads.
+    placeholderData: keepPreviousData,
+  })
 
   const run = useCallback(async (q: string) => {
-    const trimmed = q.trim()
     setQuery(q)
-    const requestId = ++latest.current
-    if (!trimmed) {
-      setBooks([])
-      setArticles([])
-      setAuthors([])
-      setSearched(false)
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const { data } = await searchApi.search(trimmed, { type: 'all', page: 1, limit: 20 })
-      if (requestId !== latest.current) return
-      setBooks(data.books)
-      setArticles(data.articles)
-      setAuthors(data.authors)
-      setSearched(true)
-    } catch (err) {
-      if (requestId === latest.current) setError(errorMessage(err, 'Search failed'))
-    } finally {
-      if (requestId === latest.current) setLoading(false)
-    }
   }, [])
 
-  return { books, articles, authors, loading, query, error, searched, run }
+  const data = enabled ? result.data : undefined
+  return {
+    books: data?.books ?? NO_BOOKS,
+    articles: data?.articles ?? NO_ARTICLES,
+    authors: data?.authors ?? NO_AUTHORS,
+    loading: enabled && result.isFetching,
+    query,
+    error: enabled && result.error ? errorMessage(result.error, 'Search failed') : null,
+    searched: enabled && result.data !== undefined,
+    run,
+  }
 }

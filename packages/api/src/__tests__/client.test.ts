@@ -69,6 +69,7 @@ describe('client', () => {
 
     await client.get('auth/me').catch(() => {})
     expect(onUnauthorized).toHaveBeenCalledTimes(1)
+    expect(onUnauthorized.mock.calls[0][1]).toBe('expired')
 
     token = null
     await client.post('auth/login', { email: 'a', password: 'b' }).catch(() => {})

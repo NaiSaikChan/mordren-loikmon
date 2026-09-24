@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { ScrollView, View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native'
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'
+import { useRef, useState } from 'react'
+import { ScrollView, View, Text, Pressable, KeyboardAvoidingView, Platform, type TextInput } from 'react-native'
+import Animated, { FadeInDown, FadeInUp, useReducedMotion } from 'react-native-reanimated'
 import { router, Link } from 'expo-router'
 import { errorMessage } from '@loikmon/api'
 import { Screen } from '@/components/Screen'
@@ -16,6 +16,11 @@ const MIN_PASSWORD_LENGTH = 8
 export default function RegisterScreen() {
   const { t } = useI18n()
   const { register, loading } = useAuth()
+  const reduceMotion = useReducedMotion()
+  const emailRef = useRef<TextInput>(null)
+  const phoneRef = useRef<TextInput>(null)
+  const passwordRef = useRef<TextInput>(null)
+  const confirmRef = useRef<TextInput>(null)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -55,11 +60,20 @@ export default function RegisterScreen() {
   if (verificationSent) {
     return (
       <Screen edges={['top', 'bottom']}>
-        <Animated.View entering={FadeInDown.duration(500)} style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
+        <Animated.View
+          entering={reduceMotion ? undefined : FadeInDown.duration(500)}
+          style={{ flex: 1, padding: 24, justifyContent: 'center' }}
+        >
           <AuthBadge size={104}>
-            <Text style={{ fontSize: 44 }}>📧</Text>
+            <Text style={{ fontSize: 44, lineHeight: 60 }} importantForAccessibility="no">
+              📧
+            </Text>
           </AuthBadge>
-          <Text className="mt-6 text-center text-base text-surface-700 dark:text-surface-200" style={bodyTextStyle}>
+          <Text
+            className="mt-6 text-center text-base text-surface-700 dark:text-surface-200"
+            style={bodyTextStyle}
+            accessibilityLiveRegion="polite"
+          >
             {t('auth.verifyEmailSent')}
           </Text>
           <View className="mt-6">
@@ -74,60 +88,114 @@ export default function RegisterScreen() {
     <Screen edges={['top', 'bottom']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 24, flexGrow: 1, justifyContent: 'center' }} keyboardShouldPersistTaps="handled">
-          <Animated.View entering={FadeInDown.duration(500)} style={{ alignItems: 'center', marginBottom: 28 }}>
+          <Animated.View
+            entering={reduceMotion ? undefined : FadeInDown.duration(500)}
+            style={{ alignItems: 'center', marginBottom: 28 }}
+          >
             <AuthLogo size={104} />
-            <Text className="text-3xl mt-5 text-center text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+            <Text
+              className="mt-5 text-center text-3xl text-surface-900 dark:text-surface-50"
+              style={headerTextStyle}
+              accessibilityRole="header"
+            >
               {t('auth.createAccount')}
             </Text>
-            <Text className="mt-1 text-center text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
+            <Text className="mt-1 text-center text-base text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
               {t('auth.signUp')}
             </Text>
           </Animated.View>
 
-          <Animated.View entering={FadeInUp.duration(450).delay(80)}>
-            <FormField label={t('auth.name')} icon="person-outline" value={name} onChangeText={setName} autoComplete="name" />
+          <Animated.View entering={reduceMotion ? undefined : FadeInUp.duration(450).delay(80)}>
             <FormField
+              label={t('auth.name')}
+              icon="person-outline"
+              value={name}
+              onChangeText={setName}
+              autoComplete="name"
+              textContentType="name"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => emailRef.current?.focus()}
+            />
+            <FormField
+              ref={emailRef}
               label={t('auth.email')}
               icon="mail-outline"
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
+              autoCorrect={false}
               autoComplete="email"
+              textContentType="emailAddress"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => phoneRef.current?.focus()}
             />
             <FormField
+              ref={phoneRef}
               label={`${t('auth.phone')} (${t('common.optional')})`}
               icon="call-outline"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
+              autoComplete="tel"
+              textContentType="telephoneNumber"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => passwordRef.current?.focus()}
             />
             <FormField
+              ref={passwordRef}
               label={t('auth.password')}
               icon="lock-closed-outline"
               value={password}
               onChangeText={setPassword}
               secureTextEntry
               autoComplete="new-password"
+              textContentType="newPassword"
+              passwordRules={`minlength: ${MIN_PASSWORD_LENGTH};`}
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => confirmRef.current?.focus()}
             />
             <FormField
+              ref={confirmRef}
               label={t('auth.passwordConfirmation')}
               icon="lock-closed-outline"
               value={confirm}
               onChangeText={setConfirm}
               secureTextEntry
               autoComplete="new-password"
+              textContentType="newPassword"
+              returnKeyType="done"
+              onSubmitEditing={() => void onSubmit()}
             />
 
-            {error ? <Text className="mb-3 text-sm text-red-500" style={bodyTextStyle}>{error}</Text> : null}
+            {error ? (
+              <Text
+                className="mb-3 text-sm text-red-600 dark:text-red-400"
+                style={bodyTextStyle}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {error}
+              </Text>
+            ) : null}
 
             <PrimaryButton label={t('auth.signUp')} loading={loading} onPress={onSubmit} labelStyle={bodyTextStyle} />
 
-            <View className="mt-6 flex-row justify-center">
-              <Text className="text-surface-500 dark:text-surface-400" style={bodyTextStyle}>{t('auth.hasAccount')} </Text>
+            <View className="mt-4 flex-row items-center justify-center">
+              <Text className="text-sm text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
+                {t('auth.hasAccount')}{' '}
+              </Text>
               <Link href="/(auth)/login" asChild>
-                <Pressable>
-                  <Text className="text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
+                <Pressable
+                  className="min-h-touch justify-center active:opacity-60"
+                  accessibilityRole="link"
+                  accessibilityLabel={t('auth.signIn')}
+                >
+                  <Text className="text-sm text-brand-600 dark:text-brand-400" style={bodyTextStyle}>
                     {t('auth.signIn')}
                   </Text>
                 </Pressable>

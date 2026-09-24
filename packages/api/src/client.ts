@@ -18,7 +18,12 @@ export interface ClientOptions {
   /** Returns the current session token, if any. */
   getToken?: () => string | null | undefined | Promise<string | null | undefined>
   /** Called when an authenticated request is rejected with 401 (expired/revoked session). */
-  onUnauthorized?: (error: ApiError) => void
+  /**
+   * Called when a request that carried a bearer token is rejected because the
+   * session ended. `sentToken` is the token that request used, so callers can
+   * ignore late 401s from a session that has since been replaced.
+   */
+  onUnauthorized?: (error: ApiError, sentToken: string) => void
   timeout?: number
 }
 
@@ -108,8 +113,9 @@ function build(options: ClientOptions): AxiosInstance {
     (response) => response,
     (err: unknown) => {
       const apiError = toApiError(err)
-      const sentToken = axios.isAxiosError(err) && Boolean(err.config?.headers?.Authorization)
-      if (sentToken && SESSION_ENDED_CODES.has(apiError.code)) _options.onUnauthorized?.(apiError)
+      const header = axios.isAxiosError(err) ? err.config?.headers?.Authorization : undefined
+      const sentToken = typeof header === 'string' ? header.replace(/^Bearer\s+/i, '') : ''
+      if (sentToken && SESSION_ENDED_CODES.has(apiError.code)) _options.onUnauthorized?.(apiError, sentToken)
       return Promise.reject(apiError)
     },
   )

@@ -1,7 +1,8 @@
+import { memo } from 'react'
 import { View, Text } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useI18n } from '@/context/I18nContext'
-import { useAuth } from '@/context/AuthContext'
+import { useEntitlementActive } from '@/context/AuthContext'
 import { useTypography } from '@/context/TypographyContext'
 import { accessBadge } from '@/lib/access'
 
@@ -18,11 +19,12 @@ const TEXT_STYLE = {
  * "Free" or "Premium" badge for a book/article. Premium shows a lock until the
  * viewer's subscription unlocks it (display only — the server enforces access).
  */
-export function PriceBadge({ item }: { item: { is_free?: boolean } }) {
+export const PriceBadge = memo(function PriceBadge({ item }: { item: { is_free?: boolean } }) {
   const { t } = useI18n()
-  const { entitlement } = useAuth()
+  // Only the entitlement flag: cards must not re-render on unrelated auth changes.
+  const entitlementActive = useEntitlementActive()
   const { bodyTextStyle } = useTypography()
-  const kind = accessBadge(item, entitlement)
+  const kind = accessBadge(item, { active: entitlementActive })
 
   if (kind === 'free') {
     return (
@@ -43,4 +45,4 @@ export function PriceBadge({ item }: { item: { is_free?: boolean } }) {
       </Text>
     </View>
   )
-}
+})

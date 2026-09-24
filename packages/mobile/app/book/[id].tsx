@@ -1,18 +1,20 @@
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   View,
   useWindowDimensions,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { useReducedMotion } from 'react-native-reanimated'
 import { Screen } from '@/components/Screen'
-import { LoadingSpinner } from '@/components/LoadingSpinner'
+import { Skeleton } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { BookCard } from '@/components/BookCard'
 import { PrimaryButton } from '@/components/PrimaryButton'
@@ -27,9 +29,14 @@ import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
 import { accessAction } from '@/lib/access'
 import { firstParam } from '@/lib/normalize'
-import { pickCover } from '@/lib/url'
+import { pickImage } from '@/lib/url'
+import { elevation, useThemeColors } from '@/theme/colors'
 
 type BookDetailTab = 'details' | 'reviews'
+
+/** The blurred hero only needs the smallest rendition (xs ≈ 150px). */
+const HERO_BLUR_SOURCE_WIDTH = 50
+const goBack = () => router.back()
 
 export default function BookDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>()
@@ -40,6 +47,8 @@ export default function BookDetailScreen() {
   const { isLoggedIn } = useAuth()
   const { isBookmarked, toggleBook } = useLibrary()
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const colors = useThemeColors()
+  const reduceMotion = useReducedMotion()
   const { width } = useWindowDimensions()
   const [activeTab, setActiveTab] = useState<BookDetailTab>('details')
 
@@ -48,12 +57,41 @@ export default function BookDetailScreen() {
   const coverW = isTablet ? Math.min(220, Math.round(width * 0.22)) : Math.round(width * 0.38)
   const coverH = Math.round(coverW * 1.48)
   const heroH = coverH + 72
+  const gutter = isTablet ? 28 : 20
+
+  const dynamic = useMemo(
+    () =>
+      StyleSheet.create({
+        cover: { width: coverW, height: coverH, borderRadius: 18 },
+        coverFallback: {
+          width: coverW,
+          height: coverH,
+          borderRadius: 18,
+          backgroundColor: colors.placeholderFill,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        hero: { height: heroH, backgroundColor: colors.hero },
+        gutter: { paddingHorizontal: gutter },
+        relatedCell: { width: `${100 / relatedColumns}%`, padding: 8 },
+      }),
+    [coverW, coverH, heroH, gutter, relatedColumns, colors],
+  )
+
+  const onToggleBookmark = useCallback(() => {
+    if (book) toggleBook(book)
+  }, [book, toggleBook])
 
   if (loading) {
     return (
       <Screen edges={['top']}>
         <Stack.Screen options={{ title: '' }} />
-        <LoadingSpinner />
+        <View style={styles.loading}>
+          <Skeleton width={coverW} height={coverH} radius={18} />
+          <Skeleton height={24} width="70%" style={styles.loadingLine} />
+          <Skeleton height={16} width="40%" style={styles.loadingLine} />
+          <Skeleton height={48} style={styles.loadingLine} />
+        </View>
       </Screen>
     )
   }
@@ -67,17 +105,20 @@ export default function BookDetailScreen() {
     )
   }
 
-  const cover = pickCover(book)
+  const cover = pickImage(book, coverW)
+  const heroBlur = pickImage(book, HERO_BLUR_SOURCE_WIDTH)
   const author = book.authorname ?? ''
   const bookmarked = isBookmarked('book', book.id)
   // The server's decision for this viewer: open / sign in / subscribe.
   const action = accessAction(book.access, isLoggedIn)
   const formats = (book.formats ?? []).filter((f): f is 'epub' | 'pdf' => f === 'epub' || f === 'pdf')
+  const bookmarkLabel = bookmarked ? t('a11y.removeBookmark') : t('a11y.addBookmark')
+  const transition = reduceMotion ? 0 : 200
 
   const openReader = (format: 'epub' | 'pdf') => {
     if (action === 'login') return router.push('/(auth)/login')
     if (action === 'subscribe') return router.push('/subscribe')
-    router.push({ pathname: '/reader', params: { id: String(book.id), format, title: book.title } })
+    router.push({ pathname: '/reader', params: { id: String(book.id), format, title: book.title, ...(book.updated_at ? { version: String(book.updated_at) } : {}) } })
   }
 
   const openAudiobook = () => router.push({ pathname: '/audiobook/[id]', params: { id: String(book.id) } })
@@ -90,27 +131,18 @@ export default function BookDetailScreen() {
 
   // ── JSX fragments shared by phone and tablet layouts ─────────────────
   const statChips = (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 14 }}>
+    <View style={styles.chips}>
       {book.rating ? (
-        <View
-          style={{
-            flexDirection: 'row', alignItems: 'center', gap: 4,
-            borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6,
-            backgroundColor: 'rgba(245,158,11,0.12)',
-          }}
-        >
-          <Ionicons name="star" size={12} color="#f59e0b" />
-          <Text className="text-xs text-amber-600 dark:text-amber-400" style={bodyTextStyle}>
+        <View style={styles.chip} className="bg-amber-100 dark:bg-amber-900/30" accessible accessibilityLabel={t('a11y.ratingValue', { rating: Number(book.rating).toFixed(1) })}>
+          <Ionicons name="star" size={12} color={colors.starFilled} />
+          <Text className="text-xs text-amber-700 dark:text-amber-400" style={bodyTextStyle}>
             {Number(book.rating).toFixed(1)}
           </Text>
         </View>
       ) : null}
       {book.pages ? (
-        <View
-          className="bg-surface-100 dark:bg-surface-700"
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}
-        >
-          <Ionicons name="document-text-outline" size={12} color="#64748b" />
+        <View style={styles.chip} className="bg-surface-100 dark:bg-surface-700">
+          <Ionicons name="document-text-outline" size={12} color={colors.mutedText} />
           <Text className="text-xs font-medium text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
             {t('books.pages', { count: String(book.pages) })}
           </Text>
@@ -121,7 +153,7 @@ export default function BookDetailScreen() {
   )
 
   const actionButtons = (
-    <View style={{ gap: 10 }}>
+    <View style={styles.actions}>
       {formats.map((format) => (
         <PrimaryButton key={format} label={readLabel(format)} onPress={() => openReader(format)} labelStyle={headerTextStyle} />
       ))}
@@ -138,53 +170,71 @@ export default function BookDetailScreen() {
   )
 
   const coverImage = cover ? (
-    <Image source={{ uri: cover }} style={{ width: coverW, height: coverH, borderRadius: 18 }} resizeMode="cover" />
+    <Image
+      source={cover}
+      style={dynamic.cover}
+      contentFit="cover"
+      cachePolicy="memory-disk"
+      transition={transition}
+      accessibilityLabel={book.title}
+    />
   ) : (
-    <View style={{ width: coverW, height: coverH, borderRadius: 18, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center' }}>
-      <Text style={{ fontSize: 52 }}>📚</Text>
+    <View style={dynamic.coverFallback}>
+      <Text style={styles.coverFallbackIcon}>📚</Text>
     </View>
   )
 
   return (
-    <Screen edges={['top']}>
+    <Screen edges={['top']} testID="book-detail">
       <Stack.Screen options={{ headerShown: false }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 48 }}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.scroll}>
           {/* ── Phone: full-width blurred hero ───────────────── */}
           {!isTablet ? (
-            <View style={{ height: heroH, overflow: 'hidden', backgroundColor: '#0f172a', borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}>
-              {cover ? (
-                <Image source={{ uri: cover }} style={{ position: 'absolute', width: '100%', height: '100%' }} blurRadius={22} resizeMode="cover" />
+            <View style={[styles.hero, dynamic.hero]}>
+              {heroBlur ? (
+                <Image
+                  source={heroBlur}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  blurRadius={22}
+                  transition={transition}
+                  accessible={false}
+                />
               ) : null}
-              <View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.52)' }} />
-              <View style={{ position: 'absolute', top: 12, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', zIndex: 10 }}>
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]} />
+              <View style={styles.heroBar}>
                 <Pressable
-                  onPress={() => router.back()}
-                  hitSlop={8}
-                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={goBack}
+                  style={[styles.heroButton, { backgroundColor: colors.overlayButton }]}
+                  className="active:opacity-70"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.back')}
                 >
-                  <Ionicons name="chevron-back" size={22} color="#fff" />
+                  <Ionicons name="chevron-back" size={22} color={colors.onImage} />
                 </Pressable>
                 <Pressable
-                  onPress={() => toggleBook(book)}
-                  hitSlop={8}
-                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}
+                  onPress={onToggleBookmark}
+                  style={[styles.heroButton, { backgroundColor: colors.overlayButton }]}
+                  className="active:opacity-70"
+                  accessibilityRole="togglebutton"
+                  accessibilityLabel={bookmarkLabel}
+                  accessibilityState={{ checked: bookmarked }}
                 >
-                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={20} color="#fff" />
+                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={20} color={colors.onImage} />
                 </Pressable>
               </View>
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 20, paddingBottom: 10 }}>
-                <View style={{ elevation: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.65, shadowRadius: 22 }}>
-                  {coverImage}
-                </View>
+              <View style={styles.heroCover}>
+                <View style={styles.heroShadow}>{coverImage}</View>
               </View>
             </View>
           ) : null}
 
           {/* ── Phone: title / author / chips / actions ──────── */}
           {!isTablet ? (
-            <View style={{ paddingHorizontal: 20, paddingTop: 22 }}>
-              <Text className="text-[22px] leading-snug text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+            <View style={styles.phoneInfo}>
+              <Text className="text-2xl text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
                 {book.title}
               </Text>
               {author ? (
@@ -193,26 +243,37 @@ export default function BookDetailScreen() {
                 </Text>
               ) : null}
               {statChips}
-              <View style={{ marginTop: 20 }}>{actionButtons}</View>
+              <View style={styles.actionsGapPhone}>{actionButtons}</View>
             </View>
           ) : null}
 
           {/* ── Tablet: side-by-side ─────────────────────────── */}
           {isTablet ? (
-            <View style={{ flexDirection: 'row', gap: 28, paddingHorizontal: 28, paddingTop: 28, paddingBottom: 4, alignItems: 'flex-start' }}>
-              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 28, paddingVertical: 4 }}>
-                <Pressable onPress={() => router.back()} hitSlop={8}>
-                  <Ionicons name="chevron-back" size={24} color="#2563eb" />
+            <View style={styles.tabletRow}>
+              <View style={styles.tabletBar}>
+                <Pressable
+                  onPress={goBack}
+                  style={styles.iconButton}
+                  className="active:opacity-70"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('a11y.back')}
+                >
+                  <Ionicons name="chevron-back" size={24} color={colors.brand} />
                 </Pressable>
-                <Pressable onPress={() => toggleBook(book)} hitSlop={8}>
-                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color="#2563eb" />
+                <Pressable
+                  onPress={onToggleBookmark}
+                  style={styles.iconButton}
+                  className="active:opacity-70"
+                  accessibilityRole="togglebutton"
+                  accessibilityLabel={bookmarkLabel}
+                  accessibilityState={{ checked: bookmarked }}
+                >
+                  <Ionicons name={bookmarked ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.brand} />
                 </Pressable>
               </View>
-              <View style={{ elevation: 18, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 18 }}>
-                {coverImage}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text className="text-3xl leading-tight text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+              <View style={elevation.raised}>{coverImage}</View>
+              <View style={styles.flex}>
+                <Text className="text-3xl text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
                   {book.title}
                 </Text>
                 {author ? (
@@ -221,14 +282,14 @@ export default function BookDetailScreen() {
                   </Text>
                 ) : null}
                 {statChips}
-                <View style={{ marginTop: 24 }}>{actionButtons}</View>
+                <View style={styles.actionsGapTablet}>{actionButtons}</View>
               </View>
             </View>
           ) : null}
 
           {/* ── Tab bar ──────────────────────────────────────── */}
-          <View style={{ paddingHorizontal: isTablet ? 28 : 20, paddingTop: 24 }}>
-            <View className="flex-row rounded-2xl bg-surface-100 dark:bg-surface-800 p-1">
+          <View style={[dynamic.gutter, styles.tabBarWrap]}>
+            <View className="flex-row rounded-card bg-surface-100 p-1 dark:bg-surface-800" accessibilityRole="tablist">
               {([
                 { id: 'details' as const, label: t('books.detailsTab') },
                 { id: 'reviews' as const, label: t('books.reviewsTab', { count: reviews.count }) },
@@ -238,7 +299,10 @@ export default function BookDetailScreen() {
                   <Pressable
                     key={tab.id}
                     onPress={() => setActiveTab(tab.id)}
-                    className={`flex-1 rounded-xl px-4 py-2.5 ${selected ? 'bg-white dark:bg-surface-700' : ''}`}
+                    className={`min-h-touch flex-1 justify-center rounded-control px-4 ${selected ? 'bg-white dark:bg-surface-700' : ''}`}
+                    accessibilityRole="tab"
+                    accessibilityLabel={tab.label}
+                    accessibilityState={{ selected }}
                   >
                     <Text
                       className={`text-center text-sm font-semibold ${selected ? 'text-brand-600 dark:text-brand-400' : 'text-surface-500 dark:text-surface-400'}`}
@@ -253,12 +317,12 @@ export default function BookDetailScreen() {
           </View>
 
           {/* ── Tab content ──────────────────────────────────── */}
-          <View style={{ paddingHorizontal: isTablet ? 28 : 20, paddingTop: 16 }}>
+          <View style={[dynamic.gutter, styles.tabContent]}>
             {activeTab === 'details' ? (
               <>
                 {book.description ? (
-                  <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-                    <Text className="mb-2 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                  <View className="rounded-card bg-white p-5 dark:bg-surface-800">
+                    <Text className="mb-2 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
                       {t('books.description')}
                     </Text>
                     <Text className="text-sm leading-7 text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
@@ -268,14 +332,14 @@ export default function BookDetailScreen() {
                 ) : null}
 
                 {related.length > 0 ? (
-                  <View style={{ marginTop: 24 }}>
-                    <Text className="mb-3 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+                  <View style={styles.related}>
+                    <Text className="mb-3 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
                       {t('books.related')}
                     </Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -8 }}>
+                    <View style={styles.relatedGrid}>
                       {related.map((item) => (
-                        <View key={String(item.id)} style={{ width: `${100 / relatedColumns}%`, padding: 8 }}>
-                          <BookCard book={item} variant="grid" />
+                        <View key={String(item.id)} style={dynamic.relatedCell}>
+                          <BookCard book={item} variant="grid" imageWidth={Math.round(width / relatedColumns)} />
                         </View>
                       ))}
                     </View>
@@ -291,3 +355,65 @@ export default function BookDetailScreen() {
     </Screen>
   )
 }
+
+const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  scroll: { paddingBottom: 48 },
+  loading: { alignItems: 'center', padding: 24 },
+  loadingLine: { marginTop: 16 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 14 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  actions: { gap: 10 },
+  coverFallbackIcon: { fontSize: 52, lineHeight: 68 },
+  hero: { overflow: 'hidden', borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  heroBar: {
+    position: 'absolute',
+    top: 8,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  heroButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  iconButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  heroCover: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 20, paddingBottom: 10 },
+  heroShadow: {
+    elevation: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.65,
+    shadowRadius: 22,
+  },
+  phoneInfo: { paddingHorizontal: 20, paddingTop: 22 },
+  actionsGapPhone: { marginTop: 20 },
+  actionsGapTablet: { marginTop: 24 },
+  tabletRow: {
+    flexDirection: 'row',
+    gap: 28,
+    paddingHorizontal: 28,
+    paddingTop: 52,
+    paddingBottom: 4,
+    alignItems: 'flex-start',
+  },
+  tabletBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  tabBarWrap: { paddingTop: 24 },
+  tabContent: { paddingTop: 16 },
+  related: { marginTop: 24 },
+  relatedGrid: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -8 },
+})

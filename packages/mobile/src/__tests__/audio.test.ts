@@ -1,5 +1,12 @@
 import type { BookChapter } from '@loikmon/api'
-import { articleToTrack, chapterToTrack, chaptersToTracks, isPlayableChapter } from '@/lib/audio'
+import {
+  LOCK_SCREEN_ART_WIDTH,
+  articleToTrack,
+  chapterToTrack,
+  chaptersToTracks,
+  isPlayableChapter,
+  trackImage,
+} from '@/lib/audio'
 
 const SIGNED = 'https://s3.loikmon.org/private/audio/ch.mp3?X-Amz-Credential=a%2Fb&X-Amz-Signature=abc'
 
@@ -92,5 +99,31 @@ describe('articleToTrack', () => {
   it('returns null when locked or without audio', () => {
     expect(articleToTrack({ ...article, locked: true })).toBeNull()
     expect(articleToTrack({ ...article, audio_url: null })).toBeNull()
+  })
+})
+
+describe('trackImage', () => {
+  const cover_image = {
+    src: 'https://s3.loikmon.org/public/covers/72.jpg',
+    variants: {
+      xs: 'https://s3.loikmon.org/public/covers/72-xs.webp',
+      sm: 'https://s3.loikmon.org/public/covers/72-sm.webp',
+      md: 'https://s3.loikmon.org/public/covers/72-md.webp',
+      lg: 'https://s3.loikmon.org/public/covers/72-lg.webp',
+    },
+  }
+
+  it('uses a right-sized rendition for the lock screen instead of the original', () => {
+    const track = chapterToTrack(chapter({}), { ...BOOK, cover_image })
+    expect(track?.coverImage).toEqual(cover_image)
+    // 300pt × 3 = 900px → the 1200px rendition, not the full-size original.
+    expect(trackImage(track, LOCK_SCREEN_ART_WIDTH)).toBe(cover_image.variants.lg)
+    expect(trackImage(track, 44)).toBe(cover_image.variants.xs)
+  })
+
+  it('falls back to the legacy cover when there are no renditions', () => {
+    const track = chapterToTrack(chapter({}), BOOK)
+    expect(trackImage(track, LOCK_SCREEN_ART_WIDTH)).toBe(BOOK.thumbnail)
+    expect(trackImage(null, 44)).toBe('')
   })
 })

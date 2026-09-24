@@ -91,7 +91,10 @@ export function initApiClient(): void {
   configureClient({
     baseURL: resolveApiBase(),
     getToken: getSessionToken,
-    onUnauthorized: (error) => {
+    onUnauthorized: (error, sentToken) => {
+      // A late 401 from a token that has since been replaced (re-login,
+      // password change) says nothing about the current session.
+      if (sentToken !== cachedToken) return
       if (isSessionRejected(error)) unauthorizedHandler?.(error)
     },
   })

@@ -1,17 +1,28 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
 import { errorMessage, type Pagination } from '@loikmon/api'
-import { FIRST_PAGE, applyPage, initialPageState, nextPage, type PageState } from '@/lib/pagination'
+import { FIRST_PAGE, applyPage, initialPageState } from '@/lib/pagination'
 
 export interface PageResult<T> {
   items: T[]
   pagination?: Pick<Pagination, 'has_more'> | null
 }
 
+/** Cache key of a paginated list; `key` must be unique across list kinds (e.g. `books:{…}`). */
+export const paginatedListKey = (key: string) => ['list', key] as const
+
+/** Keep only the first page, so a pull-to-refresh re-requests page 1 instead of every loaded page. */
+export function firstPageOnly<P>(data: InfiniteData<P, number> | undefined): InfiniteData<P, number> | undefined {
+  if (!data || data.pages.length <= 1) return data
+  return { pages: data.pages.slice(0, 1), pageParams: data.pageParams.slice(0, 1) }
+}
+
 /**
  * Generic 1-based paginated list: initial load, pull-to-refresh and infinite
- * scroll driven by the backend's `pagination.has_more`.
+ * scroll driven by the backend's `pagination.has_more` (React Query
+ * `useInfiniteQuery`: cached per `key`, de-duplicated, retried with backoff).
  *
- * `key` identifies the query; when it changes the list reloads from page 1.
+ * `key` identifies the query; when it changes the list loads from page 1.
  */
 export function usePaginatedList<T extends { id: unknown }>(
   key: string,
@@ -19,73 +30,53 @@ export function usePaginatedList<T extends { id: unknown }>(
   options: { enabled?: boolean } = {},
 ) {
   const enabled = options.enabled ?? true
-  const [state, setState] = useState<PageState<T>>(initialPageState)
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
+  const queryKey = useMemo(() => paginatedListKey(key), [key])
   const [refreshing, setRefreshing] = useState(false)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const fetchRef = useRef(fetchPage)
-  fetchRef.current = fetchPage
-  const stateRef = useRef(state)
-  stateRef.current = state
-  /** Increments per query so late responses of an old query are ignored. */
-  const generation = useRef(0)
-  const busy = useRef(false)
+  const query = useInfiniteQuery<PageResult<T>, Error, InfiniteData<PageResult<T>, number>, readonly unknown[], number>({
+    queryKey,
+    queryFn: ({ pageParam }) => fetchPage(pageParam),
+    initialPageParam: FIRST_PAGE,
+    getNextPageParam: (lastPage, _pages, lastPageParam) => (lastPage.pagination?.has_more ? lastPageParam + 1 : undefined),
+    enabled,
+  })
 
-  const load = useCallback(async (page: number) => {
-    const gen = generation.current
-    busy.current = true
-    setError(null)
-    try {
-      const result = await fetchRef.current(page)
-      if (gen !== generation.current) return
-      setState((prev) => applyPage(page === FIRST_PAGE ? initialPageState<T>() : prev, page, result.items, result.pagination))
-    } catch (err) {
-      if (gen === generation.current) setError(errorMessage(err, 'Failed to load'))
-    } finally {
-      if (gen === generation.current) busy.current = false
-    }
-  }, [])
+  const state = useMemo(() => {
+    const data = query.data
+    if (!data) return initialPageState<T>()
+    return data.pages.reduce(
+      (acc, page, index) => applyPage(acc, data.pageParams[index] ?? FIRST_PAGE, page.items, page.pagination),
+      initialPageState<T>(),
+    )
+  }, [query.data])
 
-  useEffect(() => {
-    generation.current++
-    busy.current = false
-    setState(initialPageState<T>())
-    if (!enabled) return
-    setLoading(true)
-    load(FIRST_PAGE).finally(() => setLoading(false))
-  }, [key, enabled, load])
+  const { refetch, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching } = query
 
   const refresh = useCallback(async () => {
-    generation.current++
-    busy.current = false
     setRefreshing(true)
     try {
-      await load(FIRST_PAGE)
+      queryClient.setQueryData<InfiniteData<PageResult<T>, number>>(queryKey, firstPageOnly)
+      await refetch()
     } finally {
       setRefreshing(false)
     }
-  }, [load])
+  }, [queryClient, queryKey, refetch])
 
   const loadMore = useCallback(async () => {
-    const page = nextPage(stateRef.current)
-    if (!enabled || busy.current || page === null || page === FIRST_PAGE) return
-    setLoadingMore(true)
-    try {
-      await load(page)
-    } finally {
-      setLoadingMore(false)
-    }
-  }, [enabled, load])
+    // `cancelRefetch: false` joins an in-flight request instead of firing a duplicate
+    // (onEndReached often fires twice before the next render).
+    if (!enabled || !hasNextPage || isFetchingNextPage || isFetching) return
+    await fetchNextPage({ cancelRefetch: false })
+  }, [enabled, hasNextPage, isFetchingNextPage, isFetching, fetchNextPage])
 
   return {
     items: state.items,
     hasMore: state.hasMore,
-    loading,
+    loading: enabled && query.isLoading,
     refreshing,
-    loadingMore,
-    error,
+    loadingMore: isFetchingNextPage,
+    error: query.error ? errorMessage(query.error, 'Failed to load') : null,
     refresh,
     loadMore,
   }

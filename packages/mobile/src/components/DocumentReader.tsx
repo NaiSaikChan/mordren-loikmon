@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Dimensions,
   FlatList,
   Modal,
@@ -11,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { useReducedMotion } from 'react-native-reanimated'
 import { Reader, ReaderProvider, useReader } from '@epubjs-react-native/core'
 import { useEpubFileSystem } from '@/lib/useEpubFileSystem'
 import * as FileSystem from 'expo-file-system/legacy'
@@ -20,9 +22,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { fixUrl } from '@/lib/url'
 import { detectFormat } from '@/lib/format'
 import { FONT_OPTIONS, useTypography } from '@/context/TypographyContext'
+import { useI18n } from '@/context/I18nContext'
+import { useAuth } from '@/context/AuthContext'
 import { storage } from '@/services/storage'
 import { buildFontFacesCss, buildRenditionFontHookScript } from '@/lib/readerUtils'
-import { chunkRanges } from '@/lib/pdfStream'
+import { streamToViewer } from '@/lib/pdfStream'
+import {
+  DownloadCancelledError,
+  HttpStatusError,
+  documentCacheKey,
+  removeCachedDocument,
+  resolveDocument,
+  type DocumentExt,
+} from '@/lib/documentCache'
+import {
+  createReadingProgressReporter,
+  epubCfiFrom,
+  loadReadingPosition,
+  pdfPageFrom,
+  pdfPosition,
+  type ReadingFormat,
+  type ReadingPosition,
+  type ReadingProgressReporter,
+} from '@/lib/readingProgress'
 import { useTheme } from '@/context/ThemeContext'
 
 export { detectFormat }
@@ -55,15 +77,21 @@ type ThemeId = keyof typeof READER_THEMES
 const FONT_SIZE_OPTIONS = [80, 90, 100, 110, 120, 140, 160]
 
 const LINE_SPACING_OPTIONS = [
-  { label: 'Compact',     value: 1.2 },
-  { label: 'Normal',      value: 1.5 },
-  { label: 'Comfortable', value: 1.8 },
-  { label: 'Wide',        value: 2.1 },
+  { key: 'compact', label: 'Compact', value: 1.2 },
+  { key: 'normal', label: 'Normal', value: 1.5 },
+  { key: 'comfortable', label: 'Comfortable', value: 1.8 },
+  { key: 'wide', label: 'Wide', value: 2.1 },
 ]
 
 const READER_SETTINGS_KEY = 'epub-reader-settings'
 const TOOLBAR_H = 52
 const PROGRESS_H = 3
+/** Minimum touch target (Apple HIG / Material: 44pt / 48dp). */
+const TOUCH = 44
+/** A saved position must never hold the book back for longer than this. */
+const RESTORE_TIMEOUT_MS = 2500
+/** WebView content-process restarts tolerated before giving up with an error. */
+const MAX_VIEWER_RESTARTS = 3
 
 interface ReaderSettings {
   fontId: string
@@ -77,6 +105,36 @@ const DEFAULT_SETTINGS: ReaderSettings = {
   fontSize: 100,
   themeId: 'light',
   lineSpacing: 1.5,
+}
+
+// ---------------------------------------------------------------------------
+// i18n — `reader.*` keys, with English fallbacks until the locale files have them
+// ---------------------------------------------------------------------------
+
+type Translate = (key: string, fallback: string, params?: Record<string, string | number>) => string
+
+function useReaderText(): Translate {
+  const { t } = useI18n()
+  return useCallback<Translate>(
+    (key, fallback, params) => {
+      const full = `reader.${key}`
+      const value = t(full, params)
+      if (value !== full) return value
+      if (!params) return fallback
+      return fallback.replace(/\{(\w+)\}/g, (_, name: string) => (name in params ? String(params[name]) : `{${name}}`))
+    },
+    [t],
+  )
+}
+
+function openErrorMessage(err: unknown, tr: Translate): string {
+  if (err instanceof HttpStatusError) {
+    return tr('openFailedStatus', 'Could not open this book (HTTP {status})', { status: err.status })
+  }
+  if (err instanceof Error && err.message === 'Offline and not downloaded') {
+    return tr('offlineUnavailable', 'You are offline and this book has not been downloaded yet.')
+  }
+  return err instanceof Error && err.message ? err.message : tr('openFailed', 'Could not open this book')
 }
 
 // ---------------------------------------------------------------------------
@@ -125,120 +183,204 @@ function applyFont(
 }
 
 // ---------------------------------------------------------------------------
-// Download helper
+// Fonts — resolved in parallel once per app session and shared by every mount
 // ---------------------------------------------------------------------------
 
-class HttpStatusError extends Error {
-  constructor(readonly status: number) {
-    super(`EPUB download failed: HTTP ${status}`)
-  }
-}
+let fontUrisCache: Record<string, string> | null = null
+let fontUrisPromise: Promise<Record<string, string>> | null = null
 
-/** Signed URLs expire: S3/MinIO answer 403 (or 400/401) once the signature is stale. */
-function isExpiredStatus(status: number): boolean {
-  return status === 400 || status === 401 || status === 403
-}
-
-/**
- * Download an EPUB into the cache. The cache file is keyed by book id + format
- * (never by the signed URL, whose query string changes on every request), and
- * is only committed after a successful download.
- */
-async function downloadEpub(remoteUrl: string, cacheKey: string): Promise<string> {
-  const safeKey = cacheKey.replace(/[^a-zA-Z0-9._-]/g, '_')
-  const dir = (FileSystem.cacheDirectory ?? '') + 'epubs/'
-  const localUri = `${dir}${safeKey}.epub`
-  const partUri = `${localUri}.part`
-  const dirInfo = await FileSystem.getInfoAsync(dir)
-  if (!dirInfo.exists) {
-    await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
+function loadCustomFontUris(): Promise<Record<string, string>> {
+  if (!fontUrisPromise) {
+    fontUrisPromise = Promise.all(
+      READER_CUSTOM_FONT_ASSETS.map(async (font): Promise<[string, string] | null> => {
+        try {
+          const asset = Asset.fromModule(font.module)
+          await asset.downloadAsync()
+          const uri = asset.localUri ?? asset.uri
+          return uri ? [font.id, uri] : null
+        } catch (err) {
+          console.warn('[DocumentReader] font load error:', font.id, err)
+          return null
+        }
+      }),
+    ).then((entries) => {
+      const found = entries.filter((e): e is [string, string] => e !== null)
+      const map = Object.fromEntries(found)
+      // Only memoise a complete set, so a transient failure is retried next time.
+      if (found.length === READER_CUSTOM_FONT_ASSETS.length) fontUrisCache = map
+      else fontUrisPromise = null
+      return map
+    })
   }
-  const fileInfo = await FileSystem.getInfoAsync(localUri)
-  if (fileInfo.exists && (fileInfo.size ?? 0) > 0) return localUri
-  try {
-    const result = await FileSystem.downloadAsync(remoteUrl, partUri)
-    if (result.status !== 200) throw new HttpStatusError(result.status)
-    await FileSystem.moveAsync({ from: partUri, to: localUri })
-    return localUri
-  } finally {
-    await FileSystem.deleteAsync(partUri, { idempotent: true }).catch(() => undefined)
-  }
+  return fontUrisPromise
 }
-
-// ---------------------------------------------------------------------------
-// Hooks
-// ---------------------------------------------------------------------------
 
 function useCustomFontUris(): { uris: Record<string, string>; loading: boolean } {
-  const [uris, setUris] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
+  const [uris, setUris] = useState<Record<string, string> | null>(fontUrisCache)
 
   useEffect(() => {
+    if (uris) return
     let cancelled = false
-    ;(async () => {
-      const entries: Array<[string, string]> = []
-      for (const font of READER_CUSTOM_FONT_ASSETS) {
-        const asset = Asset.fromModule(font.module)
-        await asset.downloadAsync()
-        const uri = asset.localUri ?? asset.uri
-        if (uri) entries.push([font.id, uri])
-      }
-      if (!cancelled) setUris(Object.fromEntries(entries))
-    })()
-      .catch((err: unknown) => {
-        console.warn('[DocumentReader] font load error:', err)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [])
+    void loadCustomFontUris().then((map) => {
+      if (!cancelled) setUris(map)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [uris])
 
-  return { uris, loading }
+  return { uris: uris ?? EMPTY_URIS, loading: uris === null }
 }
 
-function useEpubDownload(
-  url: string,
-  cacheKey: string,
-  refreshUrl?: () => Promise<string | null>,
-): {
-  localUri: string | null
-  downloading: boolean
+const EMPTY_URIS: Record<string, string> = {}
+
+// ---------------------------------------------------------------------------
+// Document file — cached per book/format/version, downloaded with progress
+// ---------------------------------------------------------------------------
+
+interface FileState {
+  request: string
+  uri: string | null
+  fromCache: boolean
   error: string | null
-} {
-  const [localUri, setLocalUri] = useState<string | null>(null)
-  const [downloading, setDownloading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const refreshRef = useRef(refreshUrl)
-  refreshRef.current = refreshUrl
+  /** 0-1 while downloading; null when unknown or not downloading. */
+  progress: number | null
+}
+
+function useLatest<T>(value: T) {
+  const ref = useRef(value)
+  useEffect(() => {
+    ref.current = value
+  }, [value])
+  return ref
+}
+
+function useDocumentFile({
+  url,
+  cacheKey,
+  ext,
+  version,
+  refreshUrl,
+}: {
+  url: string | null
+  cacheKey: string
+  ext: DocumentExt
+  version?: string | null
+  refreshUrl?: () => Promise<string | null>
+}): FileState & { retry: () => void } {
+  const tr = useReaderText()
+  const [attempt, setAttempt] = useState(0)
+  const request = `${cacheKey}|${version ?? ''}|${attempt}`
+  const [state, setState] = useState<FileState>({ request: '', uri: null, fromCache: false, error: null, progress: null })
+  // The signed URL rotates on every access re-check; a new URL for the same
+  // book must not restart the download, so it is read at start time only.
+  const urlRef = useLatest(url)
+  const refreshRef = useLatest(refreshUrl)
+  const trRef = useLatest(tr)
 
   useEffect(() => {
-    let cancelled = false
-    setLocalUri(null)
-    setError(null)
-    setDownloading(true)
-    ;(async () => {
-      try {
-        return await downloadEpub(url, cacheKey)
-      } catch (err) {
-        // The signed URL may have expired before the download started: fetch a fresh one once.
-        if (err instanceof HttpStatusError && isExpiredStatus(err.status) && refreshRef.current) {
-          const fresh = await refreshRef.current()
-          if (fresh) return downloadEpub(fresh, cacheKey)
+    const controller = new AbortController()
+    let lastPercent = -1
+    resolveDocument({
+      key: cacheKey,
+      ext,
+      url: urlRef.current,
+      version: version ?? null,
+      refreshUrl: () => refreshRef.current?.() ?? Promise.resolve(null),
+      signal: controller.signal,
+      onProgress: ({ written, total }) => {
+        if (controller.signal.aborted || total <= 0) return
+        const percent = Math.floor((written / total) * 100)
+        if (percent === lastPercent) return
+        lastPercent = percent
+        setState({ request, uri: null, fromCache: false, error: null, progress: percent / 100 })
+      },
+    })
+      .then((doc) => {
+        if (!controller.signal.aborted) {
+          setState({ request, uri: doc.uri, fromCache: doc.fromCache, error: null, progress: null })
         }
-        throw err
-      }
-    })()
-      .then((uri) => { if (!cancelled) setLocalUri(uri) })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Download failed')
       })
-      .finally(() => { if (!cancelled) setDownloading(false) })
-    return () => { cancelled = true }
-  }, [url, cacheKey])
+      .catch((err: unknown) => {
+        if (controller.signal.aborted || err instanceof DownloadCancelledError) return
+        setState({ request, uri: null, fromCache: false, error: openErrorMessage(err, trRef.current), progress: null })
+      })
+    return () => controller.abort()
+  }, [request, cacheKey, ext, version, urlRef, refreshRef, trRef])
 
-  return { localUri, downloading, error }
+  const current: FileState =
+    state.request === request ? state : { request, uri: null, fromCache: false, error: null, progress: null }
+  const retry = useCallback(() => setAttempt((n) => n + 1), [])
+  return { ...current, retry }
 }
+
+// ---------------------------------------------------------------------------
+// Reading position — restore on open, throttled save while reading
+// ---------------------------------------------------------------------------
+
+function useSavedPosition(
+  bookId: string | undefined,
+  format: ReadingFormat,
+): { ready: boolean; position: ReadingPosition | null } {
+  const { isLoggedIn } = useAuth()
+  // Read once at open: signing in mid-read must not jump the page.
+  const loggedInRef = useLatest(isLoggedIn)
+  const id = bookId ? `${bookId}:${format}` : ''
+  const [state, setState] = useState<{ id: string; position: ReadingPosition | null } | null>(null)
+
+  useEffect(() => {
+    if (!bookId) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), RESTORE_TIMEOUT_MS)
+    })
+    void Promise.race([loadReadingPosition(bookId, format, loggedInRef.current).catch(() => null), timeout]).then(
+      (position) => {
+        if (!cancelled) setState({ id, position })
+      },
+    )
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [bookId, format, id, loggedInRef])
+
+  if (!bookId) return { ready: true, position: null }
+  return state?.id === id ? { ready: true, position: state.position } : { ready: false, position: null }
+}
+
+function useProgressReporter(
+  bookId: string | undefined,
+  format: ReadingFormat,
+): (location: string, progress: number) => void {
+  const { isLoggedIn } = useAuth()
+  const loggedInRef = useLatest(isLoggedIn)
+  const reporterRef = useRef<ReadingProgressReporter | null>(null)
+
+  useEffect(() => {
+    if (!bookId) return
+    const reporter = createReadingProgressReporter({ bookId, format, isLoggedIn: () => loggedInRef.current })
+    reporterRef.current = reporter
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') void reporter.flush()
+    })
+    return () => {
+      subscription.remove()
+      void reporter.flush()
+      reporter.dispose()
+      if (reporterRef.current === reporter) reporterRef.current = null
+    }
+  }, [bookId, format, loggedInRef])
+
+  return useCallback((location: string, progress: number) => {
+    reporterRef.current?.report(location, progress)
+  }, [])
+}
+
+// ---------------------------------------------------------------------------
+// Settings persistence
+// ---------------------------------------------------------------------------
 
 function useReaderSettings(): {
   settings: ReaderSettings
@@ -275,6 +417,56 @@ function useReaderSettings(): {
 }
 
 // ---------------------------------------------------------------------------
+// Shared loading / download progress / error views
+// ---------------------------------------------------------------------------
+
+function DownloadProgressView({ progress, tr }: { progress: number | null; tr: Translate }) {
+  const percent = progress == null ? null : Math.max(0, Math.min(100, Math.round(progress * 100)))
+  const label =
+    percent == null
+      ? tr('preparing', 'Opening book…')
+      : tr('downloading', 'Downloading… {percent}%', { percent })
+  return (
+    <View
+      style={styles.centered}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={label}
+      accessibilityValue={percent == null ? undefined : { min: 0, max: 100, now: percent }}
+      accessibilityLiveRegion="polite"
+    >
+      <ActivityIndicator size="large" color="#4f46e5" />
+      <Text style={styles.progressLabel}>{label}</Text>
+      {percent != null ? (
+        <View style={styles.downloadTrack}>
+          <View style={[styles.downloadFill, { width: `${percent}%` }]} />
+        </View>
+      ) : null}
+    </View>
+  )
+}
+
+function ErrorView({ message, onRetry, tr }: { message: string; onRetry?: () => void; tr: Translate }) {
+  return (
+    <View style={styles.centered}>
+      <Text style={styles.errorText} accessibilityRole="alert">
+        {message}
+      </Text>
+      {onRetry ? (
+        <TouchableOpacity
+          onPress={onRetry}
+          style={styles.retryBtn}
+          accessibilityRole="button"
+          accessibilityLabel={tr('retry', 'Try again')}
+        >
+          <Text style={styles.retryText}>{tr('retry', 'Try again')}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // ToC Modal
 // ---------------------------------------------------------------------------
 
@@ -307,26 +499,37 @@ function TocModal({
   onClose,
   onNavigate,
   themeId,
+  currentHref,
 }: {
   visible: boolean
   toc: TocItem[]
   onClose: () => void
   onNavigate: (href: string) => void
   themeId: ThemeId
+  currentHref?: string
 }) {
   const { bg, fg } = READER_THEMES[themeId]
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const tr = useReaderText()
   const insets = useSafeAreaInsets()
+  const reduceMotion = useReducedMotion()
   const items = useMemo(() => flattenToc(toc), [toc])
-  const slideAnim = useRef(new Animated.Value(-300)).current
+  const [slideAnim] = useState(() => new Animated.Value(-300))
 
   useEffect(() => {
+    const toValue = visible ? 0 : -300
+    if (reduceMotion) {
+      slideAnim.setValue(toValue)
+      return
+    }
     Animated.timing(slideAnim, {
-      toValue: visible ? 0 : -300,
+      toValue,
       duration: 220,
       useNativeDriver: true,
     }).start()
-  }, [visible, slideAnim])
+  }, [visible, slideAnim, reduceMotion])
+
+  const closeLabel = tr('closeContents', 'Close contents')
 
   return (
     <Modal
@@ -335,8 +538,14 @@ function TocModal({
       animationType="none"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.tocBackdrop} onPress={onClose} />
+      <Pressable
+        style={styles.tocBackdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel={closeLabel}
+      />
       <Animated.View
+        accessibilityViewIsModal
         style={[
           styles.tocPanel,
           { backgroundColor: bg, transform: [{ translateX: slideAnim }] },
@@ -345,28 +554,52 @@ function TocModal({
         {/* Spacer pushes panel content below the notch / Dynamic Island */}
         <View style={{ height: insets.top }} />
         <View style={[styles.tocHeader, { borderBottomColor: fg + '22' }]}>
-          <Text style={[styles.tocTitle, headerTextStyle, { color: fg }]}>Contents</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={12}>
-            <Text style={{ color: fg, fontSize: 18 }}>✕</Text>
+          <Text style={[styles.tocTitle, headerTextStyle, { color: fg }]} accessibilityRole="header">
+            {tr('contents', 'Contents')}
+          </Text>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.iconBtn}
+            accessibilityRole="button"
+            accessibilityLabel={closeLabel}
+          >
+            <Text style={{ color: fg, fontSize: 18 }} importantForAccessibility="no">✕</Text>
           </TouchableOpacity>
         </View>
         {items.length === 0 ? (
-          <Text style={[styles.tocEmpty, bodyTextStyle, { color: fg }]}>No chapters found</Text>
+          <Text style={[styles.tocEmpty, bodyTextStyle, { color: fg }]}>
+            {tr('noChapters', 'No chapters found')}
+          </Text>
         ) : (
           <FlatList
             data={items}
             keyExtractor={(item, i) => `${item.href}-${i}`}
             contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => { onNavigate(item.href); onClose() }}
-                style={[styles.tocItem, { paddingLeft: 12 + item.depth * 16 }]}
-              >
-                <Text style={[styles.tocItemText, bodyTextStyle, { color: fg }, { paddingTop: 1 }]} numberOfLines={2}>
-                  {item.label || item.href || 'Untitled'}
-                </Text>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item }) => {
+              const label = item.label || item.href || tr('untitled', 'Untitled')
+              const selected = Boolean(currentHref) && item.href.split('#')[0] === currentHref
+              return (
+                <TouchableOpacity
+                  onPress={() => { onNavigate(item.href); onClose() }}
+                  style={[styles.tocItem, { paddingLeft: 12 + item.depth * 16 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected }}
+                >
+                  <Text
+                    style={[
+                      styles.tocItemText,
+                      bodyTextStyle,
+                      { color: fg, paddingTop: 1 },
+                      selected && styles.tocItemTextActive,
+                    ]}
+                    numberOfLines={2}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            }}
           />
         )}
       </Animated.View>
@@ -393,6 +626,8 @@ function SettingsModal({
 }) {
   const { bg, fg } = READER_THEMES[settings.themeId]
   const insets = useSafeAreaInsets()
+  const tr = useReaderText()
+  const reduceMotion = useReducedMotion()
 
   const availableFonts = useMemo(
     () =>
@@ -404,133 +639,175 @@ function SettingsModal({
   )
 
   const currentSizeIndex = FONT_SIZE_OPTIONS.indexOf(settings.fontSize)
+  const baseSizeIndex = currentSizeIndex < 0 ? 2 : currentSizeIndex
+  const canShrink = baseSizeIndex > 0
+  const canGrow = baseSizeIndex < FONT_SIZE_OPTIONS.length - 1
+  const closeLabel = tr('closeSettings', 'Close reader settings')
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reduceMotion ? 'none' : 'slide'}
       onRequestClose={onClose}
     >
-      <Pressable style={styles.settingsBackdrop} onPress={onClose} />
-      <View style={[styles.settingsSheet, { backgroundColor: bg, paddingBottom: Math.max(32, insets.bottom + 16) }]}>
+      <Pressable
+        style={styles.settingsBackdrop}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel={closeLabel}
+      />
+      <View
+        accessibilityViewIsModal
+        style={[styles.settingsSheet, { backgroundColor: bg, paddingBottom: Math.max(32, insets.bottom + 16) }]}
+      >
         {/* Header */}
         <View style={[styles.settingsHeader, { borderBottomColor: fg + '22' }]}>
-          <Text style={[styles.settingsTitle, { color: fg }]}>Reader Settings</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={12}>
-            <Text style={{ color: fg, fontSize: 18 }}>✕</Text>
+          <Text style={[styles.settingsTitle, { color: fg }]} accessibilityRole="header">
+            {tr('settingsTitle', 'Reader Settings')}
+          </Text>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.iconBtn}
+            accessibilityRole="button"
+            accessibilityLabel={closeLabel}
+          >
+            <Text style={{ color: fg, fontSize: 18 }} importantForAccessibility="no">✕</Text>
           </TouchableOpacity>
         </View>
 
         {/* Theme */}
         <View style={styles.settingsRow}>
-          <Text style={[styles.settingsLabel, { color: fg }]}>Theme</Text>
-          <View style={styles.themeRow}>
-            {(Object.entries(READER_THEMES) as Array<[ThemeId, typeof READER_THEMES[ThemeId]]>).map(
-              ([id, theme]) => (
-                <TouchableOpacity
-                  key={id}
-                  onPress={() => onUpdate({ themeId: id })}
-                  style={[
-                    styles.themeCircle,
-                    { backgroundColor: theme.bg, borderColor: settings.themeId === id ? '#4f46e5' : theme.fg + '44' },
-                    settings.themeId === id && styles.themeCircleActive,
-                  ]}
-                >
-                  <Text style={{ color: theme.fg, fontSize: 9, fontWeight: '600' }}>
-                    {theme.label}
-                  </Text>
-                </TouchableOpacity>
-              ),
+          <Text style={[styles.settingsLabel, { color: fg }]}>{tr('theme', 'Theme')}</Text>
+          <View style={styles.themeRow} accessibilityRole="radiogroup">
+            {(Object.entries(READER_THEMES) as [ThemeId, (typeof READER_THEMES)[ThemeId]][]).map(
+              ([id, theme]) => {
+                const selected = settings.themeId === id
+                const label = tr(`themes.${id}`, theme.label)
+                return (
+                  <TouchableOpacity
+                    key={id}
+                    onPress={() => onUpdate({ themeId: id })}
+                    accessibilityRole="radio"
+                    accessibilityLabel={label}
+                    accessibilityState={{ selected, checked: selected }}
+                    style={[
+                      styles.themeCircle,
+                      { backgroundColor: theme.bg, borderColor: selected ? '#4f46e5' : theme.fg + '44' },
+                      selected && styles.themeCircleActive,
+                    ]}
+                  >
+                    <Text style={{ color: theme.fg, fontSize: 10, fontWeight: '600' }}>{label}</Text>
+                  </TouchableOpacity>
+                )
+              },
             )}
           </View>
         </View>
 
         {/* Font */}
         <View style={styles.settingsRow}>
-          <Text style={[styles.settingsLabel, { color: fg }]}>Font</Text>
+          <Text style={[styles.settingsLabel, { color: fg }]}>{tr('font', 'Font')}</Text>
           <FlatList
             horizontal
             data={availableFonts}
             keyExtractor={(item) => item.id}
             showsHorizontalScrollIndicator={false}
             style={styles.fontList}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                onPress={() => onUpdate({ fontId: item.id })}
-                style={[
-                  styles.fontChip,
-                  {
-                    backgroundColor: settings.fontId === item.id ? '#4f46e5' : fg + '11',
-                    borderColor: settings.fontId === item.id ? '#4f46e5' : fg + '33',
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: settings.fontId === item.id ? '#fff' : fg,
-                    fontSize: 12,
-                    fontFamily: item.family,
-                  }}
-                  numberOfLines={1}
+            accessibilityRole="radiogroup"
+            renderItem={({ item }) => {
+              const selected = settings.fontId === item.id
+              return (
+                <TouchableOpacity
+                  onPress={() => onUpdate({ fontId: item.id })}
+                  accessibilityRole="radio"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ selected, checked: selected }}
+                  style={[
+                    styles.fontChip,
+                    {
+                      backgroundColor: selected ? '#4f46e5' : fg + '11',
+                      borderColor: selected ? '#4f46e5' : fg + '33',
+                    },
+                  ]}
                 >
-                  {item.label}
-                </Text>
-              </TouchableOpacity>
-            )}
+                  <Text
+                    style={{
+                      color: selected ? '#fff' : fg,
+                      fontSize: 12,
+                      fontFamily: item.family,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              )
+            }}
           />
         </View>
 
         {/* Font size */}
         <View style={styles.settingsRow}>
-          <Text style={[styles.settingsLabel, { color: fg }]}>Font Size</Text>
+          <Text style={[styles.settingsLabel, { color: fg }]}>{tr('fontSize', 'Font Size')}</Text>
           <View style={styles.sizeRow}>
             <TouchableOpacity
-              onPress={() => {
-                const idx = Math.max(0, (currentSizeIndex < 0 ? 2 : currentSizeIndex) - 1)
-                onUpdate({ fontSize: FONT_SIZE_OPTIONS[idx] })
-              }}
-              style={[styles.sizeBtn, { borderColor: fg + '44' }]}
+              onPress={() => onUpdate({ fontSize: FONT_SIZE_OPTIONS[Math.max(0, baseSizeIndex - 1)] })}
+              disabled={!canShrink}
+              accessibilityRole="button"
+              accessibilityLabel={tr('decreaseFontSize', 'Decrease font size')}
+              accessibilityState={{ disabled: !canShrink }}
+              style={[styles.sizeBtn, { borderColor: fg + '44', opacity: canShrink ? 1 : 0.4 }]}
             >
-              <Text style={{ color: fg, fontSize: 18 }}>−</Text>
+              <Text style={{ color: fg, fontSize: 18 }} importantForAccessibility="no">−</Text>
             </TouchableOpacity>
-            <Text style={[styles.sizeLbl, { color: fg }]}>{settings.fontSize}%</Text>
-            <TouchableOpacity
-              onPress={() => {
-                const idx = Math.min(
-                  FONT_SIZE_OPTIONS.length - 1,
-                  (currentSizeIndex < 0 ? 2 : currentSizeIndex) + 1,
-                )
-                onUpdate({ fontSize: FONT_SIZE_OPTIONS[idx] })
-              }}
-              style={[styles.sizeBtn, { borderColor: fg + '44' }]}
+            <Text
+              style={[styles.sizeLbl, { color: fg }]}
+              accessibilityLabel={tr('fontSizeValue', 'Font size {size} percent', { size: settings.fontSize })}
             >
-              <Text style={{ color: fg, fontSize: 18 }}>+</Text>
+              {settings.fontSize}%
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                onUpdate({ fontSize: FONT_SIZE_OPTIONS[Math.min(FONT_SIZE_OPTIONS.length - 1, baseSizeIndex + 1)] })
+              }
+              disabled={!canGrow}
+              accessibilityRole="button"
+              accessibilityLabel={tr('increaseFontSize', 'Increase font size')}
+              accessibilityState={{ disabled: !canGrow }}
+              style={[styles.sizeBtn, { borderColor: fg + '44', opacity: canGrow ? 1 : 0.4 }]}
+            >
+              <Text style={{ color: fg, fontSize: 18 }} importantForAccessibility="no">+</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Line spacing */}
         <View style={[styles.settingsRow, { marginBottom: 0 }]}>
-          <Text style={[styles.settingsLabel, { color: fg }]}>Line Spacing</Text>
-          <View style={styles.spacingRow}>
-            {LINE_SPACING_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                onPress={() => onUpdate({ lineSpacing: opt.value })}
-                style={[
-                  styles.spacingChip,
-                  {
-                    backgroundColor: settings.lineSpacing === opt.value ? '#4f46e5' : fg + '11',
-                    borderColor: settings.lineSpacing === opt.value ? '#4f46e5' : fg + '33',
-                  },
-                ]}
-              >
-                <Text style={{ color: settings.lineSpacing === opt.value ? '#fff' : fg, fontSize: 11 }}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <Text style={[styles.settingsLabel, { color: fg }]}>{tr('lineSpacing', 'Line Spacing')}</Text>
+          <View style={styles.spacingRow} accessibilityRole="radiogroup">
+            {LINE_SPACING_OPTIONS.map((opt) => {
+              const selected = settings.lineSpacing === opt.value
+              const label = tr(`spacing.${opt.key}`, opt.label)
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => onUpdate({ lineSpacing: opt.value })}
+                  accessibilityRole="radio"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected, checked: selected }}
+                  style={[
+                    styles.spacingChip,
+                    {
+                      backgroundColor: selected ? '#4f46e5' : fg + '11',
+                      borderColor: selected ? '#4f46e5' : fg + '33',
+                    },
+                  ]}
+                >
+                  <Text style={{ color: selected ? '#fff' : fg, fontSize: 12 }}>{label}</Text>
+                </TouchableOpacity>
+              )
+            })}
           </View>
         </View>
       </View>
@@ -542,36 +819,53 @@ function SettingsModal({
 // Inner EPUB reader view — must be inside ReaderProvider to use useReader
 // ---------------------------------------------------------------------------
 
+/** The subset of epub.js's `Location` this view reads. */
+interface EpubLocation {
+  start?: { cfi?: string; href?: string }
+}
+
 function EpubReaderView({
   localUri,
   fontHookScript,
   customFontUris,
   initialFontId,
+  initialLocation,
+  initialPercent,
   settings,
   onSettingsUpdate,
+  onPosition,
 }: {
   localUri: string
   fontHookScript: string
   customFontUris: Record<string, string>
   initialFontId: string
+  initialLocation?: string
+  initialPercent?: number
   settings: ReaderSettings
   onSettingsUpdate: (patch: Partial<ReaderSettings>) => void
+  onPosition: (cfi: string, percent: number) => void
 }) {
   const {
     goToLocation,
     toc,
     section,
-    progress,
     isLoading,
     changeFontSize,
     changeTheme,
     injectJavascript,
   } = useReader()
+  const tr = useReaderText()
 
   const [showToC, setShowToC] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const settingsRef = useRef(settings)
-  settingsRef.current = settings
+  /** 0-100, from the reader's own location events (the context value mixes 0-1 and 0-100 scales). */
+  const [percent, setPercent] = useState(initialPercent ?? 0)
+  const lastPercentRef = useRef(initialPercent ?? 0)
+  const locationsReadyRef = useRef(false)
+  const [currentHref, setCurrentHref] = useState<string | undefined>(undefined)
+  const settingsRef = useLatest(settings)
+  /** Location events before `onReady` are the pre-restore first page: never saved. */
+  const readyRef = useRef(false)
 
   // Use onLayout to get the exact available dimensions for the Reader container.
   // Dimensions.get('window') does NOT subtract the navigation header height,
@@ -582,11 +876,11 @@ function EpubReaderView({
   // Stable initial theme — captured ONCE at mount so Reader's useEffect dep never
   // changes between renders, preventing the "Maximum update depth exceeded" loop.
   // Settings are guaranteed loaded by the parent before this component mounts.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const initialEpubTheme = useMemo(() => buildEpubTheme(settings.themeId), [])
+  const [initialEpubTheme] = useState(() => buildEpubTheme(settings.themeId))
 
   // Apply all reader settings after the book is ready
   const handleReady = useCallback(() => {
+    readyRef.current = true
     const s = settingsRef.current
     changeTheme(buildEpubTheme(s.themeId))
     changeFontSize(`${s.fontSize}%`)
@@ -595,7 +889,29 @@ function EpubReaderView({
     injectJavascript(
       `try{rendition.themes.override('line-height','${lsEscaped}');}catch(e){}true;`,
     )
-  }, [changeTheme, changeFontSize, injectJavascript, initialFontId])
+  }, [changeTheme, changeFontSize, injectJavascript, initialFontId, settingsRef])
+
+  const handleLocationChange = useCallback(
+    (_total: number, location: EpubLocation, progress: number) => {
+      const href = location?.start?.href
+      if (href) setCurrentHref(href.split('#')[0])
+      let pct = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0
+      if (!locationsReadyRef.current && pct === 0) pct = lastPercentRef.current
+      lastPercentRef.current = pct
+      setPercent(pct)
+      if (!readyRef.current) return
+      const cfi = location?.start?.cfi
+      if (cfi) onPosition(cfi, pct)
+    },
+    [onPosition],
+  )
+
+  // epub.js generates "locations" in the background after opening; until then
+  // every position reports 0%. Keep the last known percentage meanwhile rather
+  // than overwrite the stored one with 0.
+  const handleLocationsReady = useCallback(() => {
+    locationsReadyRef.current = true
+  }, [])
 
   // Sync settings changes to epub.js live (only when values actually change)
   const prevSettings = useRef(settings)
@@ -621,25 +937,42 @@ function EpubReaderView({
   }, [settings, changeTheme, changeFontSize, injectJavascript])
 
   const { bg, fg } = READER_THEMES[settings.themeId]
+  const roundedPercent = Math.round(percent)
 
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>
       {/* Toolbar */}
       <View style={[styles.toolbar, { backgroundColor: bg, borderBottomColor: fg + '22' }]}>
-        <TouchableOpacity onPress={() => setShowToC(true)} hitSlop={8} style={styles.toolbarBtn}>
-          <Text style={[styles.toolbarIcon, { color: fg }]}>☰</Text>
+        <TouchableOpacity
+          onPress={() => setShowToC(true)}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel={tr('openContents', 'Table of contents')}
+        >
+          <Text style={[styles.toolbarIcon, { color: fg }]} importantForAccessibility="no">☰</Text>
         </TouchableOpacity>
-        <Text style={[styles.chapterTitle, { color: fg }]} numberOfLines={1}>
+        <Text style={[styles.chapterTitle, { color: fg }]} numberOfLines={1} accessibilityRole="header">
           {section?.label ?? ''}
         </Text>
-        <TouchableOpacity onPress={() => setShowSettings(true)} hitSlop={8} style={styles.toolbarBtn}>
-          <Text style={[styles.toolbarIcon, { color: fg }]}>⚙</Text>
+        <TouchableOpacity
+          onPress={() => setShowSettings(true)}
+          style={styles.iconBtn}
+          accessibilityRole="button"
+          accessibilityLabel={tr('openSettings', 'Reader settings')}
+        >
+          <Text style={[styles.toolbarIcon, { color: fg }]} importantForAccessibility="no">⚙</Text>
         </TouchableOpacity>
       </View>
 
       {/* Progress bar */}
-      <View style={[styles.progressBar, { backgroundColor: fg + '22' }]}>
-        <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
+      <View
+        style={[styles.progressBar, { backgroundColor: fg + '22' }]}
+        accessible
+        accessibilityRole="progressbar"
+        accessibilityLabel={tr('bookProgress', '{percent}% read', { percent: roundedPercent })}
+        accessibilityValue={{ min: 0, max: 100, now: roundedPercent }}
+      >
+        <View style={[styles.progressFill, { width: `${percent}%` }]} />
       </View>
 
       {/* Reader — onLayout provides the exact available dimensions */}
@@ -659,13 +992,21 @@ function EpubReaderView({
             defaultTheme={initialEpubTheme}
             enableSwipe
             injectedJavascript={fontHookScript}
+            initialLocation={initialLocation}
             onReady={handleReady}
+            onLocationChange={handleLocationChange}
+            onLocationsReady={handleLocationsReady}
           />
         )}
 
         {/* Loading overlay — shown while epub.js initialises or container isn't measured yet */}
         {(isLoading || readerLayout.height === 0) && (
-          <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+          <View
+            style={[StyleSheet.absoluteFill, styles.loadingOverlay]}
+            accessible
+            accessibilityRole="progressbar"
+            accessibilityLabel={tr('preparing', 'Opening book…')}
+          >
             <ActivityIndicator size="large" color="#4f46e5" />
           </View>
         )}
@@ -678,6 +1019,7 @@ function EpubReaderView({
         onClose={() => setShowToC(false)}
         onNavigate={(href) => goToLocation(href)}
         themeId={settings.themeId}
+        currentHref={currentHref}
       />
 
       {/* Settings */}
@@ -696,18 +1038,21 @@ function EpubReaderView({
 // Outer EPUB component — provides fonts + download, then renders ReaderProvider
 // ---------------------------------------------------------------------------
 
-function EpubDocumentReader({
-  url,
-  cacheKey,
-  refreshUrl,
-}: {
-  url: string
+interface DocumentProps {
+  url: string | null
   cacheKey: string
+  bookId?: string
+  version?: string | null
   refreshUrl?: () => Promise<string | null>
-}) {
+}
+
+function EpubDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: DocumentProps) {
   const { bodyFontFamily } = useTypography()
+  const tr = useReaderText()
   const { uris: customFontUris, loading: fontLoading } = useCustomFontUris()
-  const { localUri, downloading, error } = useEpubDownload(url, cacheKey, refreshUrl)
+  const file = useDocumentFile({ url, cacheKey, ext: 'epub', version, refreshUrl })
+  const saved = useSavedPosition(bookId, 'epub')
+  const report = useProgressReporter(bookId, 'epub')
   // Settings are owned here so they're loaded before EpubReaderView mounts.
   // This ensures the initial theme passed to <Reader defaultTheme={}> is correct
   // and prevents the render-loop caused by a stale default vs loaded settings.
@@ -726,33 +1071,32 @@ function EpubDocumentReader({
     return opt?.id ?? 'system'
   }, [bodyFontFamily])
 
-  const renderLoading = () => (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" color="#4f46e5" />
-    </View>
-  )
+  const initialCfi = epubCfiFrom(saved.position) ?? undefined
 
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    )
+  if (file.error) {
+    return <ErrorView message={file.error} onRetry={file.retry} tr={tr} />
   }
 
-  if (downloading || fontLoading || !localUri || !settingsLoaded) {
-    return renderLoading()
+  if (!file.uri) {
+    return <DownloadProgressView progress={file.progress} tr={tr} />
+  }
+
+  if (fontLoading || !settingsLoaded || !saved.ready) {
+    return <DownloadProgressView progress={null} tr={tr} />
   }
 
   return (
     <ReaderProvider>
       <EpubReaderView
-        localUri={localUri}
+        localUri={file.uri}
         fontHookScript={fontHookScript}
         customFontUris={customFontUris}
         initialFontId={initialFontId}
+        initialLocation={initialCfi}
+        initialPercent={initialCfi ? saved.position?.progress : undefined}
         settings={settings}
         onSettingsUpdate={update}
+        onPosition={report}
       />
     </ReaderProvider>
   )
@@ -771,8 +1115,10 @@ function EpubDocumentReader({
  *
  * Instead we bundle pdf.js (see `scripts/build-pdf-viewer.js`) and stream the
  * bytes into it over the RN bridge. The document is only ever pixels on a
- * canvas inside the app: no text layer to select or copy, no toolbar, no URL
- * to download or share, and no temporary file left behind.
+ * canvas inside the app: no text layer to select or copy, no toolbar, and no
+ * URL to download or share. The file itself stays in the app-private document
+ * cache (`documentCache.ts`) so reopening the book — or a WebView reload after
+ * the system reclaimed its memory — does not download it again.
  */
 
 const PDF_VIEWER_ASSET = require('../../assets/pdfjs/viewer.html')
@@ -809,67 +1155,81 @@ function usePdfViewerAsset(): { uri: string | null; error: string | null } {
   return { uri, error }
 }
 
-/**
- * Downloads the PDF to the app's private cache, pushes it into the WebView in
- * aligned slices, and deletes the file again — it exists on disk only for the
- * few hundred milliseconds it takes to stream.
- */
-async function streamPdf(
-  remoteUrl: string,
+/** Streams a local PDF into the viewer in aligned base64 slices. */
+async function streamPdfFile(
+  localUri: string,
   inject: (code: string) => void,
-  refreshUrl?: () => Promise<string | null>,
-): Promise<void> {
-  const dir = (FileSystem.cacheDirectory ?? '') + 'pdf-view/'
-  const localUri = `${dir}doc-${Date.now()}.pdf`
-  const dirInfo = await FileSystem.getInfoAsync(dir)
-  if (!dirInfo.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
-
-  try {
-    let result = await FileSystem.downloadAsync(remoteUrl, localUri)
-    // The signed URL may have expired between issuing and use: retry once.
-    if (isExpiredStatus(result.status) && refreshUrl) {
-      const fresh = await refreshUrl()
-      if (fresh) result = await FileSystem.downloadAsync(fresh, localUri)
-    }
-    if (result.status !== 200) throw new HttpStatusError(result.status)
-
-    const info = await FileSystem.getInfoAsync(localUri)
-    const size = info.exists ? (info.size ?? 0) : 0
-    if (!size) throw new Error('The file is empty')
-
-    for (const range of chunkRanges(size)) {
-      const base64 = await FileSystem.readAsStringAsync(localUri, {
+  signal: AbortSignal,
+  startPage: number,
+): Promise<boolean> {
+  const info = await FileSystem.getInfoAsync(localUri)
+  const size = info.exists ? (info.size ?? 0) : 0
+  return streamToViewer({
+    size,
+    startPage,
+    inject,
+    signal,
+    readSlice: (position, length) =>
+      FileSystem.readAsStringAsync(localUri, {
         encoding: FileSystem.EncodingType.Base64,
-        position: range.position,
-        length: range.length,
-      })
-      inject(`window.__pdfChunk(${JSON.stringify(base64)});true;`)
-    }
-    inject(`window.__pdfDone(${size});true;`)
-  } finally {
-    await FileSystem.deleteAsync(localUri, { idempotent: true }).catch(() => undefined)
-  }
+        position,
+        length,
+      }),
+  })
 }
 
-function PdfDocumentReader({ url, refreshUrl }: { url: string; refreshUrl?: () => Promise<string | null> }) {
-  const { isDark } = useTheme()
-  const { uri: viewerUri, error: viewerError } = usePdfViewerAsset()
-  const webRef = useRef<WebView>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const streaming = useRef(false)
-  const refreshRef = useRef(refreshUrl)
-  refreshRef.current = refreshUrl
+interface ViewerStatus {
+  /** `${localUri}#${webKey}` the status belongs to. */
+  doc: string
+  loaded: boolean
+  error: string | null
+}
 
-  // A new signed URL means a new document.
+function PdfDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: DocumentProps) {
+  const { isDark } = useTheme()
+  const tr = useReaderText()
+  const { uri: viewerUri, error: viewerError } = usePdfViewerAsset()
+  const file = useDocumentFile({ url, cacheKey, ext: 'pdf', version, refreshUrl })
+  const saved = useSavedPosition(bookId, 'pdf')
+  const report = useProgressReporter(bookId, 'pdf')
+  const webRef = useRef<WebView>(null)
+  /** Remount counter: bumped when the WebView's content process dies. */
+  const [webKey, setWebKey] = useState(0)
+  /** Bumped on every `ready` from the page (first load, reload), per WebView instance. */
+  const [ready, setReady] = useState({ webKey: -1, count: 0 })
+  const [status, setStatus] = useState<ViewerStatus>({ doc: '', loaded: false, error: null })
+  const restartsRef = useRef(0)
+  /** Last page the reader was on; a restarted viewer reopens there. */
+  const pageRef = useRef<number | null>(null)
+
+  const localUri = file.uri
+  const docId = `${localUri ?? ''}#${webKey}`
+  const current = status.doc === docId ? status : null
+  const savedPage = pdfPageFrom(saved.position)
+  const fromCacheRef = useLatest(file.fromCache)
+  const trRef = useLatest(tr)
+  const readyCount = ready.webKey === webKey ? ready.count : 0
+
+  // Push the file into the viewer once all three are in place: this WebView
+  // has said it is ready, the file is on disk, and the saved position is known.
+  // Streaming reads from disk, so a reload never downloads the book again.
   useEffect(() => {
-    setError(null)
-    setLoading(true)
-  }, [url])
+    if (!readyCount || !localUri || !saved.ready) return
+    const controller = new AbortController()
+    const startPage = pageRef.current ?? savedPage ?? 1
+    const doc = `${localUri}#${webKey}`
+    streamPdfFile(localUri, (code) => webRef.current?.injectJavaScript(code), controller.signal, startPage).catch(
+      (err: unknown) => {
+        if (controller.signal.aborted) return
+        setStatus({ doc, loaded: false, error: openErrorMessage(err, trRef.current) })
+      },
+    )
+    return () => controller.abort()
+  }, [readyCount, localUri, saved.ready, savedPage, webKey, trRef])
 
   const onMessage = useCallback(
     (event: { nativeEvent: { data: string } }) => {
-      let message: { type?: string; message?: string }
+      let message: { type?: string; message?: string; page?: number; pages?: number }
       try {
         message = JSON.parse(event.nativeEvent.data)
       } catch {
@@ -877,47 +1237,57 @@ function PdfDocumentReader({ url, refreshUrl }: { url: string; refreshUrl?: () =
       }
 
       if (message.type === 'ready') {
-        // The page says it is empty and waiting — which is also true after the
-        // system reloads a backgrounded WebView, so stream again every time.
-        if (streaming.current) return
-        streaming.current = true
-        streamPdf(url, (code) => webRef.current?.injectJavaScript(code), refreshRef.current)
-          .catch((err: unknown) => {
-            const reason =
-              err instanceof HttpStatusError
-                ? `Could not open this book (HTTP ${err.status})`
-                : err instanceof Error
-                  ? err.message
-                  : 'Could not open this book'
-            setError(reason)
-            setLoading(false)
-          })
-          .finally(() => {
-            streaming.current = false
-          })
+        // The page is empty and waiting — also true after the system reloads a
+        // backgrounded WebView — so stream (from disk) again every time.
+        setReady((r) => ({ webKey, count: r.webKey === webKey ? r.count + 1 : 1 }))
       } else if (message.type === 'loaded') {
-        setLoading(false)
+        restartsRef.current = 0
+        setStatus({ doc: docId, loaded: true, error: null })
+      } else if (message.type === 'page') {
+        const page = Number(message.page)
+        const position = pdfPosition(page, Number(message.pages))
+        if (!position) return
+        pageRef.current = page
+        report(position.location, position.progress)
       } else if (message.type === 'error') {
-        setError(message.message ?? 'This file could not be opened')
-        setLoading(false)
+        // A corrupt cached copy must not keep failing: drop it so a retry downloads afresh.
+        if (fromCacheRef.current) void removeCachedDocument(cacheKey)
+        setStatus({ doc: docId, loaded: false, error: message.message ?? tr('fileUnreadable', 'This file could not be opened') })
       }
     },
-    [url],
+    [docId, webKey, report, cacheKey, fromCacheRef, tr],
   )
 
-  const failure = error ?? viewerError
-  if (failure) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{failure}</Text>
-      </View>
-    )
+  // The WebView's content process was killed (usually memory pressure with a
+  // large PDF): without this the screen stays blank. Remount and reopen at the
+  // same page; give up after a few attempts rather than loop.
+  const onProcessGone = useCallback(() => {
+    restartsRef.current += 1
+    if (restartsRef.current > MAX_VIEWER_RESTARTS) {
+      setStatus({ doc: docId, loaded: false, error: tr('viewerCrashed', 'This book is too large to display on this device.') })
+      return
+    }
+    setWebKey((k) => k + 1)
+  }, [docId, tr])
+
+  const retryViewer = () => {
+    restartsRef.current = 0
+    file.retry()
+    setWebKey((k) => k + 1)
   }
+
+  const failure = file.error ?? current?.error ?? viewerError
+  if (failure) {
+    return <ErrorView message={failure} onRetry={viewerError ? undefined : retryViewer} tr={tr} />
+  }
+
+  const loaded = Boolean(localUri && current?.loaded)
 
   return (
     <View style={styles.container}>
       {viewerUri ? (
         <WebView
+          key={webKey}
           ref={webRef}
           source={{ uri: viewerUri }}
           originWhitelist={['file://*']}
@@ -928,7 +1298,10 @@ function PdfDocumentReader({ url, refreshUrl }: { url: string; refreshUrl?: () =
           }
           onMessage={onMessage}
           injectedJavaScript={pdfViewerBootstrap(isDark)}
-          onError={(e) => setError(e.nativeEvent.description)}
+          onError={(e) => setStatus({ doc: docId, loaded: false, error: e.nativeEvent.description })}
+          onRenderProcessGone={onProcessGone}
+          onContentProcessDidTerminate={onProcessGone}
+          accessibilityLabel={tr('pdfDocument', 'Book pages')}
           // Reading only: no downloads, no share sheet, no selection callout.
           allowFileAccess
           allowFileAccessFromFileURLs={false}
@@ -946,9 +1319,12 @@ function PdfDocumentReader({ url, refreshUrl }: { url: string; refreshUrl?: () =
           style={{ flex: 1, backgroundColor: isDark ? '#0f172a' : '#f1f5f9' }}
         />
       ) : null}
-      {loading ? (
-        <View style={[styles.centered, StyleSheet.absoluteFill]} pointerEvents="none">
-          <ActivityIndicator size="large" color="#4f46e5" />
+      {!loaded ? (
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#0f172a' : '#f1f5f9' }]}
+          pointerEvents="none"
+        >
+          <DownloadProgressView progress={localUri ? null : file.progress} tr={tr} />
         </View>
       ) : null}
     </View>
@@ -963,23 +1339,34 @@ export function DocumentReader({
   source,
   format,
   cacheKey,
+  bookId,
+  version,
   refreshUrl,
 }: {
-  /** Signed, short-lived file URL from `books.getFileUrl`. */
-  source: string
+  /**
+   * Signed, short-lived file URL from `books.getFileUrl`, or null to open the
+   * copy already on the device (offline).
+   */
+  source: string | null
   format?: 'pdf' | 'epub'
   /** Stable cache identity, e.g. `book-12-epub`. */
   cacheKey?: string
+  /** Enables saving / restoring the reading position. */
+  bookId?: string
+  /** The book's `updated_at` (or similar): a change invalidates the cached file. */
+  version?: string | null
   /** Fetches a fresh signed URL when the current one has expired. */
   refreshUrl?: () => Promise<string | null>
 }) {
-  const url = fixUrl(source)
-  const kind = format ?? detectFormat(url)
+  const url = source ? fixUrl(source) : null
+  const kind: DocumentExt = format ?? (url ? (detectFormat(url) === 'epub' ? 'epub' : 'pdf') : 'pdf')
+  const key =
+    cacheKey ?? (bookId ? documentCacheKey(bookId, kind) : `${kind}-${(url ?? '').split('?')[0]}`)
 
   if (kind === 'epub') {
-    return <EpubDocumentReader url={url} cacheKey={cacheKey ?? `epub-${url.split('?')[0]}`} refreshUrl={refreshUrl} />
+    return <EpubDocumentReader url={url} cacheKey={key} bookId={bookId} version={version} refreshUrl={refreshUrl} />
   }
-  return <PdfDocumentReader url={url} refreshUrl={refreshUrl} />
+  return <PdfDocumentReader url={url} cacheKey={key} bookId={bookId} version={version} refreshUrl={refreshUrl} />
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,17 +1387,53 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     textAlign: 'center',
   },
+  retryBtn: {
+    marginTop: 16,
+    minHeight: TOUCH,
+    minWidth: TOUCH * 2,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryText: {
+    color: '#4f46e5',
+    fontWeight: '600',
+  },
+  progressLabel: {
+    marginTop: 12,
+    color: '#64748b',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  downloadTrack: {
+    marginTop: 10,
+    width: 180,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#4f46e522',
+    overflow: 'hidden',
+  },
+  downloadFill: {
+    height: '100%',
+    backgroundColor: '#4f46e5',
+  },
   // Toolbar
   toolbar: {
     height: TOOLBAR_H,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 12,
+    paddingHorizontal: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  toolbarBtn: {
-    padding: 6,
+  iconBtn: {
+    minWidth: TOUCH,
+    minHeight: TOUCH,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toolbarIcon: {
     fontSize: 22,
@@ -1052,7 +1475,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
+    paddingLeft: 14,
+    paddingRight: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   tocTitle: {
@@ -1065,12 +1489,18 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   tocItem: {
+    minHeight: TOUCH,
+    justifyContent: 'center',
     paddingVertical: 12,
     paddingRight: 12,
   },
   tocItemText: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  tocItemTextActive: {
+    fontWeight: '700',
+    color: '#4f46e5',
   },
   // Settings
   settingsBackdrop: {
@@ -1090,7 +1520,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     marginBottom: 12,
   },
@@ -1115,8 +1545,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   themeCircle: {
-    width: 54,
-    height: 40,
+    width: 58,
+    height: TOUCH,
     borderRadius: 8,
     borderWidth: 2,
     alignItems: 'center',
@@ -1130,9 +1560,10 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   fontChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    minHeight: TOUCH,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 22,
     borderWidth: 1,
     marginRight: 8,
     alignSelf: 'flex-start',
@@ -1144,9 +1575,9 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   sizeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: TOUCH,
+    height: TOUCH,
+    borderRadius: TOUCH / 2,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1164,9 +1595,10 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   spacingChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
+    minHeight: TOUCH,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 22,
     borderWidth: 1,
   },
 })

@@ -1,9 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { books as booksApi, errorMessage } from '@loikmon/api'
 import type { Book, BookDetail, BookQuery } from '@loikmon/api'
-import { useAuth } from '@/context/AuthContext'
+import { useAccessKey } from '@/context/AuthContext'
+import { queryKeys } from '@/lib/queryClient'
 import { stableKey } from '@/lib/stableKey'
 import { usePaginatedList } from './usePaginatedList'
+
+/** Detail screens are revisited often (back navigation): don't refetch within 5 minutes. */
+export const DETAIL_STALE_TIME = 5 * 60_000
 
 /** Paginated book list (books tab / audiobooks / filtered lists). */
 export function useBooks(params: Omit<BookQuery, 'page'> = {}) {
@@ -13,73 +18,71 @@ export function useBooks(params: Omit<BookQuery, 'page'> = {}) {
       const { data } = await booksApi.fetchBooks({ limit: 20, ...params, page })
       return { items: data.books, pagination: data.pagination }
     },
+    // `key` is the serialised `params`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [key],
   )
-  return usePaginatedList<Book>(key, fetchPage)
+  return usePaginatedList<Book>(`books:${key}`, fetchPage)
+}
+
+/** Keeps the previous detail of the *same* item on screen while an access refresh (login, subscription) loads. */
+export function keepSameItem<T>(id: string) {
+  return (previous: T | undefined, previousQuery: { queryKey: readonly unknown[] } | undefined) =>
+    previousQuery?.queryKey[1] === id ? keepPreviousData(previous) : undefined
 }
 
 /**
  * Book detail (with the server's `access` decision) + related books.
- * Re-fetches when the session/entitlement changes so `access` stays current.
- * Counts one view per opened book.
+ * Cached per session/entitlement so `access` stays current and back
+ * navigation is instant. Counts one view per opened book.
  */
 export function useBookDetail(id: string | number | undefined, options: { trackView?: boolean } = {}) {
   const trackView = options.trackView ?? true
-  const { user, entitlement } = useAuth()
-  const [book, setBook] = useState<BookDetail | null>(null)
-  const [related, setRelated] = useState<Book[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [version, setVersion] = useState(0)
+  const accessKey = useAccessKey()
+  const bookId = id == null ? '' : String(id)
+  const hasId = bookId !== ''
   const viewedId = useRef<string | null>(null)
-  const loadedId = useRef<string | null>(null)
 
-  const accessKey = `${user?.id ?? ''}:${entitlement?.active ? 1 : 0}`
+  const detail = useQuery({
+    queryKey: queryKeys.book(bookId, accessKey),
+    queryFn: async () => (await booksApi.getBook(bookId)).data.book,
+    enabled: hasId,
+    staleTime: DETAIL_STALE_TIME,
+    placeholderData: keepSameItem<BookDetail>(bookId),
+  })
 
-  useEffect(() => {
-    if (id == null || String(id) === '') {
-      setLoading(false)
-      setError('Missing book id')
-      return
-    }
-    let active = true
-    // Only show the full-screen spinner for a different book, not for access refreshes.
-    const isNewBook = loadedId.current !== String(id)
-    ;(async () => {
-      if (isNewBook) {
-        setLoading(true)
-        setBook(null)
-        setRelated([])
-      }
-      setError(null)
+  const related = useQuery({
+    queryKey: queryKeys.relatedBooks(bookId),
+    queryFn: async () => {
       try {
-        const [detail, relatedRes] = await Promise.all([
-          booksApi.getBook(id),
-          isNewBook ? booksApi.relatedBooks(id).catch(() => null) : Promise.resolve(null),
-        ])
-        if (!active) return
-        loadedId.current = String(id)
-        setBook(detail.data.book)
-        if (relatedRes) setRelated(relatedRes.data.books.filter((b) => String(b.id) !== String(id)))
-      } catch (err) {
-        if (active) setError(errorMessage(err, 'Failed to load book'))
-      } finally {
-        if (active) setLoading(false)
+        const { data } = await booksApi.relatedBooks(bookId)
+        return data.books.filter((b) => String(b.id) !== bookId)
+      } catch {
+        return [] as Book[] // optional section: never fail the screen
       }
-    })()
-    return () => {
-      active = false
-    }
-  }, [id, accessKey, version])
+    },
+    enabled: hasId,
+    staleTime: DETAIL_STALE_TIME,
+  })
 
   useEffect(() => {
-    if (!trackView || id == null || viewedId.current === String(id)) return
-    viewedId.current = String(id)
-    booksApi.updateTotalViews(id).catch(() => undefined)
-  }, [id, trackView])
+    if (!trackView || !hasId || viewedId.current === bookId) return
+    viewedId.current = bookId
+    booksApi.updateTotalViews(bookId).catch(() => undefined)
+  }, [bookId, hasId, trackView])
 
-  const reload = useCallback(() => setVersion((v) => v + 1), [])
+  const { refetch } = detail
+  const reload = useCallback(() => {
+    void refetch()
+  }, [refetch])
 
-  return { book, related, loading, error, reload }
+  return {
+    book: detail.data ?? null,
+    related: related.data ?? EMPTY_BOOKS,
+    loading: hasId && detail.isPending,
+    error: !hasId ? 'Missing book id' : detail.error ? errorMessage(detail.error, 'Failed to load book') : null,
+    reload,
+  }
 }
+
+const EMPTY_BOOKS: Book[] = []

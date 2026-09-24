@@ -15,6 +15,7 @@ import {
   useTypography,
 } from '@/context/TypographyContext'
 import type { Locale } from '@/i18n'
+import { useThemeColors } from '@/theme/colors'
 
 function Row({
   label,
@@ -45,6 +46,8 @@ function Row({
       </Text>
 
       <View
+        accessibilityRole={compact ? 'radiogroup' : 'tablist'}
+        accessibilityLabel={label}
         className={
           compact
             ? 'flex-row flex-wrap gap-2'
@@ -55,14 +58,17 @@ function Row({
           <Pressable
             key={opt.id}
             onPress={() => onChange(opt.id)}
+            accessibilityRole={compact ? 'radio' : 'tab'}
+            accessibilityLabel={opt.label}
+            accessibilityState={compact ? { checked: value === opt.id } : { selected: value === opt.id }}
             className={
               compact
-                ? `rounded-xl border px-3 py-2.5 ${
+                ? `min-h-touch justify-center rounded-control border px-3 ${
                     value === opt.id
                       ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30'
                       : 'border-surface-300 bg-surface-100 dark:border-surface-700 dark:bg-surface-800'
                   }`
-                : `flex-1 flex-row items-center justify-center rounded-xl py-2.5 ${
+                : `min-h-touch flex-1 flex-row items-center justify-center rounded-control px-1 ${
                     value === opt.id ? 'bg-white dark:bg-surface-700' : ''
                   }`
             }
@@ -95,13 +101,14 @@ function SectionCard({
   titleStyle?: StyleProp<TextStyle>
   children: React.ReactNode
 }) {
+  const colors = useThemeColors()
   return (
     <View className="mb-4 rounded-3xl border border-surface-200 bg-white p-4 dark:border-surface-700 dark:bg-surface-800">
       <View className="mb-3 flex-row items-center gap-3">
         <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/30">
-          <Ionicons name={icon} size={18} color="#4f46e5" />
+          <Ionicons name={icon} size={18} color={colors.brand} />
         </View>
-        <Text className="text-base text-surface-900 dark:text-surface-50" style={titleStyle}>
+        <Text className="text-base text-surface-900 dark:text-surface-50" style={titleStyle} accessibilityRole="header">
           {title}
         </Text>
       </View>
@@ -114,8 +121,8 @@ export default function SettingsScreen() {
   const { pref, setPref } = useTheme()
   const { t, locale, setLocale, locales } = useI18n()
   const { isLoggedIn } = useAuth()
-  const { bodyFont, headerFont, bodyFontFamily, headerFontFamily, setBodyFont, setHeaderFont } =
-    useTypography()
+  const { bodyFont, headerFont, bodyTextStyle, headerTextStyle, setBodyFont, setHeaderFont } = useTypography()
+  const colors = useThemeColors()
 
   const typographyFonts =
     locale === 'mon' ? FONT_OPTIONS.filter((font) => MON_SAFE_FONT_IDS.has(font.id)) : FONT_OPTIONS
@@ -125,9 +132,10 @@ export default function SettingsScreen() {
   const [isBodyFontOpen, setIsBodyFontOpen] = useState(false)
   const [isHeadingFontOpen, setIsHeadingFontOpen] = useState(false)
 
-  const titleStyle = bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined
-  const bodyStyle = bodyFontFamily ? { fontFamily: bodyFontFamily } : undefined
-  const headerPreviewStyle = headerFontFamily ? { fontFamily: headerFontFamily } : undefined
+  // Settings chrome uses the body font; the preview shows the heading font.
+  const titleStyle = bodyTextStyle
+  const bodyStyle = bodyTextStyle
+  const headerPreviewStyle = headerTextStyle
 
   const localeLabel = locales.find((l) => l.id === locale)?.label ?? locale
   const themeLabel =
@@ -146,25 +154,25 @@ export default function SettingsScreen() {
         <View className="mb-4 rounded-3xl bg-brand-600 px-5 py-5">
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-4">
-              <Text className="text-lg text-white" style={titleStyle}>
+              <Text className="text-lg text-white" style={titleStyle} accessibilityRole="header">
                 {t('nav.settings')}
               </Text>
               <Text className="mt-1 text-xs text-brand-100" style={bodyStyle}>
                 {t('settings.appearance')} · {t('settings.typography')}
               </Text>
             </View>
-            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20">
-              <Ionicons name="sparkles-outline" size={20} color="#ffffff" />
+            <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20" importantForAccessibility="no-hide-descendants">
+              <Ionicons name="sparkles-outline" size={20} color={colors.onBrand} />
             </View>
           </View>
 
           <View className="mt-4 flex-row gap-2">
-            <View className="flex-1 rounded-xl bg-white/15 px-3 py-2.5">
-              <Text className="text-[11px] text-white/80" style={bodyStyle}>{t('settings.theme')}</Text>
+            <View className="flex-1 rounded-control bg-white/15 px-3 py-2">
+              <Text className="text-2xs text-white/80" style={bodyStyle}>{t('settings.theme')}</Text>
               <Text className="mt-0.5 text-sm font-semibold text-white" style={bodyStyle}>{themeLabel}</Text>
             </View>
-            <View className="flex-1 rounded-xl bg-white/15 px-3 py-2.5">
-              <Text className="text-[11px] text-white/80" style={bodyStyle}>{t('settings.language')}</Text>
+            <View className="flex-1 rounded-control bg-white/15 px-3 py-2">
+              <Text className="text-2xs text-white/80" style={bodyStyle}>{t('settings.language')}</Text>
               <Text className="mt-0.5 text-sm font-semibold text-white" style={bodyStyle}>{localeLabel}</Text>
             </View>
           </View>
@@ -196,7 +204,7 @@ export default function SettingsScreen() {
 
         <SectionCard icon="text-outline" title={t('settings.typography')} titleStyle={titleStyle}>
 
-                    <View className="mb-5">
+          <View className="mb-5">
             <Text
               className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-surface-500 dark:text-surface-400"
               style={bodyStyle}
@@ -208,12 +216,15 @@ export default function SettingsScreen() {
                 setIsHeadingFontOpen((prev) => !prev)
                 if (!isHeadingFontOpen) setIsBodyFontOpen(false)
               }}
-              className="flex-row items-center justify-between rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-900/40"
+              accessibilityRole="button"
+              accessibilityLabel={`${t('settings.headingFont')}: ${selectedHeadingFontLabel}`}
+              accessibilityState={{ expanded: isHeadingFontOpen }}
+              className="min-h-touch flex-row items-center justify-between rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-900/40"
             >
               <Text style={[bodyStyle, { fontFamily: getFontFamily(displayedHeaderFont) }]} className="text-sm text-surface-900 dark:text-surface-50">
                 {selectedHeadingFontLabel}
               </Text>
-              <Ionicons name={isHeadingFontOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#94a3b8" />
+              <Ionicons name={isHeadingFontOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
             </Pressable>
 
             {isHeadingFontOpen ? (
@@ -225,12 +236,15 @@ export default function SettingsScreen() {
                       setHeaderFont(font.id)
                       setIsHeadingFontOpen(false)
                     }}
-                    className={`flex-row items-center justify-between px-4 py-3 ${index > 0 ? 'border-t border-surface-100 dark:border-surface-700' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityLabel={font.label}
+                    accessibilityState={{ checked: displayedHeaderFont === font.id }}
+                    className={`min-h-touch flex-row items-center justify-between px-4 py-3 ${index > 0 ? 'border-t border-surface-100 dark:border-surface-700' : ''}`}
                   >
                     <Text style={[bodyStyle, { fontFamily: getFontFamily(font.id) }]} className="text-sm text-surface-900 dark:text-surface-50">
                       {font.label}
                     </Text>
-                    {displayedHeaderFont === font.id ? <Ionicons name="checkmark" size={16} color="#4f46e5" /> : null}
+                    {displayedHeaderFont === font.id ? <Ionicons name="checkmark" size={16} color={colors.brand} /> : null}
                   </Pressable>
                 ))}
               </View>
@@ -249,12 +263,15 @@ export default function SettingsScreen() {
                 setIsBodyFontOpen((prev) => !prev)
                 if (!isBodyFontOpen) setIsHeadingFontOpen(false)
               }}
-              className="flex-row items-center justify-between rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-900/40"
+              accessibilityRole="button"
+              accessibilityLabel={`${t('settings.bodyFont')}: ${selectedBodyFontLabel}`}
+              accessibilityState={{ expanded: isBodyFontOpen }}
+              className="min-h-touch flex-row items-center justify-between rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-900/40"
             >
               <Text style={[bodyStyle, { fontFamily: getFontFamily(displayedBodyFont) }]} className="text-sm text-surface-900 dark:text-surface-50">
                 {selectedBodyFontLabel}
               </Text>
-              <Ionicons name={isBodyFontOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#94a3b8" />
+              <Ionicons name={isBodyFontOpen ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedText} />
             </Pressable>
 
             {isBodyFontOpen ? (
@@ -266,12 +283,15 @@ export default function SettingsScreen() {
                       setBodyFont(font.id)
                       setIsBodyFontOpen(false)
                     }}
-                    className={`flex-row items-center justify-between px-4 py-3 ${index > 0 ? 'border-t border-surface-100 dark:border-surface-700' : ''}`}
+                    accessibilityRole="radio"
+                    accessibilityLabel={font.label}
+                    accessibilityState={{ checked: displayedBodyFont === font.id }}
+                    className={`min-h-touch flex-row items-center justify-between px-4 py-3 ${index > 0 ? 'border-t border-surface-100 dark:border-surface-700' : ''}`}
                   >
                     <Text style={[bodyStyle, { fontFamily: getFontFamily(font.id) }]} className="text-sm text-surface-900 dark:text-surface-50">
                       {font.label}
                     </Text>
-                    {displayedBodyFont === font.id ? <Ionicons name="checkmark" size={16} color="#4f46e5" /> : null}
+                    {displayedBodyFont === font.id ? <Ionicons name="checkmark" size={16} color={colors.brand} /> : null}
                   </Pressable>
                 ))}
               </View>
@@ -280,7 +300,7 @@ export default function SettingsScreen() {
 
           <View className="rounded-2xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900/40">
             <View className="mb-2 flex-row items-center gap-2">
-              <Ionicons name="eye-outline" size={14} color="#64748b" />
+              <Ionicons name="eye-outline" size={14} color={colors.mutedText} />
               <Text
                 className="text-xs uppercase tracking-wider text-surface-500 dark:text-surface-400"
                 style={bodyStyle}
@@ -303,17 +323,19 @@ export default function SettingsScreen() {
           ) : (
             <Pressable
               onPress={() => router.push('/(auth)/login')}
+              accessibilityRole="button"
+              accessibilityLabel={t('auth.signIn')}
               className="flex-row items-center justify-between rounded-2xl border border-surface-200 bg-surface-50 p-4 dark:border-surface-700 dark:bg-surface-900/40"
             >
               <View className="flex-row items-center gap-3">
                 <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-900/30">
-                  <Ionicons name="log-in-outline" size={16} color="#4f46e5" />
+                  <Ionicons name="log-in-outline" size={16} color={colors.brand} />
                 </View>
-                <Text className="font-semibold text-surface-900 dark:text-surface-50" style={bodyStyle}>
+                <Text className="text-base font-semibold text-surface-900 dark:text-surface-50" style={bodyStyle}>
                   {t('auth.signIn')}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+              <Ionicons name="chevron-forward" size={20} color={colors.mutedText} />
             </Pressable>
           )}
         </SectionCard>

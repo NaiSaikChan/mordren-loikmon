@@ -28,3 +28,42 @@ describe('chunkRanges', () => {
     expect(chunkRanges(Number.NaN)).toEqual([])
   })
 })
+
+describe('streamToViewer', () => {
+  const { streamToViewer } = jest.requireActual('@/lib/pdfStream') as typeof import('@/lib/pdfStream')
+
+  it('begins with the size and start page, sends every slice, then finishes', async () => {
+    const injected: string[] = []
+    const readSlice = jest.fn(async (position: number, length: number) => `${position}:${length}`)
+    const done = await streamToViewer({ size: 10, startPage: 7, chunk: 3, readSlice, inject: (c) => injected.push(c) })
+    expect(done).toBe(true)
+    expect(injected[0]).toContain('__pdfBegin(10,7)')
+    expect(injected.filter((c) => c.includes('__pdfChunk'))).toHaveLength(4)
+    expect(injected[injected.length - 1]).toContain('__pdfDone(10)')
+  })
+
+  it('starts at the top for a missing or invalid page', async () => {
+    const injected: string[] = []
+    await streamToViewer({ size: 3, startPage: Number.NaN, readSlice: async () => 'AAAA', inject: (c) => injected.push(c) })
+    expect(injected[0]).toContain('__pdfBegin(3,1)')
+  })
+
+  it('stops without __pdfDone when aborted mid-stream', async () => {
+    const controller = new AbortController()
+    const injected: string[] = []
+    const readSlice = jest.fn(async () => {
+      controller.abort()
+      return 'AAAA'
+    })
+    const done = await streamToViewer({ size: 9, chunk: 3, readSlice, inject: (c) => injected.push(c), signal: controller.signal })
+    expect(done).toBe(false)
+    expect(injected.some((c) => c.includes('__pdfDone'))).toBe(false)
+    expect(readSlice).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects an empty file', async () => {
+    await expect(streamToViewer({ size: 0, readSlice: async () => '', inject: () => undefined })).rejects.toThrow(
+      'The file is empty',
+    )
+  })
+})

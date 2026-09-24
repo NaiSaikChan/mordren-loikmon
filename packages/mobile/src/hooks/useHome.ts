@@ -1,47 +1,44 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { errorMessage, misc } from '@loikmon/api'
 import type { HomeResponse } from '@loikmon/api'
+import { useAccessKey } from '@/context/AuthContext'
+import { queryKeys } from '@/lib/queryClient'
+
+const EMPTY: never[] = []
 
 /** Home screen feed (`GET /home`): latest/popular/recommended/audio books, articles, authors. */
 export function useHome() {
-  const [data, setData] = useState<HomeResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const accessKey = useAccessKey()
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const query = useQuery({
+    queryKey: queryKeys.home(accessKey),
+    queryFn: async (): Promise<HomeResponse> => (await misc.home()).data,
+    // Signing in/out re-keys the feed; keep the old one on screen until the new one arrives.
+    placeholderData: keepPreviousData,
+  })
 
-  const load = useCallback(async () => {
-    setError(null)
-    try {
-      const res = await misc.home()
-      setData(res.data)
-    } catch (err) {
-      setError(errorMessage(err, 'Failed to load'))
-    }
-  }, [])
-
-  useEffect(() => {
-    load().finally(() => setLoading(false))
-  }, [load])
-
+  const { refetch } = query
   const refresh = useCallback(async () => {
     setRefreshing(true)
     try {
-      await load()
+      await refetch()
     } finally {
       setRefreshing(false)
     }
-  }, [load])
+  }, [refetch])
 
+  const data = query.data
   return {
-    latestBooks: data?.latest_books ?? [],
-    popularBooks: data?.popular_books ?? [],
-    recommendedBooks: data?.recommended_books ?? [],
-    audioBooks: data?.audio_books ?? [],
-    articles: data?.articles ?? [],
-    authors: data?.authors ?? [],
-    loading,
+    latestBooks: data?.latest_books ?? EMPTY,
+    popularBooks: data?.popular_books ?? EMPTY,
+    recommendedBooks: data?.recommended_books ?? EMPTY,
+    audioBooks: data?.audio_books ?? EMPTY,
+    articles: data?.articles ?? EMPTY,
+    authors: data?.authors ?? EMPTY,
+    loading: query.isPending,
     refreshing,
-    error,
+    error: query.error ? errorMessage(query.error, 'Failed to load') : null,
     refresh,
   }
 }

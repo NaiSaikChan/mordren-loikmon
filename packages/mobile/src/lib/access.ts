@@ -10,11 +10,14 @@ import { isLocked, type AccessInfo, type Entitlement } from '@loikmon/api'
 export type AccessBadgeKind = 'free' | 'premium-locked' | 'premium-unlocked'
 
 /** Badge for a catalogue item: Free, Premium (locked) or Premium (unlocked by the subscription). */
-export function accessBadge(item: { is_free?: boolean }, entitlement: Entitlement | null | undefined): AccessBadgeKind {
+export function accessBadge(
+  item: { is_free?: boolean },
+  entitlement: Pick<Entitlement, 'active'> | null | undefined,
+): AccessBadgeKind {
   // Strict check: bookmarks cached by the legacy app may hold `is_free: "0"`.
   const free = item.is_free === true
   if (free) return 'free'
-  return isLocked({ is_free: free }, entitlement) ? 'premium-locked' : 'premium-unlocked'
+  return isLocked({ is_free: free }, entitlement as Entitlement | null | undefined) ? 'premium-locked' : 'premium-unlocked'
 }
 
 export type AccessAction = 'open' | 'login' | 'subscribe'

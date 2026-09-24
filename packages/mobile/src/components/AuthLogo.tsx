@@ -1,12 +1,14 @@
-import { Image, View, type ViewStyle } from 'react-native'
-import Animated, { ZoomIn } from 'react-native-reanimated'
+import { View, type ViewStyle } from 'react-native'
+import { Image } from 'expo-image'
+import Animated, { ZoomIn, useReducedMotion } from 'react-native-reanimated'
 import { useTheme } from '@/context/ThemeContext'
+import { surface } from '@/theme/palette'
 
 const logo = require('../../assets/splash-icon.png')
 
 // Brand pastel used for the app icon/splash background (see app.json), with a
 // dark-mode surface tone so the badge still reads as a distinct accent.
-const BADGE_BG = { light: '#e0d0d0', dark: '#1e293b' }
+const BADGE_BG = { light: '#e0d0d0', dark: surface[800] }
 
 /** Circular brand-colored badge used behind the logo (and auth success states). */
 export function AuthBadge({
@@ -19,9 +21,10 @@ export function AuthBadge({
   children: React.ReactNode
 }) {
   const { isDark } = useTheme()
+  const reduceMotion = useReducedMotion()
   return (
     <Animated.View
-      entering={ZoomIn.duration(450).springify().damping(14)}
+      entering={reduceMotion ? undefined : ZoomIn.duration(450).springify().damping(14)}
       className="self-center items-center justify-center rounded-full"
       style={[
         {
@@ -46,7 +49,9 @@ export function AuthLogo({ size = 128, logoSize }: { size?: number; logoSize?: n
     <AuthBadge size={size}>
       <Image
         source={logo}
-        resizeMode="contain"
+        contentFit="contain"
+        accessibilityIgnoresInvertColors
+        accessible={false}
         style={{ width: logoSize ?? size * 0.72, height: logoSize ?? size * 0.72 }}
       />
     </AuthBadge>

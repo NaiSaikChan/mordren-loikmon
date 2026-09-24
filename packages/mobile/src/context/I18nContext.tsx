@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useCallback, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useContext, useCallback, useMemo, useState } from 'react'
 import { getLocales } from 'expo-localization'
 import { storage } from '@/services/storage'
 import { translate, type Locale, AVAILABLE_LOCALES } from '@/i18n'
-
-const LOCALE_KEY = 'locale'
+import { detectLocale, PREF_KEYS } from '@/lib/preferences'
 
 interface I18nContextValue {
   locale: Locale
@@ -15,23 +14,26 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | undefined>(undefined)
 
 function detectDeviceLocale(): Locale {
-  const tag = getLocales()[0]?.languageCode ?? 'en'
-  return tag === 'mon' ? 'mon' : 'en'
+  try {
+    return detectLocale(getLocales())
+  } catch {
+    return 'en'
+  }
 }
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>('en')
-
-  useEffect(() => {
-    ;(async () => {
-      const saved = (await storage.get(LOCALE_KEY)) as Locale | null
-      setLocaleState(saved ?? detectDeviceLocale())
-    })()
-  }, [])
+export function I18nProvider({
+  children,
+  initialLocale,
+}: {
+  children: React.ReactNode
+  /** Saved locale, read before the first frame; device locale when unset. */
+  initialLocale?: Locale | null
+}) {
+  const [locale, setLocaleState] = useState<Locale>(() => initialLocale ?? detectDeviceLocale())
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next)
-    void storage.set(LOCALE_KEY, next)
+    void storage.set(PREF_KEYS.locale, next)
   }, [])
 
   const t = useCallback(

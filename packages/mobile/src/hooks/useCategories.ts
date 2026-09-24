@@ -1,28 +1,36 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { categories as catApi, errorMessage } from '@loikmon/api'
 import type { Category } from '@loikmon/api'
+import { queryKeys } from '@/lib/queryClient'
+
+const EMPTY: Category[] = []
+
+/** Categories rarely change: cache them for 30 minutes. */
+const CATEGORIES_STALE_TIME = 30 * 60_000
 
 export function useCategories(type?: 'book' | 'article') {
-  const [items, setItems] = useState<Category[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const query = useQuery({
+    queryKey: [...queryKeys.categories(), type ?? 'all'],
+    queryFn: async () => (await catApi.fetchCategories(type)).data.categories ?? EMPTY,
+    staleTime: CATEGORIES_STALE_TIME,
+  })
 
-  const fetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const { refetch } = query
+  const refresh = useCallback(async () => {
+    setRefreshing(true)
     try {
-      const { data } = await catApi.fetchCategories(type)
-      setItems(data.categories ?? [])
-    } catch (err) {
-      setError(errorMessage(err, 'Failed to load categories'))
+      await refetch()
     } finally {
-      setLoading(false)
+      setRefreshing(false)
     }
-  }, [type])
+  }, [refetch])
 
-  useEffect(() => {
-    void fetch()
-  }, [fetch])
-
-  return { items, loading, error, refresh: fetch }
+  return {
+    items: query.data ?? EMPTY,
+    loading: query.isLoading || refreshing,
+    error: query.error ? errorMessage(query.error, 'Failed to load categories') : null,
+    refresh,
+  }
 }

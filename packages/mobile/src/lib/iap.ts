@@ -315,13 +315,63 @@ export function selectRetryCandidates(
   pendingKeys: ReadonlySet<string>,
   platform: StorePlatform,
   skus: ReadonlySet<string>,
+  /** Keys to leave alone for now (recently rejected by the backend, see `isBackedOff`). */
+  skipKeys: ReadonlySet<string> = new Set(),
 ): Purchase[] {
   return purchases.filter((purchase) => {
     if (!skus.has(purchase.productId)) return false
     if (purchase.purchaseState === 'pending') return false
-    if (pendingKeys.has(purchaseKey(purchase, platform))) return true
+    const key = purchaseKey(purchase, platform)
+    if (skipKeys.has(key)) return false
+    if (pendingKeys.has(key)) return true
     return platform === 'android' && (purchase as PurchaseAndroid).isAcknowledgedAndroid === false
   })
+}
+
+// ── Rejection back-off ────────────────────────────────────────────────────
+
+/**
+ * A purchase the backend rejected (e.g. PURCHASE_ALREADY_LINKED) stays
+ * unfinished in the store, so Play keeps reporting it as unacknowledged and
+ * StoreKit re-delivers it. Without memory it would be re-verified on every
+ * foreground; instead retries back off: 1h, 2h, 4h … capped at 7 days.
+ */
+export interface RejectionRecord {
+  attempts: number
+  /** Epoch ms before which the purchase is not re-verified in the background. */
+  retryAt: number
+}
+
+export type RejectionLog = Record<string, RejectionRecord>
+
+export const REJECTION_BASE_BACKOFF_MS = 60 * 60_000
+export const REJECTION_MAX_BACKOFF_MS = 7 * 24 * 60 * 60_000
+
+export function recordRejection(log: RejectionLog, key: string, now: number): RejectionLog {
+  const attempts = (log[key]?.attempts ?? 0) + 1
+  const delay = Math.min(REJECTION_BASE_BACKOFF_MS * 2 ** (attempts - 1), REJECTION_MAX_BACKOFF_MS)
+  return { ...log, [key]: { attempts, retryAt: now + delay } }
+}
+
+export function isBackedOff(log: RejectionLog, key: string, now: number): boolean {
+  const record = log[key]
+  return Boolean(record && record.retryAt > now)
+}
+
+/** Keys currently in back-off. */
+export function backedOffKeys(log: RejectionLog, now: number): Set<string> {
+  return new Set(Object.keys(log).filter((key) => isBackedOff(log, key, now)))
+}
+
+/** Drops records for purchases the store no longer reports (and a verified purchase's record). */
+export function pruneRejections(log: RejectionLog, keep: (key: string) => boolean): RejectionLog {
+  const next: RejectionLog = {}
+  let changed = false
+  for (const [key, record] of Object.entries(log)) {
+    if (keep(key)) next[key] = record
+    else changed = true
+  }
+  return changed ? next : log
 }
 
 export interface RestoreOutcome {
@@ -329,7 +379,7 @@ export interface RestoreOutcome {
   restored: number
   nothingToRestore: boolean
   alreadyLinked: boolean
-  failures: Array<{ code?: string; message?: string }>
+  failures: { code?: string; message?: string }[]
 }
 
 export interface RestoreDeps {
@@ -342,7 +392,7 @@ export interface RestoreDeps {
 /** "Restore purchases": re-link the store's purchases to the signed-in account, finishing the ones the backend accepted. */
 export async function restoreWithBackend(purchases: Purchase[], deps: RestoreDeps): Promise<RestoreOutcome> {
   const seen = new Set<string>()
-  const pairs: Array<{ purchase: Purchase; proof: PurchaseProof }> = []
+  const pairs: { purchase: Purchase; proof: PurchaseProof }[] = []
   for (const purchase of purchases) {
     if (!deps.skus.has(purchase.productId) || purchase.purchaseState === 'pending') continue
     const proof = buildPurchaseProof(purchase, deps.platform)

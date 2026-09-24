@@ -181,7 +181,45 @@
   "reader": {
     "notAvailable": "No readable file available for this book.",
     "open": "Open Reader",
-    "loading": "Loading document…"
+    "loading": "Loading document…",
+    "openFailedStatus": "Could not open this book (HTTP {status})",
+    "offlineUnavailable": "You are offline and this book has not been downloaded yet.",
+    "openFailed": "Could not open this book",
+    "preparing": "Opening book…",
+    "downloading": "Downloading… {percent}%",
+    "retry": "Try again",
+    "closeContents": "Close contents",
+    "contents": "Contents",
+    "noChapters": "No chapters found",
+    "untitled": "Untitled",
+    "closeSettings": "Close reader settings",
+    "settingsTitle": "Reader Settings",
+    "theme": "Theme",
+    "themes": {
+      "light": "Light",
+      "sepia": "Sepia",
+      "dark": "Dark",
+      "black": "Black"
+    },
+    "font": "Font",
+    "fontSize": "Font Size",
+    "decreaseFontSize": "Decrease font size",
+    "increaseFontSize": "Increase font size",
+    "fontSizeValue": "Font size {size} percent",
+    "lineSpacing": "Line Spacing",
+    "spacing": {
+      "compact": "Compact",
+      "normal": "Normal",
+      "comfortable": "Comfortable",
+      "wide": "Wide"
+    },
+    "openContents": "Table of contents",
+    "openSettings": "Reader settings",
+    "bookProgress": "{percent}% read",
+    "fileUnreadable": "This file could not be opened",
+    "viewerCrashed": "This book is too large to display on this device.",
+    "pdfDocument": "Book pages",
+    "offlineCopy": "Offline — showing the copy saved on this device."
   },
   "home": {
     "greeting": "Welcome",
@@ -270,5 +308,18 @@
     "storeUnavailable": "The store is not available right now. Check your connection and try again.",
     "productUnavailable": "This plan is not available from the store right now.",
     "unsupportedPlatform": "Subscriptions can be purchased in the Loikmon iOS and Android apps."
+  },
+  "a11y": {
+    "loading": "Loading",
+    "clearSearch": "Clear search",
+    "showPassword": "Show password",
+    "ratingValue": "Rated {rating} out of 5",
+    "ratingPicker": "Your rating",
+    "rateStars": "Rate {count} stars",
+    "locked": "Locked",
+    "back": "Back",
+    "addBookmark": "Add bookmark",
+    "removeBookmark": "Remove bookmark",
+    "pause": "Pause"
   }
 }

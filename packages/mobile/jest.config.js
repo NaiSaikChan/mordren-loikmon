@@ -10,7 +10,7 @@ const transpileModules = [
   '@react-navigation/.*',
   '@unimodules/.*',
   'unimodules',
-  'sentry-expo',
+  '@sentry/.*',
   'native-base',
   'react-native-svg',
   'nativewind',

@@ -1,26 +1,50 @@
-import { View, Text, Pressable, ScrollView } from 'react-native'
+import { useCallback, useMemo } from 'react'
+import {
+  Platform,
+  Pressable,
+  SectionList,
+  Text,
+  View,
+  useWindowDimensions,
+  type SectionListData,
+  type SectionListRenderItem,
+} from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import type { Article, Book } from '@loikmon/api'
 import { Screen } from '@/components/Screen'
-import { BookCard } from '@/components/BookCard'
 import { ArticleCard } from '@/components/ArticleCard'
+import { BookRow } from '@/components/BookRow'
 import { EmptyState } from '@/components/EmptyState'
+import { chunk } from '@/components/gridRows'
 import { useLibrary } from '@/context/LibraryContext'
 import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
+import { useThemeColors } from '@/theme/colors'
+
+const COLUMNS = 3
+const CONTENT = { paddingHorizontal: 16, paddingBottom: 24 } as const
+
+type Row = { kind: 'books'; key: string; books: Book[] } | { kind: 'article'; key: string; article: Article }
+type Section = { key: string; title: string; data: Row[] }
+
+const keyExtractor = (row: Row) => row.key
+const goSubscribe = () => router.push('/subscribe')
 
 function PremiumPrompt() {
   const { t } = useI18n()
   const { headerTextStyle, bodyTextStyle } = useTypography()
+  const colors = useThemeColors()
   return (
     <Pressable
-      onPress={() => router.push('/subscribe')}
-      className="mx-4 mt-3 flex-row items-center rounded-2xl bg-brand-600 p-4"
+      onPress={goSubscribe}
+      className="mt-3 flex-row items-center rounded-card bg-brand-600 p-4 active:opacity-90"
       accessibilityRole="button"
+      accessibilityLabel={`${t('library.premiumTitle')}. ${t('library.premiumHint')}`}
     >
-      <View className="h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-        <Ionicons name="diamond-outline" size={20} color="#ffffff" />
+      <View className="h-10 w-10 items-center justify-center rounded-control bg-white/20">
+        <Ionicons name="diamond-outline" size={20} color={colors.onBrand} />
       </View>
       <View className="ml-3 flex-1">
         <Text className="text-base text-white" style={headerTextStyle}>
@@ -30,7 +54,7 @@ function PremiumPrompt() {
           {t('library.premiumHint')}
         </Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+      <Ionicons name="chevron-forward" size={20} color={colors.onBrand} />
     </Pressable>
   )
 }
@@ -40,41 +64,83 @@ export default function LibraryScreen() {
   const { books, articles } = useLibrary()
   const { entitlement } = useAuth()
   const { headerTextStyle } = useTypography()
+  const { width } = useWindowDimensions()
+  const imageWidth = Math.round((width - 32) / COLUMNS - 8)
 
-  const empty = books.length === 0 && articles.length === 0
+  const sections = useMemo<Section[]>(() => {
+    const out: Section[] = []
+    if (books.length > 0) {
+      out.push({
+        key: 'books',
+        title: t('nav.books'),
+        data: chunk(books, COLUMNS).map((row) => ({ kind: 'books', key: `b-${row[0].id}`, books: row })),
+      })
+    }
+    if (articles.length > 0) {
+      out.push({
+        key: 'articles',
+        title: t('nav.articles'),
+        data: articles.map((article) => ({ kind: 'article', key: `a-${article.id}`, article })),
+      })
+    }
+    return out
+  }, [books, articles, t])
+
+  const renderItem = useCallback<SectionListRenderItem<Row, Section>>(
+    ({ item }) =>
+      item.kind === 'books' ? (
+        <View className="mb-2">
+          <BookRow books={item.books} columns={COLUMNS} imageWidth={imageWidth} />
+        </View>
+      ) : (
+        <ArticleCard article={item.article} />
+      ),
+    [imageWidth],
+  )
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: SectionListData<Row, Section> }) => (
+      <Text
+        className="pb-2 pt-4 text-base text-surface-900 dark:text-surface-50"
+        style={headerTextStyle}
+        accessibilityRole="header"
+      >
+        {section.title}
+      </Text>
+    ),
+    [headerTextStyle],
+  )
+
+  const header = (
+    <View>
+      <Text
+        className="pt-3 text-2xl text-surface-900 dark:text-surface-50"
+        style={headerTextStyle}
+        accessibilityRole="header"
+        maxFontSizeMultiplier={1.6}
+      >
+        {t('nav.library')}
+      </Text>
+      {!entitlement?.active ? <PremiumPrompt /> : null}
+    </View>
+  )
 
   return (
     <Screen>
-      <View className="px-4 pt-2">
-        <Text className="text-2xl text-surface-900 dark:text-surface-50 pt-5" style={headerTextStyle}>
-          {t('nav.library')}
-        </Text>
-      </View>
-
-      {!entitlement?.active ? <PremiumPrompt /> : null}
-
-      {empty ? (
-        <EmptyState icon="🔖" title={t('library.empty')} subtitle={t('library.emptyHint')} />
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-          {books.length > 0 ? (
-            <View className="flex-row flex-wrap px-2 pt-4">
-              {books.map((book) => (
-                <View key={String(book.id)} className="w-1/3 p-2">
-                  <BookCard book={book} variant="grid" />
-                </View>
-              ))}
-            </View>
-          ) : null}
-          {articles.length > 0 ? (
-            <View className="px-4 pt-2">
-              {articles.map((article) => (
-                <ArticleCard key={String(article.id)} article={article} />
-              ))}
-            </View>
-          ) : null}
-        </ScrollView>
-      )}
+      <SectionList
+        sections={sections}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        renderSectionHeader={renderSectionHeader}
+        stickySectionHeadersEnabled={false}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<EmptyState icon="🔖" title={t('library.empty')} subtitle={t('library.emptyHint')} />}
+        contentContainerStyle={CONTENT}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
     </Screen>
   )
 }

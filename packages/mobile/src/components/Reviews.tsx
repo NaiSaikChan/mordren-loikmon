@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useI18n } from '@/context/I18nContext'
 import { useTypography } from '@/context/TypographyContext'
 import type { useReviews } from '@/hooks/useReviews'
+import { useThemeColors } from '@/theme/colors'
 
 export function ReviewStars({
   rating,
@@ -20,16 +21,45 @@ export function ReviewStars({
   onChange?: (next: number) => void
   size?: number
 }) {
+  const { t } = useI18n()
+  const colors = useThemeColors()
+  const stars = Array.from({ length: 5 }, (_, index) => index + 1)
+
+  if (!onChange) {
+    return (
+      <View
+        className="flex-row gap-1"
+        accessible
+        accessibilityRole="image"
+        accessibilityLabel={t('a11y.ratingValue', { rating: Math.round(rating) })}
+      >
+        {stars.map((value) => (
+          <Ionicons
+            key={value}
+            name={value <= rating ? 'star' : 'star-outline'}
+            size={size}
+            color={value <= rating ? colors.starFilled : colors.starEmpty}
+          />
+        ))}
+      </View>
+    )
+  }
+
   return (
-    <View className="flex-row gap-1">
-      {Array.from({ length: 5 }).map((_, index) => {
-        const value = index + 1
+    <View className="flex-row gap-1" accessibilityRole="radiogroup" accessibilityLabel={t('a11y.ratingPicker')}>
+      {stars.map((value) => {
         const filled = value <= rating
-        const star = <Ionicons name={filled ? 'star' : 'star-outline'} size={size} color={filled ? '#f59e0b' : '#cbd5e1'} />
-        if (!onChange) return <View key={value}>{star}</View>
         return (
-          <Pressable key={value} onPress={() => onChange(value)} hitSlop={8} accessibilityLabel={`${value}`}>
-            {star}
+          <Pressable
+            key={value}
+            onPress={() => onChange(value)}
+            hitSlop={8}
+            className="active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel={t('a11y.rateStars', { count: value })}
+            accessibilityState={{ selected: value === rating }}
+          >
+            <Ionicons name={filled ? 'star' : 'star-outline'} size={size} color={filled ? colors.starFilled : colors.starEmpty} />
           </Pressable>
         )
       })}
@@ -45,7 +75,7 @@ function ReviewCard({ review, highlighted = false }: { review: Review; highlight
 
   return (
     <View
-      className={`rounded-2xl border p-4 ${
+      className={`rounded-card border p-4 ${
         highlighted
           ? 'border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-900/20'
           : 'border-surface-200 bg-white dark:border-surface-700 dark:bg-surface-800'
@@ -57,12 +87,12 @@ function ReviewCard({ review, highlighted = false }: { review: Review; highlight
             {author}
           </Text>
           {content ? (
-            <Text className="mt-1 text-sm leading-6 text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
+            <Text className="mt-1 text-sm text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
               {content}
             </Text>
           ) : null}
         </View>
-        <Text className="text-xs text-surface-400" style={bodyTextStyle}>
+        <Text className="text-xs text-surface-500 dark:text-surface-400" style={bodyTextStyle}>
           {review.created_at ? new Date(review.created_at).toLocaleDateString() : ''}
         </Text>
       </View>
@@ -70,7 +100,7 @@ function ReviewCard({ review, highlighted = false }: { review: Review; highlight
         <ReviewStars rating={Number(review.rating ?? 0)} size={16} />
         {highlighted ? (
           <View className="rounded-full bg-brand-500 px-2 py-0.5">
-            <Text className="text-[10px] font-semibold text-white" style={bodyTextStyle}>
+            <Text className="text-2xs font-semibold text-white" style={bodyTextStyle}>
               {t('common.you')}
             </Text>
           </View>
@@ -91,6 +121,7 @@ export function ReviewsSection({
   const { t } = useI18n()
   const { isLoggedIn } = useAuth()
   const { bodyTextStyle, headerTextStyle } = useTypography()
+  const colors = useThemeColors()
   const [text, setText] = useState('')
   const [rating, setRating] = useState(5)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
@@ -109,8 +140,8 @@ export function ReviewsSection({
   return (
     <View>
       {isLoggedIn ? (
-        <View className="rounded-2xl bg-white dark:bg-surface-800 p-5">
-          <Text className="mb-3 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+        <View className="rounded-card bg-white dark:bg-surface-800 p-5">
+          <Text className="mb-3 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
             {reviews.userReview ? t('common.edit') : t('books.writeReview')}
           </Text>
           <View className="mb-4">
@@ -120,7 +151,8 @@ export function ReviewsSection({
             value={text}
             onChangeText={setText}
             placeholder={t('books.reviewPlaceholder')}
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.placeholder}
+            accessibilityLabel={t('books.writeReview')}
             multiline
             maxLength={5000}
             textAlignVertical="top"
@@ -129,7 +161,8 @@ export function ReviewsSection({
           />
           <View className="mt-3 flex-row items-center justify-between gap-3">
             <Text
-              className={`flex-1 text-sm ${message?.ok === false ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}
+              accessibilityLiveRegion="polite"
+              className={`flex-1 text-sm ${message?.ok === false ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-400'}`}
               style={bodyTextStyle}
             >
               {message?.text ?? ''}
@@ -144,7 +177,7 @@ export function ReviewsSection({
           </View>
         </View>
       ) : (
-        <View className="rounded-2xl bg-white dark:bg-surface-800 p-5 items-center">
+        <View className="rounded-card bg-white dark:bg-surface-800 p-5 items-center">
           <Text className="mb-3 text-center text-surface-600 dark:text-surface-300" style={bodyTextStyle}>
             {t('books.loginToReview')}
           </Text>
@@ -158,7 +191,7 @@ export function ReviewsSection({
       )}
 
       <View style={{ marginTop: 20 }}>
-        <Text className="mb-3 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle}>
+        <Text className="mb-3 text-base text-surface-900 dark:text-surface-50" style={headerTextStyle} accessibilityRole="header">
           {t('books.reviewsTab', { count: reviews.count })}
         </Text>
         {reviews.loading && reviews.reviews.length === 0 ? (
