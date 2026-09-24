@@ -28,7 +28,8 @@
     "production": {
       "extends": "base",
       "channel": "production",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "prebuild": "npm install --workspaces"
     }
   },
   "submit": {
