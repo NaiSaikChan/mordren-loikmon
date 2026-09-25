@@ -6,6 +6,7 @@ import {
   Dimensions,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -1035,6 +1036,77 @@ function EpubReaderView({
 }
 
 // ---------------------------------------------------------------------------
+// iOS file access scope helper
+// ---------------------------------------------------------------------------
+
+/**
+ * iOS WKWebView's file access scope (`allowingReadAccessToURL`) is tied to the
+ * directory of the loaded HTML file. The EPUB cache lives in `cacheDirectory`,
+ * which is outside the Reader's `documentDirectory` sandbox, so a physical iOS
+ * device cannot open the book. Copy the file into `documentDirectory` before
+ * handing it to the Reader and clean it up on unmount.
+ */
+function useEpubReaderFile(
+  cachedUri: string | null,
+  cacheKey: string,
+): FileState & { retry: () => void } {
+  const tr = useReaderText()
+  const [attempt, setAttempt] = useState(0)
+  const request = `${cachedUri ?? ''}|${cacheKey}|${attempt}`
+  const [state, setState] = useState<FileState>({
+    request,
+    uri: null,
+    fromCache: false,
+    error: null,
+    progress: null,
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    let copiedUri: string | null = null
+
+    const prepare = async () => {
+      if (!cachedUri) return
+      try {
+        const docDir = FileSystem.documentDirectory
+        if (!docDir) throw new Error('Document directory not available')
+
+        if (Platform.OS === 'ios' && !cachedUri.startsWith(docDir)) {
+          const name = `epub-reader-${cacheKey.replace(/[^a-zA-Z0-9._-]/g, '_')}.epub`
+          copiedUri = docDir + name
+          await FileSystem.deleteAsync(copiedUri, { idempotent: true }).catch(() => undefined)
+          await FileSystem.copyAsync({ from: cachedUri, to: copiedUri })
+        } else {
+          copiedUri = cachedUri
+        }
+
+        if (!cancelled) {
+          setState({ request, uri: copiedUri, fromCache: false, error: null, progress: null })
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setState({ request, uri: null, fromCache: false, error: openErrorMessage(err, tr), progress: null })
+        }
+      }
+    }
+
+    void prepare()
+
+    return () => {
+      cancelled = true
+      if (copiedUri && copiedUri !== cachedUri) {
+        void FileSystem.deleteAsync(copiedUri, { idempotent: true }).catch(() => undefined)
+      }
+    }
+  }, [cachedUri, cacheKey, request, tr])
+
+  const current: FileState =
+    state.request === request ? state : { request, uri: null, fromCache: false, error: null, progress: null }
+  const retry = useCallback(() => setAttempt((n) => n + 1), [])
+  return { ...current, retry }
+}
+
+// ---------------------------------------------------------------------------
 // Outer EPUB component — provides fonts + download, then renders ReaderProvider
 // ---------------------------------------------------------------------------
 
@@ -1051,6 +1123,7 @@ function EpubDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: Docu
   const tr = useReaderText()
   const { uris: customFontUris, loading: fontLoading } = useCustomFontUris()
   const file = useDocumentFile({ url, cacheKey, ext: 'epub', version, refreshUrl })
+  const readerFile = useEpubReaderFile(file.uri, cacheKey)
   const saved = useSavedPosition(bookId, 'epub')
   const report = useProgressReporter(bookId, 'epub')
   // Settings are owned here so they're loaded before EpubReaderView mounts.
@@ -1081,6 +1154,14 @@ function EpubDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: Docu
     return <DownloadProgressView progress={file.progress} tr={tr} />
   }
 
+  if (readerFile.error) {
+    return <ErrorView message={readerFile.error} onRetry={readerFile.retry} tr={tr} />
+  }
+
+  if (!readerFile.uri) {
+    return <DownloadProgressView progress={null} tr={tr} />
+  }
+
   if (fontLoading || !settingsLoaded || !saved.ready) {
     return <DownloadProgressView progress={null} tr={tr} />
   }
@@ -1088,7 +1169,7 @@ function EpubDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: Docu
   return (
     <ReaderProvider>
       <EpubReaderView
-        localUri={file.uri}
+        localUri={readerFile.uri}
         fontHookScript={fontHookScript}
         customFontUris={customFontUris}
         initialFontId={initialFontId}

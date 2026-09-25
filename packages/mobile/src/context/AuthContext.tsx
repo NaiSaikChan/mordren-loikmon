@@ -3,6 +3,7 @@ import { auth as authApi, errorCode, isApiError } from '@loikmon/api'
 import type { AuthResponse, Entitlement, LoginPayload, RegisterPayload, User } from '@loikmon/api'
 import { normaliseUser } from '@/lib/user'
 import { queryClient } from '@/lib/queryClient'
+import { markFirstAuthCompleted } from '@/lib/authGate'
 import { secureStorage } from '@/services/storage'
 import { getSessionToken, isSessionRejected, setSessionToken, setUnauthorizedHandler } from '@/services/api'
 
@@ -127,7 +128,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setHasToken(true)
     setUser(normalised)
     setEntitlement(nextEntitlement)
-    await Promise.all([setSessionToken(nextToken), secureStorage.set(USER_KEY, JSON.stringify(normalised))])
+    await Promise.all([
+      setSessionToken(nextToken),
+      secureStorage.set(USER_KEY, JSON.stringify(normalised)),
+      markFirstAuthCompleted(),
+    ])
   }, [])
 
   // Restore the stored session: validate the token with `auth.me()`.

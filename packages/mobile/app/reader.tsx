@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { PaywallCard } from '@/components/PaywallCard'
 import { PrimaryButton } from '@/components/PrimaryButton'
+import { RequireAuth } from '@/components/RequireAuth'
 import { useTheme } from '@/context/ThemeContext'
 import { useI18n } from '@/context/I18nContext'
 import { useAuth } from '@/context/AuthContext'
@@ -49,6 +50,14 @@ async function findCachedFormat(id: string, format: Format | undefined): Promise
  * never bypassed that way.
  */
 export default function ReaderScreen() {
+  return (
+    <RequireAuth>
+      <ReaderContent />
+    </RequireAuth>
+  )
+}
+
+function ReaderContent() {
   const params = useLocalSearchParams<{ id: string; format?: string; title?: string; version?: string }>()
   const id = firstParam(params.id)
   const format: Format | undefined = params.format === 'pdf' || params.format === 'epub' ? params.format : undefined

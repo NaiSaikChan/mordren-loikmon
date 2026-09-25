@@ -33,6 +33,7 @@ import { useReducedMotion } from 'react-native-reanimated'
 import { router, useLocalSearchParams, Stack } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { RequireAuth } from '@/components/RequireAuth'
 import type { BookChapter } from '@loikmon/api'
 import {
   PLAYBACK_RATES,
@@ -392,6 +393,14 @@ const chapterKey = (chapter: BookChapter) => String(chapter.id)
 /* ────────────────────────────────────────────────────────────── screen */
 
 export default function AudiobookScreen() {
+  return (
+    <RequireAuth>
+      <AudiobookContent />
+    </RequireAuth>
+  )
+}
+
+function AudiobookContent() {
   const params = useLocalSearchParams<{ id?: string | string[] }>()
   const id = firstParam(params.id)
   const { t } = useI18n()

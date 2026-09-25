@@ -8,6 +8,7 @@ import { Screen } from '@/components/Screen'
 import { LoadingSpinner } from '@/components/LoadingSpinner'
 import { EmptyState } from '@/components/EmptyState'
 import { PriceBadge } from '@/components/PriceBadge'
+import { RequireAuth } from '@/components/RequireAuth'
 import { useBooks } from '@/hooks/useBooks'
 import { useAudioControls } from '@/context/AudioContext'
 import { useI18n } from '@/context/I18nContext'
@@ -90,6 +91,14 @@ const keyExtractor = (item: Book) => String(item.id)
 const renderItem: ListRenderItem<Book> = ({ item }) => <AudioRow book={item} />
 
 export default function AudioScreen() {
+  return (
+    <RequireAuth>
+      <AudioContent />
+    </RequireAuth>
+  )
+}
+
+function AudioContent() {
   const { t } = useI18n()
   const { items, loading, refreshing, refresh, loadMore } = useBooks({ has_audio: true, sort: 'latest' })
   const onEndReached = useCallback(() => void loadMore(), [loadMore])

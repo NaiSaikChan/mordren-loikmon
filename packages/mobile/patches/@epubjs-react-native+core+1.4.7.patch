@@ -1,0 +1,62 @@
+diff --git a/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js b/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js
+index f65d1fe..0e566ea 100644
+--- a/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js
++++ b/node_modules/@epubjs-react-native/core/lib/commonjs/Reader.js
+@@ -79,7 +79,7 @@ function Reader({
+       } catch (e) {
+         throw new Error('failed to write epubjs js file');
+       }
+-      setAllowedUris(`${jszipFileUri},${epubjsFileUri}`);
++      setAllowedUris(documentDirectory);
+       if (src) {
+         const sourceType = (0, _getSourceType.getSourceType)(src);
+         const isExternalSource = (0, _isURL.isURL)(src);
+@@ -89,7 +89,7 @@ function Reader({
+         }
+         if (!isExternalSource) {
+           if (isSrcInFs) {
+-            setAllowedUris(`${src}${jszipFileUri},${epubjsFileUri}`);
++            setAllowedUris(documentDirectory);
+           }
+           if (sourceType === _sourceType.SourceType.BASE64) {
+             setTemplate(injectWebViewVariables({
+@@ -160,7 +160,7 @@ function Reader({
+               uri: bookFileUri
+             } = await downloadFile(src, sourceName);
+             if (!bookFileUri) throw new Error("Couldn't download book");
+-            setAllowedUris(`${bookFileUri},${jszipFileUri},${epubjsFileUri}`);
++            setAllowedUris(documentDirectory);
+             setTemplate(injectWebViewVariables({
+               jszip: jszipFileUri,
+               epubjs: epubjsFileUri,
+diff --git a/node_modules/@epubjs-react-native/core/lib/module/Reader.js b/node_modules/@epubjs-react-native/core/lib/module/Reader.js
+index 2350836..05e2676 100644
+--- a/node_modules/@epubjs-react-native/core/lib/module/Reader.js
++++ b/node_modules/@epubjs-react-native/core/lib/module/Reader.js
+@@ -70,7 +70,7 @@ export function Reader({
+       } catch (e) {
+         throw new Error('failed to write epubjs js file');
+       }
+-      setAllowedUris(`${jszipFileUri},${epubjsFileUri}`);
++      setAllowedUris(documentDirectory);
+       if (src) {
+         const sourceType = getSourceType(src);
+         const isExternalSource = isURL(src);
+@@ -80,7 +80,7 @@ export function Reader({
+         }
+         if (!isExternalSource) {
+           if (isSrcInFs) {
+-            setAllowedUris(`${src}${jszipFileUri},${epubjsFileUri}`);
++            setAllowedUris(documentDirectory);
+           }
+           if (sourceType === SourceType.BASE64) {
+             setTemplate(injectWebViewVariables({
+@@ -151,7 +151,7 @@ export function Reader({
+               uri: bookFileUri
+             } = await downloadFile(src, sourceName);
+             if (!bookFileUri) throw new Error("Couldn't download book");
+-            setAllowedUris(`${bookFileUri},${jszipFileUri},${epubjsFileUri}`);
++            setAllowedUris(documentDirectory);
+             setTemplate(injectWebViewVariables({
+               jszip: jszipFileUri,
+               epubjs: epubjsFileUri,

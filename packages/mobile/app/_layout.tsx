@@ -1,7 +1,7 @@
 import '../global.css'
 import { useCallback, useEffect, useState } from 'react'
 import { View } from 'react-native'
-import { Stack, useNavigationContainerRef, useSegments } from 'expo-router'
+import { Stack, useNavigationContainerRef, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { getLocales } from 'expo-localization'
@@ -17,6 +17,7 @@ import { LibraryProvider } from '@/context/LibraryContext'
 import { requiredFontFamilies, TypographyProvider, useTypography } from '@/context/TypographyContext'
 import { QueryProvider } from '@/lib/queryClient'
 import { detectLocale, EMPTY_PREFERENCES, loadPreferences, type StoredPreferences } from '@/lib/preferences'
+import { hasCompletedFirstAuth } from '@/lib/authGate'
 import { loadAllFonts, loadFonts } from '@/lib/fonts'
 import { darkColors, lightColors } from '@/theme/colors'
 import { initMonitoring, navigationIntegration, setMonitoringUser, wrapRoot } from '@/lib/monitoring'
@@ -57,6 +58,52 @@ function MonitoringUser() {
   return null
 }
 
+/**
+ * Enforces the auth-first flow.
+ *
+ * - On first launch, the user must sign in or register before they can continue
+ *   using the app.
+ * - After that, the user can browse content while signed out, but reading and
+ *   listening routes have their own guards.
+ */
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn, initializing } = useAuth()
+  const segments = useSegments() as string[]
+  const router = useRouter()
+  const [firstAuthReady, setFirstAuthReady] = useState(false)
+  const [firstAuthCompleted, setFirstAuthCompleted] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    hasCompletedFirstAuth()
+      .then((completed) => {
+        if (!cancelled) {
+          setFirstAuthCompleted(completed)
+          setFirstAuthReady(true)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFirstAuthReady(true)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const inAuthGroup = segments[0] === '(auth)'
+  const needsFirstAuth =
+    firstAuthReady && !initializing && !isLoggedIn && !firstAuthCompleted && !inAuthGroup
+
+  useEffect(() => {
+    if (needsFirstAuth) {
+      router.replace('/(auth)/login')
+    }
+  }, [needsFirstAuth, router])
+
+  if (!firstAuthReady || initializing || needsFirstAuth) return null
+  return <>{children}</>
+}
+
 function RootNavigator() {
   const { isDark } = useTheme()
   const colors = isDark ? darkColors : lightColors
@@ -88,7 +135,7 @@ function RootNavigator() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false, title: tabsBackTitle }} />
-        <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="reader" options={{ title: '' }} />
         {/* <Stack.Screen name="subscribe" options={{ title: t('subscribe.title') }} /> */}
         <Stack.Screen name="audio" options={{ title: '' }} />
@@ -142,13 +189,15 @@ function RootLayout() {
                 <TypographyProvider initialBodyFont={prefs.bodyFont} initialHeaderFont={prefs.headerFont}>
                   <AuthProvider>
                     <MonitoringUser />
-                    <SubscriptionProvider>
-                      <LibraryProvider>
-                        <AudioProvider>
-                          <RootNavigator />
-                        </AudioProvider>
-                      </LibraryProvider>
-                    </SubscriptionProvider>
+                    <AuthGate>
+                      <SubscriptionProvider>
+                        <LibraryProvider>
+                          <AudioProvider>
+                            <RootNavigator />
+                          </AudioProvider>
+                        </LibraryProvider>
+                      </SubscriptionProvider>
+                    </AuthGate>
                   </AuthProvider>
                 </TypographyProvider>
               </I18nProvider>
