@@ -10,3 +10,6 @@ web-build/
 
 expo-env.d.ts
 # @end expo-cli
+# EAS local signing credentials (contain keystore/cert passwords)
+credentials.json
+credentials/

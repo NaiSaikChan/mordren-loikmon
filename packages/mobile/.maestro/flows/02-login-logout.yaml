@@ -1,4 +1,4 @@
-appId: org.loikmon.mobile
+appId: com.loikmon.mobile
 name: Sign in, session survives relaunch
 tags: [auth]
 env:

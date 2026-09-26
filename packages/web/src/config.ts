@@ -5,7 +5,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE || DEFAULT_BASE_URL
 
 /** Store listings of the Loikmon app — subscriptions can only be purchased there. */
 export const PLAY_STORE_URL =
-  import.meta.env.VITE_PLAY_STORE_URL || 'https://play.google.com/store/apps/details?id=org.loikmon.mobile'
+  import.meta.env.VITE_PLAY_STORE_URL || 'https://play.google.com/store/apps/details?id=com.loikmon.mobile'
 
 export const APP_STORE_URL = import.meta.env.VITE_APP_STORE_URL || 'https://apps.apple.com/search?term=loikmon'
 

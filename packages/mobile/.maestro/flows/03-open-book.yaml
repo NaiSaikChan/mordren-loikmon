@@ -1,4 +1,4 @@
-appId: org.loikmon.mobile
+appId: com.loikmon.mobile
 name: Open a book from the Books tab and go back
 tags: [smoke]
 ---

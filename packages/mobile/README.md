@@ -156,7 +156,7 @@ than the generated HTML, then re-run the command above.
 
 ### Store setup checklist
 
-**App Store Connect** (`org.loikmon.mobile`)
+**App Store Connect** (`com.loikmon.mobile`)
 1. Agreements, Tax and Banking: accept the Paid Apps agreement.
 2. Create one subscription group (e.g. *Loikmon Premium*) with four auto-renewable
    subscriptions matching the backend plans' `apple_product_id`s
@@ -170,7 +170,7 @@ than the generated HTML, then re-run the command above.
 5. App Privacy + the Terms of Use / Privacy Policy links (the paywall links
    `https://loikmon.org/terms` and `https://loikmon.org/privacy`).
 
-**Google Play Console** (`org.loikmon.mobile`)
+**Google Play Console** (`com.loikmon.mobile`)
 1. Upload a build containing the Billing permission (added by the `expo-iap`
    plugin) to an internal testing track — products can only be created after that.
 2. Monetize → Subscriptions → create product **`loikmon_premium`** with four

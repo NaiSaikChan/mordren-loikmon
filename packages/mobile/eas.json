@@ -4,7 +4,11 @@
     "appVersionSource": "remote"
   },
   "build": {
-    "base": {},
+    "base": {
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
+    },
     "development": {
       "extends": "base",
       "developmentClient": true,

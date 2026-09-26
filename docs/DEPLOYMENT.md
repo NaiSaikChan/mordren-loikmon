@@ -127,7 +127,7 @@ console; the backend prices are for display on the web.
    - copy the numeric **Apple ID** → `APPLE_APP_APPLE_ID`;
    - **App Store Server Notifications** → Version 2, production *and* sandbox URL: `https://api.loikmon.org/api/v1/webhooks/apple`.
 4. **Users and Access → Integrations → In-App Purchase** → generate a key → `APPLE_KEY_ID`, `APPLE_ISSUER_ID`, and the `.p8` contents → `APPLE_PRIVATE_KEY` (one line, `\n` for newlines). This lets the backend ask Apple for the live status (grace period, billing retry, refunds).
-5. `APPLE_BUNDLE_ID=org.loikmon.mobile`. Keep `APPLE_ALLOW_SANDBOX=true`: App Review and TestFlight purchase in the sandbox.
+5. `APPLE_BUNDLE_ID=com.loikmon.mobile`. Keep `APPLE_ALLOW_SANDBOX=true`: App Review and TestFlight purchase in the sandbox.
 6. Create **Sandbox testers** (Users and Access → Sandbox) to test on devices.
 
 The app sets `appAccountToken` = the Loikmon user id, and every transaction and
@@ -138,7 +138,7 @@ notification is signature-verified against Apple's root certificates
 
 1. Play Console → **Monetize → Products → Subscriptions** → create `loikmon_premium` with four **auto-renewing base plans**: `monthly` (1 month), `quarterly` (3 months), `semiannual` (6 months), `yearly` (1 year). Activate them.
 2. Google Cloud console (any project): create a **service account**, create a JSON key.
-3. Play Console → **Users and permissions** → invite the service account email with *View financial data* and *Manage orders and subscriptions* for the app. Put the JSON (raw or base64) in `GOOGLE_SERVICE_ACCOUNT_JSON`; set `GOOGLE_PLAY_PACKAGE_NAME=org.loikmon.mobile`.
+3. Play Console → **Users and permissions** → invite the service account email with *View financial data* and *Manage orders and subscriptions* for the app. Put the JSON (raw or base64) in `GOOGLE_SERVICE_ACCOUNT_JSON`; set `GOOGLE_PLAY_PACKAGE_NAME=com.loikmon.mobile`.
 4. **Real-time developer notifications** (Pub/Sub):
    - create topic `play-rtdn`; grant `google-play-developer-notifications@system.gserviceaccount.com` the *Pub/Sub Publisher* role on it;
    - create a **push** subscription to `https://api.loikmon.org/api/v1/webhooks/google` with **authentication enabled**: choose a service account (→ `GOOGLE_PUBSUB_SERVICE_ACCOUNT`) and audience `https://api.loikmon.org/api/v1/webhooks/google` (→ `GOOGLE_PUBSUB_AUDIENCE`);

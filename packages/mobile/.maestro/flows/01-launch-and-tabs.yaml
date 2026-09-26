@@ -1,4 +1,4 @@
-appId: org.loikmon.mobile
+appId: com.loikmon.mobile
 name: Cold launch reaches Home and every tab renders
 tags: [smoke]
 ---

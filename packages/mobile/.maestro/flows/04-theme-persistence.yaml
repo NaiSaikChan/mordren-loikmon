@@ -1,4 +1,4 @@
-appId: org.loikmon.mobile
+appId: com.loikmon.mobile
 name: Dark theme applies on the first frame after relaunch
 tags: [smoke]
 ---

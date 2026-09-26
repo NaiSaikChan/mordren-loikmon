@@ -1212,18 +1212,46 @@ function pdfViewerBootstrap(isDark: boolean): string {
   `
 }
 
-/** Copies the bundled viewer out of the app bundle and returns its file:// URI. */
-function usePdfViewerAsset(): { uri: string | null; error: string | null } {
-  const [uri, setUri] = useState<string | null>(null)
+type PdfViewerSource = { uri: string } | { html: string; baseUrl: string }
+
+/** The viewer page's source text, read once per app session and shared by every mount. */
+let pdfViewerHtmlPromise: Promise<string> | null = null
+
+/*
+ * iOS gets the viewer as an HTML string, never as a file:// URL. In a release
+ * build the asset sits inside the read-only .app bundle (or expo-updates' asset
+ * folder after an OTA update), and WKWebView (made ephemeral here by
+ * `cacheEnabled={false}`) refuses to load it: "Ignoring request to load this
+ * main resource because it is outside the sandbox". Dev builds never hit that
+ * because Metro serves the asset and expo-asset copies it into Caches. The page
+ * is fully self-contained and gets the PDF over the bridge, so nothing depends
+ * on it having a file origin. Android loads the file directly, which works.
+ */
+function loadPdfViewerSource(): Promise<PdfViewerSource> {
+  const asset = Asset.fromModule(PDF_VIEWER_ASSET)
+  const localUri = asset.downloadAsync().then(() => asset.localUri ?? asset.uri)
+  if (Platform.OS !== 'ios') return localUri.then((uri) => ({ uri }))
+
+  if (!pdfViewerHtmlPromise) {
+    pdfViewerHtmlPromise = localUri.then((uri) => FileSystem.readAsStringAsync(uri))
+    // Only memoise success, so a transient failure is retried on the next open.
+    pdfViewerHtmlPromise.catch(() => {
+      pdfViewerHtmlPromise = null
+    })
+  }
+  return pdfViewerHtmlPromise.then((html) => ({ html, baseUrl: 'about:blank' }))
+}
+
+/** Resolves the bundled viewer page into a WebView source. */
+function usePdfViewerAsset(): { source: PdfViewerSource | null; error: string | null } {
+  const [source, setSource] = useState<PdfViewerSource | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    const asset = Asset.fromModule(PDF_VIEWER_ASSET)
-    asset
-      .downloadAsync()
-      .then(() => {
-        if (!cancelled) setUri(asset.localUri ?? asset.uri)
+    loadPdfViewerSource()
+      .then((next) => {
+        if (!cancelled) setSource(next)
       })
       .catch((err: unknown) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Viewer unavailable')
@@ -1233,7 +1261,7 @@ function usePdfViewerAsset(): { uri: string | null; error: string | null } {
     }
   }, [])
 
-  return { uri, error }
+  return { source, error }
 }
 
 /** Streams a local PDF into the viewer in aligned base64 slices. */
@@ -1269,7 +1297,7 @@ interface ViewerStatus {
 function PdfDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: DocumentProps) {
   const { isDark } = useTheme()
   const tr = useReaderText()
-  const { uri: viewerUri, error: viewerError } = usePdfViewerAsset()
+  const { source: viewerSource, error: viewerError } = usePdfViewerAsset()
   const file = useDocumentFile({ url, cacheKey, ext: 'pdf', version, refreshUrl })
   const saved = useSavedPosition(bookId, 'pdf')
   const report = useProgressReporter(bookId, 'pdf')
@@ -1366,14 +1394,15 @@ function PdfDocumentReader({ url, cacheKey, bookId, version, refreshUrl }: Docum
 
   return (
     <View style={styles.container}>
-      {viewerUri ? (
+      {viewerSource ? (
         <WebView
           key={webKey}
           ref={webRef}
-          source={{ uri: viewerUri }}
+          source={viewerSource}
           originWhitelist={['file://*']}
           // The bundled viewer is the only thing this WebView may ever show:
           // no link, redirect or embedded resource can take it elsewhere.
+          // (iOS loads it as an HTML string at about:blank, Android from file://.)
           onShouldStartLoadWithRequest={(request) =>
             request.url.startsWith('file://') || request.url.startsWith('about:')
           }
